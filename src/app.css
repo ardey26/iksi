@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+	background-color: linear-gradient(to #2525, rgba(51, 68, 51, 0.333), rgb(247, 241, 241));
+
+	animation: 5s infinite alternate ease-out breathing-color--dark;
+}
+
+@keyframes breathing-color--dark {
+	from {
+		background-color: #252525;
+	}
+	to {
+		background-color: hsl(0, 0%, 15%);
+	}
+}
