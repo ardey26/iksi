@@ -7,16 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model URL {
-  id        String      @id
+model LongURL {
+  id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
-  longURL String 
-  shortURL String 
-  userId    String?
-  user      User?     @relation(fields: [userId], references: [id])
-}
-
-model User {
-  id   String @id
-  URLs URL[]
+  originalURL String 
+  shortURL String
+  // userId    String?
+  // user      User?     @relation(fields: [userId], references: [id])
 }
