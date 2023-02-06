@@ -1,8 +1,5 @@
 /* eslint-disable no-useless-escape */
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
-
-const salt = 10;
 
 const prisma = new PrismaClient();
 
