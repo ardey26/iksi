@@ -45,28 +45,49 @@ const isValidURL = (prefixedURL) => {
 	return pattern.test(prefixedURL);
 };
 export const POST = async ({ request }) => {
-	const { longURL } = await request.json();
+	const { longURL, customURL } = await request.json();
+
+	let shortURL;
 
 	const prefixedURL = addPrefix(longURL);
 
 	if (!isValidURL(prefixedURL)) {
-		return new Response(JSON.stringify({ error: 'provide a valid URL' }));
+		return new Response(JSON.stringify({ error: 'you provided an invalid URL' }));
 	}
 
-	const isShortened = await prisma.longURL.findFirst({
-		where: {
-			originalURL: prefixedURL
+	if (customURL) {
+		const customURLExists = await prisma.longURL.findFirst({
+			where: {
+				shortURL: customURL
+			}
+		});
+
+		if (customURLExists) {
+			return new Response(
+				JSON.stringify({ error: 'custom link alias already exists, pick another one' })
+			);
 		}
-	});
 
-	if (isShortened) {
-		return new Response(JSON.stringify({ message: isShortened.shortURL }));
+		shortURL = customURL;
+	} else {
+		const isShortened = await prisma.longURL.findFirst({
+			where: {
+				originalURL: prefixedURL
+			}
+		});
+
+		if (isShortened) {
+			return new Response(JSON.stringify({ message: isShortened.shortURL }));
+		}
+
+		shortURL = await generateShortURL();
 	}
 
+	console.log('FINAL BOSS', shortURL);
 	const url = await prisma.longURL.create({
 		data: {
 			originalURL: prefixedURL,
-			shortURL: await generateShortURL()
+			shortURL: shortURL
 		}
 	});
 	return new Response(JSON.stringify({ message: url.shortURL }));
