@@ -10,7 +10,7 @@
 	const handleSubmit = async (e) => {
 		const response = await fetch('/shorten', {
 			method: 'POST',
-			body: JSON.stringify({ longURL, customURL: customURL.trim() }),
+			body: JSON.stringify({ longURL: longURL.trim(), customURL: customURL.trim() }),
 			headers: {
 				'content-type': 'application/json'
 			}

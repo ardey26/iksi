@@ -47,6 +47,12 @@ const isValidURL = (prefixedURL) => {
 
 	return pattern.test(prefixedURL);
 };
+
+const isValidAlias = (customURL) => {
+	const pattern = /^[a-zA-Z0-9-_]+$/;
+
+	return pattern.test(customURL);
+};
 export const POST = async ({ request }) => {
 	const { longURL, customURL } = await request.json();
 
@@ -59,6 +65,10 @@ export const POST = async ({ request }) => {
 	}
 
 	if (customURL) {
+		if (!isValidAlias(customURL)) {
+			return new Response(JSON.stringify({ error: 'you provided an invalid alias' }));
+		}
+
 		const customURLExists = await prisma.longURL.findFirst({
 			where: {
 				shortURL: customURL
@@ -88,8 +98,8 @@ export const POST = async ({ request }) => {
 
 	const url = await prisma.longURL.create({
 		data: {
-			originalURL: prefixedURL,
-			shortURL: shortURL
+			originalURL: prefixedURL.trim(),
+			shortURL: shortURL.trim()
 		}
 	});
 	return new Response(JSON.stringify({ message: url.shortURL }));
