@@ -73,12 +73,12 @@
 				<button
 					class="w-full relative btn border border-white mt-3 py-3 bg-neutral-900 text-left normal-case"
 					on:click={() => {
-						navigator.clipboard.writeText(`iksi.com/${shortURL}`);
+						navigator.clipboard.writeText(`${location.hostname}/${shortURL}`);
 						copied = true;
 					}}
 				>
 					<span class="absolute bottom-4 left-3">
-						iksi.com/{shortURL}
+						{location.hostname}/{shortURL}
 					</span>
 
 					<div class="absolute bottom-2 right-3">
