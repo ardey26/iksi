@@ -1,11 +1,5 @@
-<!-- svelte-ignore a11y-label-has-associated-control -->
 <script>
-	import InvalidUrl from '../lib/components/toasts/InvalidURL.svelte';
-
-	import FaGithubSquare from 'svelte-icons/fa/FaGithubSquare.svelte';
-	import FaGooglePlusSquare from 'svelte-icons/fa/FaGooglePlusSquare.svelte';
-	import FaLinkedin from 'svelte-icons/fa/FaLinkedin.svelte';
-
+	import { InvalidUrl, Input, ShortenedURL } from '../lib/components/';
 	let longURL = '';
 	let shortURL = '';
 	let customURL = '';
@@ -33,90 +27,16 @@
 	};
 </script>
 
-<!-- svelte-ignore a11y-missing-attribute -->
-
 <div>
 	<div class="relative mt-1 mx-2 rounded-md flex h-[93.5vh] justify-center items-center text-xl">
 		<div class="lg:w-1/3 sm:w-3/4 max-w-screen-sm">
-			<form on:submit|preventDefault={handleSubmit} class="form-control">
-				<div class="relative">
-					<label class="label text-white text-3xl"> go ahead, shorten something... </label>
-					<div class="row">
-						<input
-							type="text"
-							name="longURL"
-							id="longURL"
-							placeholder="long url..."
-							bind:value={longURL}
-							class="pl-3 pr-[7rem] w-full h-[3rem] rounded-md border border-white border-gray-300 bg-neutral-900 text-white"
-						/>
-						<div class="absolute bottom-0 right-0">
-							<button type="submit" class="btn btn-outline px-8 border text-white lowercase">
-								enter
-							</button>
-						</div>
-					</div>
-				</div>
-				<div class="form-group">
-					<label class="label" for="customURL">
-						<span class="label-text text-white text-lg md:text-2xl mr-2">
-							wanna make a custom one?
-						</span>
-						<input
-							type="text"
-							name="customURL"
-							id="customURL"
-							bind:value={customURL}
-							maxlength="24"
-							class="pl-3 w-2/5 h-[3rem] rounded-md border border-white border-gray-300 bg-neutral-900 text-white text-sm truncate"
-							placeholder="optional custom link..."
-						/>
-					</label>
-				</div>
-			</form>
+			<Input bind:longURL bind:customURL {handleSubmit} />
 
-			{#if shortURL}
-				<button
-					class="w-full relative btn border border-white mt-3 py-3 bg-neutral-900 text-left normal-case"
-					on:click={() => {
-						navigator.clipboard.writeText(`${location.hostname}/${shortURL}`);
-						copied = true;
-					}}
-				>
-					<span class="absolute bottom-4 left-3">
-						{location.hostname}/{shortURL}
-					</span>
-
-					<div class="absolute bottom-2 right-3">
-						{#if copied}
-							<button type="submit" class="btn btn-sm btn-success"> copied </button>
-						{:else}
-							<button type="submit" class="btn btn-sm btn-outline border text-white"> copy </button>
-						{/if}
-					</div>
-				</button>
-			{/if}
+			<ShortenedURL {shortURL} bind:copied />
 
 			{#if error}
 				<InvalidUrl {error} />
 			{/if}
 		</div>
 	</div>
-	<footer class="footer relative text-white">
-		<div class="absolute bottom-0 left-9">
-			<p>Copyright © {new Date().getFullYear()} - All right reserved</p>
-		</div>
-		<div class="grid-flow-col gap-4 absolute bottom-0 right-12 w-[120px]">
-			<div class="tooltip tooltip" data-tip="check out the repo!">
-				<a href="http://www.github.com/ardey26/iksi.git" target="_blank">
-					<FaGithubSquare />
-				</a>
-			</div>
-			<div class="tooltip" data-tip="shoot an email!">
-				<a href="mailto: dejesusandre0226@gmail.com" target="_blank">
-					<FaGooglePlusSquare />
-				</a>
-			</div>
-		</div>
-	</footer>
 </div>

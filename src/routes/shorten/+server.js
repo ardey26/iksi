@@ -1,5 +1,8 @@
 /* eslint-disable no-useless-escape */
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+
+const salt = 10;
 
 const prisma = new PrismaClient();
 
@@ -83,7 +86,6 @@ export const POST = async ({ request }) => {
 		shortURL = await generateShortURL();
 	}
 
-	console.log('FINAL BOSS', shortURL);
 	const url = await prisma.longURL.create({
 		data: {
 			originalURL: prefixedURL,
