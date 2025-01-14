@@ -33,11 +33,11 @@
 		/>
 	</div>
 	<div class="self-end mt-2">
-		<button type="submit" class="btn btn-outline w-40 border-2 bg-neutral-800 text-white lowercase" disabled="{!longURL}">
+		<button type="submit" class="btn btn-outline w-40 border-2 bg-green-800 font-bold text-white lowercase" disabled="{!longURL}">
 			{#if isLoading}
 				<svg class="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full" viewBox="0 0 24 24"></svg>
 			{:else}
-				<span>shorten</span>
+				<span>enter</span>
 			{/if}
 		</button>
 	</div>
