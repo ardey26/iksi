@@ -3,7 +3,7 @@
 	export let handleSubmit, longURL, customURL;
 </script>
 
-<form on:submit|preventDefault={handleSubmit} class="form-control">
+<form on:submit|preventDefault={handleSubmit} class="form-control flex flex-col gap-4">
 	<div class="relative">
 		<label class="label text-white text-3xl"> go ahead, shorten something... </label>
 		<div class="row">
