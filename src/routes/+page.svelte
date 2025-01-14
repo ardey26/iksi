@@ -29,7 +29,7 @@
 
 <div>
 	<div class="relative mt-1 mx-2 rounded-md flex h-[93.5vh] justify-center items-center text-xl">
-		<div class="lg:w-1/3 sm:w-3/4 max-w-screen-sm">
+		<div class="lg:w-1/3 sm:w-3/4 max-w-screen-sm relative">
 			<Input bind:longURL bind:customURL {handleSubmit} />
 
 			<ShortenedURL {shortURL} bind:copied />
