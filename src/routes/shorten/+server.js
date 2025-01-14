@@ -1,5 +1,6 @@
 /* eslint-disable no-useless-escape */
 import { PrismaClient } from '@prisma/client';
+import { redirect } from '@sveltejs/kit';
 
 const prisma = new PrismaClient();
 
@@ -50,6 +51,11 @@ const isValidAlias = (customURL) => {
 
 	return pattern.test(customURL);
 };
+
+export const GET = async ({ request }) => {
+	throw redirect(302, '/');	
+	
+}
 export const POST = async ({ request }) => {
 	const { longURL, customURL } = await request.json();
 
