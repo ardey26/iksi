@@ -3,7 +3,7 @@
 	export let handleSubmit, longURL, customURL;
 </script>
 
-<form on:submit|preventDefault={handleSubmit} class="form-control flex flex-col gap-4">
+<form on:submit|preventDefault={handleSubmit} class="form-control flex flex-col gap-1">
 	<div class="relative">
 		<label class="label text-white text-3xl"> go ahead, shorten something </label>
 		<div class="row">
@@ -15,14 +15,9 @@
 				bind:value={longURL}
 				class="pl-3 pr-[7rem] w-full h-[3rem] rounded-md border border-gray-300 bg-neutral-900 text-white text-base"
 			/>
-			<div class="absolute bottom-0 right-0">
-				<button type="submit" class="btn btn-outline px-8 border-2 bg-neutral-700 text-white lowercase">
-					enter
-				</button>
-			</div>
 		</div>
 	</div>
-	<div class="form-group flex flex-col justify-end items-end">
+	<div class="form-group flex flex-col">
 		<label class="label" for="customURL">
 			<span class="label-text text-white text-lg mr-2"> wanna make a custom one? </span>
 		</label>
@@ -31,9 +26,15 @@
 			name="customURL"
 			id="customURL"
 			bind:value={customURL}
+			disabled="{!longURL}"
 			maxlength="24"
 			class="p-2 w-full rounded-md border border-gray-300 bg-neutral-900 text-white truncate text-base"
 			placeholder="Optional custom link..."
 		/>
+	</div>
+	<div class="self-end mt-2">
+		<button type="submit" class="btn btn-outline px-8 border-2 bg-neutral-800 text-white lowercase" disabled="{!longURL}">
+			enter
+		</button>
 	</div>
 </form>

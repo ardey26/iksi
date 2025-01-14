@@ -22,7 +22,7 @@
 				{#if copied}
 					<button type="submit" class="btn btn-sm btn-success"> copied </button>
 				{:else}
-					<button type="submit" class="btn btn-sm btn-outline border text-white"> copy </button>
+					<button type="submit" class="btn btn-sm bg-neutral-800 btn-outline border-2 text-white"> copy </button>
 				{/if}
 			</div>
 		</button>
