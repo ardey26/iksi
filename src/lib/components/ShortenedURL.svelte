@@ -5,7 +5,7 @@
 <div class="absolute -bottom-14 left-0 w-full">
 	{#if shortURL}
 		<button
-			class="w-full relative btn border border-white mt-3 py-3 bg-neutral-900 text-left normal-case"
+			class="w-full relative btn mt-3 py-6 bg-neutral-900 text-left normal-case"
 			on:click={() => {
 				navigator.clipboard.writeText(`${location.hostname}/${shortURL}`);
 				copied = true;
