@@ -15,7 +15,7 @@
 			}}
 		>
 			<span class="absolute bottom-4 left-3">
-				{location.hostname}/{shortURL}
+				{location.hostname.replace("www", "")}/{shortURL}
 			</span>
 
 			<div class="absolute bottom-2 right-3">
