@@ -13,7 +13,7 @@
 				id="longURL"
 				placeholder="long url..."
 				bind:value={longURL}
-				class="pl-3 pr-[7rem] w-full h-[3rem] rounded-md border border-white border-gray-300 bg-neutral-900 text-white"
+				class="pl-3 pr-[7rem] w-full h-[3rem] rounded-md border border-gray-300 bg-neutral-900 text-white"
 			/>
 			<div class="absolute bottom-0 right-0">
 				<button type="submit" class="btn btn-outline px-8 border text-white lowercase">
@@ -31,7 +31,7 @@
 				id="customURL"
 				bind:value={customURL}
 				maxlength="24"
-				class="pl-3 w-2/5 h-[3rem] rounded-md border border-white border-gray-300 bg-neutral-900 text-white text-sm truncate"
+				class="pl-3 w-2/5 h-[3rem] rounded-md border border-gray-300 bg-neutral-900 text-white text-sm truncate"
 				placeholder="optional custom link..."
 			/>
 		</label>
