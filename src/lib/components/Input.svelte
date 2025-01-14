@@ -1,6 +1,6 @@
 <!-- svelte-ignore a11y-label-has-associated-control -->
 <script>
-	export let handleSubmit, longURL, customURL;
+	export let handleSubmit, longURL, customURL, isLoading;
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="form-control flex flex-col gap-1 bg-gradient-to-r from-neutral-700 via-neutral-750 to-neutral-800 backdrop-opacity-90 md:p-4 p-8 rounded-lg">
@@ -33,8 +33,12 @@
 		/>
 	</div>
 	<div class="self-end mt-2">
-		<button type="submit" class="btn btn-outline px-8 border-2 bg-neutral-800 text-white lowercase" disabled="{!longURL}">
-			enter
+		<button type="submit" class="btn btn-outline w-40 border-2 bg-neutral-800 text-white lowercase" disabled="{!longURL}">
+			{#if isLoading}
+				<svg class="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full" viewBox="0 0 24 24"></svg>
+			{:else}
+				<span>shorten</span>
+			{/if}
 		</button>
 	</div>
 </form>
