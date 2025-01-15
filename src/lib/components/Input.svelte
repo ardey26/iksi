@@ -13,7 +13,7 @@
 				id="longURL"
 				placeholder="Paste your long URL here…"
 				bind:value={longURL}
-				class="pl-3 pr-[7rem] w-full h-[3rem] rounded-md border border-gray-300 bg-neutral-900 text-white text-base"
+				class="p-2 w-full rounded-md border border-gray-300 bg-neutral-900 text-white text-base"
 			/>
 		</div>
 	</div>
@@ -28,7 +28,7 @@
 			bind:value={customURL}
 			disabled="{!longURL}"
 			maxlength="24"
-			class="p-2 w-full rounded-md border border-gray-300 bg-neutral-900 text-white truncate text-base"
+			class="p-2 w-full rounded-md border border-gray-300 bg-neutral-900 text-white text-base"
 			placeholder="Optional custom link..."
 		/>
 	</div>
