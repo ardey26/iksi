@@ -10,7 +10,7 @@
 
 	const handleSubmit = async (e) => {
 		isLoading = true;
-		const response = await fetch('/shorten', {
+		const response = await fetch('/api/shorten', {
 			method: 'POST',
 			body: JSON.stringify({ longURL: longURL.trim(), customURL: customURL.trim() }),
 			headers: {
