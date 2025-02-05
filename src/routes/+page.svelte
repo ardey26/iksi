@@ -19,7 +19,7 @@
 		});
 		const data = await response.json();
 
-		shortURL = data.message;
+		shortURL = data.shortURL;
 		error = data.error;
 
 		if (error) {
