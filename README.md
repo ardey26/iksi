@@ -1,38 +1,81 @@
-# create-svelte
+# Iksi 
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+Welcome to the documentation! Iksi is a powerful-- yet simple URL shortener built with SvelteKit, Prisma, and Tailwind CSS. The name "Iksi" comes from the Filipino word for "short", reflecting its core purpose—making long URLs concise and easy to share. This guide will help you set up, and use Iksi efficiently.
 
-## Creating a project
 
-If you're seeing this, you've probably already done this step. Congrats!
+---
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+## 📦 Installation & Setup
 
-# create a new project in my-app
-npm create svelte@latest my-app
+### **Prerequisites**
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/)
+- [PostgreSQL](https://www.postgresql.org/) or another supported database
+- [Prisma](https://www.prisma.io/)
+- [npm](https://www.npmjs.com/)
+
+### **Clone the Repository**
+```sh
+git clone https://github.com/ardey26/iksi.git
+cd iksi
 ```
 
-## Developing
+### **Install Dependencies**
+```sh
+npm install
+```
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+### **Set Up Environment Variables**
+Create a `.env` file in the project root and add your database connection string:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/iksi"
+```
 
-```bash
+### **Run Database Migrations**
+```sh
+npm run prisma migrate dev --name init
+```
+
+### **Start the Development Server**
+```sh
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
+The app should now be running at `http://localhost:5173/`
 
-## Building
+---
 
-To create a production version of your app:
+## 🚀 Features
+- **Shorten URLs** quickly and efficiently
+- **Customizable links** for branded URLs
+---
 
-```bash
-npm run build
+## 🛠 API Usage
+
+### **Shorten a URL**
+To shorten a long URL, send a `POST` request to the `/shorten` route.
+
+**Endpoint:** `POST /api/shorten`
+**Payload:**
+```json
+{
+  "longURL": "https://example.com",
+  "customURL": "my-link"  // (Optional)
+}
 ```
+**Response:**
+```json
+{
+  "shortUrl": "https://iksi.io/my-link"
+}
+```
+---
 
-You can preview the production build with `npm run preview`.
+## 🤝 Contributing
+We welcome contributions! Feel free to open an issue or submit a pull request.
+---
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+## 📜 License
+Iksi is licensed under the MIT License.
+
+For any questions, reach out via [GitHub Issues](https://github.com/yourusername/iksi/issues).
+
