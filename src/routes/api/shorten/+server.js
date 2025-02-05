@@ -3,7 +3,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const generateShortURL = async () => {
+const generateShortURL = async (retries = 5) => {
+	if (!retries) {
+		throw new Error('Number of collisions exceeded maximum retries, please try again.');
+	}
+
 	const availableChars = 'Iifk1eM5ZLAnXNajCh7olzPrGsKVwmRQStB0FgYUxDcJqWTbOv3p9Ed82uyH46';
 	let shortURL = '';
 
@@ -23,7 +27,8 @@ const generateShortURL = async () => {
 	});
 
 	if (hasCollision) {
-		generateShortURL();
+		const newRetries = retries - 1;
+		generateShortURL(newRetries);
 	}
 
 	return shortURL;
