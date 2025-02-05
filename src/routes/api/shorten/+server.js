@@ -89,7 +89,7 @@ export const POST = async ({ request }) => {
 		});
 
 		if (isShortened) {
-			return new Response(JSON.stringify({ message: isShortened.shortURL }));
+			return new Response(JSON.stringify({ shortURL: isShortened.shortURL }));
 		}
 
 		shortURL = await generateShortURL();
@@ -101,5 +101,5 @@ export const POST = async ({ request }) => {
 			shortURL: shortURL.trim()
 		}
 	});
-	return new Response(JSON.stringify({ message: url.shortURL }));
+	return new Response(JSON.stringify({ shortURL: url.shortURL }));
 };
