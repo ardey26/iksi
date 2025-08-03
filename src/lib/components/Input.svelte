@@ -3,42 +3,54 @@
 	export let handleSubmit, longURL, customURL, isLoading;
 </script>
 
-<form on:submit|preventDefault={handleSubmit} class="form-control flex flex-col gap-1 bg-gradient-to-r from-neutral-700 via-neutral-750 to-neutral-800 backdrop-opacity-90 md:p-4 p-8 rounded-lg">
-	<div class="relative">
-		<label class="label text-white text-3xl"> go ahead, shorten something </label>
-		<div class="row">
+<form on:submit|preventDefault={handleSubmit} class="space-y-4">
+	<div class="space-y-3">
+		<div class="space-y-1">
+			<label for="longURL" class="block text-2xl font-medium" style="color: var(--apple-text);">
+				go ahead, shorten something...
+			</label>
 			<input
-				type="text"
+				type="url"
 				name="longURL"
 				id="longURL"
-				placeholder="Paste your long URL here…"
+				placeholder="https://long-boring-url.com"
 				bind:value={longURL}
-				class="p-2 w-full rounded-md border border-gray-300 bg-neutral-900 text-white text-base"
+				class="apple-input w-full"
+				required
 			/>
 		</div>
+
+		<div class="space-y-1">
+			<label for="customURL" class="block text-md font-medium" style="color: var(--apple-text);">
+				wanna make a custom one? <span style="color: var(--apple-text-secondary);">(totally optional)</span>
+			</label>
+			<div class="relative">				
+				<input
+					type="text"
+					name="customURL"
+					id="customURL"
+					bind:value={customURL}
+					disabled={!longURL}
+					maxlength="24"
+					class="apple-input w-full pl-32"
+					placeholder="my-awesome-link"
+				/>
+			</div>
+		</div>
 	</div>
-	<div class="form-group flex flex-col">
-		<label class="label" for="customURL">
-			<span class="label-text text-white text-lg mr-2"> wanna make a custom one? </span>
-		</label>
-		<input
-			type="text"
-			name="customURL"
-			id="customURL"
-			bind:value={customURL}
-			disabled="{!longURL}"
-			maxlength="24"
-			class="p-2 w-full rounded-md border border-gray-300 bg-neutral-900 text-white text-base"
-			placeholder="Optional custom link..."
-		/>
-	</div>
-	<div class="self-end mt-2">
-		<button type="submit" class="btn btn-outline w-40 border-2 bg-green-800 font-bold text-white lowercase" disabled="{!longURL}">
-			{#if isLoading}
-				<svg class="animate-spin h-5 w-5 mr-3 border-t-2 border-b-2 border-white rounded-full" viewBox="0 0 24 24"></svg>
-			{:else}
-				<span>enter</span>
-			{/if}
-		</button>
-	</div>
+
+	<button 
+		type="submit" 
+		class="apple-button w-full" 
+		disabled={!longURL || isLoading}
+	>
+		{#if isLoading}
+			<div class="flex items-center justify-center space-x-2">
+				<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+				<span>Creating magic...</span>
+			</div>
+		{:else}
+			<span>Make it short!</span>
+		{/if}
+	</button>
 </form>

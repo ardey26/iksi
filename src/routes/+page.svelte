@@ -31,16 +31,20 @@
 	};
 </script>
 
-<div>
-	<div class="relative mt-1 mx-2 rounded-md flex h-[93.5vh] justify-center items-center text-xl">
-		<div class="lg:w-1/3 sm:w-3/4 max-w-screen-sm relative">
-			<Input bind:longURL bind:customURL bind:isLoading {handleSubmit} />
+<div class="w-full max-w-md relative px-4">
+	<!-- Ambient light effects -->
+	<div class="absolute -top-20 -left-20 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
+	<div class="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+	
+	<!-- Main card with liquid glass effect -->
+	<div class="liquid-glass p-8 space-y-4 fade-in-up">		
 
-			<ShortenedURL {shortURL} bind:copied />
+		<Input bind:longURL bind:customURL bind:isLoading {handleSubmit} />
 
-			{#if error}
-				<InvalidUrl {error} />
-			{/if}
-		</div>
+		<ShortenedURL {shortURL} bind:copied />
+
+		{#if error}
+			<InvalidUrl {error} />
+		{/if}
 	</div>
 </div>

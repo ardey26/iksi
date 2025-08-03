@@ -8,10 +8,8 @@ datasource db {
 }
 
 model LongURL {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  originalURL String 
-  shortURL String
-  // userId    String?
-  // user      User?     @relation(fields: [userId], references: [id])
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  originalURL String
+  shortURL    String
 }
