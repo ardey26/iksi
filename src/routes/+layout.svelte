@@ -14,9 +14,9 @@
 	});
 </script>
 
-<div class="min-h-screen flex flex-col" style="background: var(--apple-background);" lang="en">
+<div class="min-h-screen flex flex-col" style="background: var(--apple-background);">
 	<Header />
-	<main class="flex-1 flex items-center justify-center pt-16 pb-4 px-4 sm:px-6 lg:px-8" role="main">
+	<main class="flex-1 flex items-center justify-center pt-16 pb-4">
 		<slot />
 	</main>
 	<Footer />

@@ -1,12 +1,13 @@
 import { error, redirect } from '@sveltejs/kit';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../lib/prisma.js';
 
 export const load = async ({ params }) => {
-	const longURL = await prisma.longURL.findFirst({
+	const longURL = await prisma.longURL.findUnique({
 		where: {
 			shortURL: params.slug
+		},
+		select: {
+			originalURL: true
 		}
 	});
 

@@ -1,12 +1,21 @@
 <script>
+	import { copyToClipboard } from '../utils/clipboard.js';
+	
 	export let shortURL, copied;
 	
-	const copyToClipboard = () => {
-		navigator.clipboard.writeText(`${location.hostname}/${shortURL}`);
-		copied = true;
-		setTimeout(() => {
-			copied = false;
-		}, 2000);
+	const copyURL = async () => {
+		const fullURL = `${location.protocol}//${location.host}/${shortURL}`;
+		const success = await copyToClipboard(fullURL);
+		
+		if (success) {
+			copied = true;
+			setTimeout(() => {
+				copied = false;
+			}, 2000);
+		} else {
+			// Show error feedback if copy fails
+			console.error('Failed to copy URL');
+		}
 	};
 </script>
 
@@ -25,10 +34,10 @@
 				</div>
 				
 				<button
-					on:click={copyToClipboard}
-					class="ml-4 flex items-center space-x-2 px-4 py-2 rounded-xl {copied 
+					on:click={copyURL}
+					class="ml-4 flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 {copied 
 						? 'text-green-400' 
-						: ''
+						: 'hover:bg-opacity-80'
 					}"
 					style="background: var(--apple-surface-secondary); border: 1px solid var(--apple-border); color: var(--apple-text);"
 				>

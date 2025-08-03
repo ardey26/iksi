@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <meta name="description" content="Iksi - A fast, secure URL shortener that transforms long links into clean, shareable short URLs in seconds. Simple, reliable, and free." />
+        <meta name="keywords" content="URL shortener, link shortener, short links, share links, custom URLs, free URL shortener" />
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
         <meta name="robots" content="index, follow" />
@@ -16,18 +18,22 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         
+        <!-- Preload critical API endpoints -->
+        <link rel="prefetch" href="/api/shorten" />
+        
         <!-- Security headers -->
         <meta http-equiv="X-Content-Type-Options" content="nosniff">
         <meta http-equiv="X-Frame-Options" content="DENY">
         <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+        <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
         
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300&display=swap"
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
               rel="stylesheet" />
         <title>Iksi - Simplify and Share Links in Seconds</title>
         %sveltekit.head%
     </head>
-    <body data-sveltekit-preload-data="hover">
-        <div style="display: contents">%sveltekit.body%</div>
+    <body data-sveltekit-preload-data="hover" class="sveltekit-body">
+        <div class="sveltekit-container">%sveltekit.body%</div>
     </body>
 </html>
