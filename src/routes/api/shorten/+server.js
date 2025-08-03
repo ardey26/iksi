@@ -1,7 +1,7 @@
-/* eslint-disable no-useless-escape */
 import { prisma } from '../../../lib/prisma.js';
 import { rateLimit } from '../../../lib/rateLimit.js';
 import { RATE_LIMIT, SHORT_URL } from '../../../lib/config.js';
+import { randomBytes } from 'crypto';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -14,14 +14,15 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 
 	const lengthOfShortUrl = SHORT_URL.length;
 
+	// Use crypto for better randomness
+	const randomBytesArray = randomBytes(lengthOfShortUrl);
+	
 	for (let i = 0; i < lengthOfShortUrl; i++) {
-		const randomIndex = Math.floor(Math.random() * availableChars.length);
-		const randomChar = availableChars[randomIndex];
-
-		shortURL += randomChar;
+		const randomIndex = randomBytesArray[i] % availableChars.length;
+		shortURL += availableChars[randomIndex];
 	}
 
-	const hasCollision = await prisma.longURL.findUnique({
+	const hasCollision = await prisma.longURL.findFirst({
 		where: {
 			shortURL: shortURL
 		},
@@ -48,10 +49,17 @@ const addPrefix = (url) => {
 };
 
 const isValidURL = (prefixedURL) => {
-	const pattern =
-		/^(http:\/\/|https:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?$/;
-
-	return pattern.test(prefixedURL);
+	try {
+		const url = new URL(prefixedURL);
+		// More comprehensive validation
+		return ['http:', 'https:'].includes(url.protocol) && 
+		       url.hostname.length > 0 && 
+		       !url.hostname.includes('localhost') && 
+		       !url.hostname.includes('127.0.0.1') &&
+		       !url.hostname.includes('0.0.0.0');
+	} catch {
+		return false;
+	}
 };
 
 const isValidAlias = (customURL) => {
@@ -75,6 +83,15 @@ export const POST = async ({ request, getClientAddress }) => {
 					'X-RateLimit-Remaining': '0',
 					'X-RateLimit-Reset': '60'
 				}
+			});
+		}
+
+		// Check content length
+		const contentLength = request.headers.get('content-length');
+		if (contentLength && parseInt(contentLength) > 4096) { // 4KB limit
+			return new Response(JSON.stringify({ error: 'Request body too large' }), {
+				status: 413,
+				headers: { 'Content-Type': 'application/json' }
 			});
 		}
 
@@ -123,7 +140,7 @@ export const POST = async ({ request, getClientAddress }) => {
 				});
 			}
 
-			const customURLExists = await prisma.longURL.findUnique({
+			const customURLExists = await prisma.longURL.findFirst({
 				where: {
 					shortURL: trimmedCustomURL
 				},
@@ -175,8 +192,24 @@ export const POST = async ({ request, getClientAddress }) => {
 			headers: { 'Content-Type': 'application/json' }
 		});
 		
-	} catch (error) {
+		} catch (error) {
 		console.error('Error in shorten API:', error);
+		
+		// Handle specific error types
+		if (error.name === 'PrismaClientKnownRequestError') {
+			return new Response(JSON.stringify({ error: 'Database error occurred' }), {
+				status: 503,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+		
+		if (error.message.includes('timeout')) {
+			return new Response(JSON.stringify({ error: 'Request timed out, please try again' }), {
+				status: 504,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+		
 		return new Response(JSON.stringify({ error: 'Internal server error' }), {
 			status: 500,
 			headers: { 'Content-Type': 'application/json' }
