@@ -1,9 +1,22 @@
 <script>
+	import { isValidURL, isValidAlias } from '../utils/validation.js';
+	
 	export let handleSubmit, longURL, customURL, isLoading;
+	
+	$: isURLValid = longURL ? isValidURL(longURL) : true;
+	$: isAliasValid = customURL ? isValidAlias(customURL) : true;
+	$: canSubmit = longURL && isURLValid && isAliasValid && !isLoading;
+	const handleKeyDown = (e) => {
+		// Submit on Ctrl/Cmd + Enter
+		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSubmit) {
+			handleSubmit(e);
+		}
+	};
 </script>
 
 <form 
 	on:submit|preventDefault={handleSubmit} 
+	on:keydown={handleKeyDown}
 	class="space-y-4"
 	aria-label="URL Shortening Form"
 	role="form"
@@ -19,11 +32,14 @@
 				id="longURL"
 				placeholder="https://long-boring-url.com"
 				bind:value={longURL}
-				class="apple-input w-full"
+				class="apple-input w-full {!isURLValid && longURL ? 'border-red-500' : ''}"
 				required
 				aria-describedby="longURL-help"
 				aria-label="Enter the long URL you want to shorten"
 			/>
+			{#if !isURLValid && longURL}
+				<p class="text-red-500 text-xs mt-1">Please enter a valid URL</p>
+			{/if}
 			<div id="longURL-help" class="sr-only">
 				Enter a valid URL starting with http:// or https:// that you want to make shorter
 			</div>
@@ -40,12 +56,15 @@
 					id="customURL"
 					bind:value={customURL}
 					disabled={!longURL}
-					maxlength="24"
-					class="apple-input w-full"
+					maxlength="50"
+					class="apple-input w-full {!isAliasValid && customURL ? 'border-red-500' : ''}"
 					placeholder="my-awesome-link"
 					aria-describedby="customURL-help"
 					aria-label="Optional custom short link name"
 				/>
+				{#if !isAliasValid && customURL}
+					<p class="text-red-500 text-xs mt-1">Only letters, numbers, hyphens, and underscores allowed (max 50 chars)</p>
+				{/if}
 				<div id="customURL-help" class="sr-only">
 					Optional: Create a custom name for your short link (letters, numbers, and hyphens only)
 				</div>
@@ -56,7 +75,7 @@
 	<button 
 		type="submit" 
 		class="apple-button w-full" 
-		disabled={!longURL || isLoading}
+		disabled={!canSubmit}
 		aria-label={isLoading ? 'Creating short link...' : 'Create short link'}
 	>
 		{#if isLoading}
