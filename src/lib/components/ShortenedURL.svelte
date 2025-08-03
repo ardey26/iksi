@@ -11,7 +11,7 @@
 </script>
 
 {#if shortURL}
-	<div class="space-y-2 fade-in-up">
+	<div class="space-y-2 fade-in-up mt-2">
 		<div class="text-center">
 			<p class="text-xs mb-1" style="color: var(--apple-text-secondary);">✨ boom! here's your shiny new link ✨</p>
 		</div>
