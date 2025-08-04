@@ -97,6 +97,7 @@ Iksi includes environment-based configuration for optimal performance:
 
 ### **Core Functionality**
 - **Lightning-Fast URL Shortening** - Optimized algorithms for quick processing
+- **Flexible Input Format** - Accepts simple domains (example.com) or full URLs
 - **Custom Aliases** - Create branded, memorable short links
 - **Collision-Free Generation** - Cryptographic randomness prevents duplicates
 - **URL Validation** - Comprehensive security checks and format validation
@@ -130,7 +131,7 @@ Content-Type: application/json
 **Payload:**
 ```json
 {
-  "longURL": "https://example.com/very/long/url/path",
+  "longURL": "example.com",
   "customURL": "my-awesome-link"  // Optional: custom alias (max 50 chars)
 }
 ```

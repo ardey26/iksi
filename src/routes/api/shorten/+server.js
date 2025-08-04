@@ -39,13 +39,13 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 	return shortURL;
 };
 
-// prefixes with https by default
 const addPrefix = (url) => {
-	if (!url.startsWith('http://') && !url.startsWith('https://')) {
-		return 'https://' + url;
+	
+	url = url.trim();
+	if (url.startsWith('http://') || url.startsWith('https://')) {
+		return url;
 	}
-
-	return url;
+	return 'https://' + url;
 };
 
 const isValidURL = (prefixedURL) => {
@@ -54,9 +54,11 @@ const isValidURL = (prefixedURL) => {
 		// More comprehensive validation
 		return ['http:', 'https:'].includes(url.protocol) && 
 		       url.hostname.length > 0 && 
+		       url.hostname.includes('.') &&
 		       !url.hostname.includes('localhost') && 
 		       !url.hostname.includes('127.0.0.1') &&
-		       !url.hostname.includes('0.0.0.0');
+		       !url.hostname.includes('0.0.0.0') &&
+		       url.hostname.split('.').length >= 2;
 	} catch {
 		return false;
 	}
