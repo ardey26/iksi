@@ -1,18 +1,24 @@
 // Client-side utilities for URL validation and formatting
 export function isValidURL(url) {
 	try {
-		const urlObj = new URL(addPrefix(url));
-		return ['http:', 'https:'].includes(urlObj.protocol);
+		const prefixed = addPrefix(url.trim());
+		const urlObj = new URL(prefixed);
+		return ['http:', 'https:'].includes(urlObj.protocol) &&
+		       urlObj.hostname.length > 0 &&
+		       urlObj.hostname.includes('.') &&
+		       urlObj.hostname.split('.').length >= 2;
 	} catch {
 		return false;
 	}
 }
 
 export function addPrefix(url) {
-	if (!url.startsWith('http://') && !url.startsWith('https://')) {
-		return 'https://' + url;
+	url = url.trim();
+	if (url.startsWith('http://') || url.startsWith('https://')) {
+		return url;
 	}
-	return url;
+	
+	return 'https://' + url;
 }
 
 export function isValidAlias(alias) {

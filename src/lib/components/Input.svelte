@@ -27,18 +27,21 @@
 				go ahead, shorten something...
 			</label>
 			<input
-				type="url"
+				type="text"
 				name="longURL"
 				id="longURL"
-				placeholder="https://long-boring-url.com"
+				placeholder="long-boring-url.com"
 				bind:value={longURL}
 				class="apple-input w-full {!isURLValid && longURL ? 'border-red-500' : ''}"
 				required
 				aria-describedby="longURL-help"
-				aria-label="Enter the long URL you want to shorten"
+				aria-label="Enter the URL you want to shorten"
 			/>
+			<div id="longURL-help" class="sr-only">
+				Enter a URL to shorten. You can use just the domain (example.com) or a full URL with https://
+			</div>
 			{#if !isURLValid && longURL}
-				<p class="text-red-500 text-xs mt-1">Please enter a valid URL</p>
+				<p class="text-red-500 text-xs mt-1">Please enter a valid URL (e.g., example.com or https://example.com)</p>
 			{/if}
 			<div id="longURL-help" class="sr-only">
 				Enter a valid URL starting with http:// or https:// that you want to make shorter
