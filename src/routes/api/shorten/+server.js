@@ -1,6 +1,7 @@
 import { prisma } from '../../../lib/prisma.js';
 import { rateLimit } from '../../../lib/rateLimit.js';
 import { RATE_LIMIT, SHORT_URL } from '../../../lib/config.js';
+import { addPrefix, isValidURLServer, isValidAlias } from '../../../lib/utils/urlValidation.js';
 import { randomBytes } from 'crypto';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
@@ -37,37 +38,6 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 	}
 
 	return shortURL;
-};
-
-const addPrefix = (url) => {
-	
-	url = url.trim();
-	if (url.startsWith('http://') || url.startsWith('https://')) {
-		return url;
-	}
-	return 'https://' + url;
-};
-
-const isValidURL = (prefixedURL) => {
-	try {
-		const url = new URL(prefixedURL);
-		// More comprehensive validation
-		return ['http:', 'https:'].includes(url.protocol) && 
-		       url.hostname.length > 0 && 
-		       url.hostname.includes('.') &&
-		       !url.hostname.includes('localhost') && 
-		       !url.hostname.includes('127.0.0.1') &&
-		       !url.hostname.includes('0.0.0.0') &&
-		       url.hostname.split('.').length >= 2;
-	} catch {
-		return false;
-	}
-};
-
-const isValidAlias = (customURL) => {
-	const pattern = /^[a-zA-Z0-9-_]+$/;
-
-	return pattern.test(customURL);
 };
 
 
@@ -118,7 +88,7 @@ export const POST = async ({ request, getClientAddress }) => {
 
 		const prefixedURL = addPrefix(longURL.trim());
 
-		if (!isValidURL(prefixedURL)) {
+		if (!isValidURLServer(prefixedURL)) {
 			return new Response(JSON.stringify({ error: 'you provided an invalid URL' }), {
 				status: 400,
 				headers: { 'Content-Type': 'application/json' }

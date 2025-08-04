@@ -1,5 +1,5 @@
 <script>
-	import { isValidURL, isValidAlias } from '../utils/validation.js';
+	import { isValidURL, isValidAlias } from '../utils/urlValidation.js';
 	
 	export let handleSubmit, longURL, customURL, isLoading;
 	
@@ -58,7 +58,7 @@
 					name="customURL"
 					id="customURL"
 					bind:value={customURL}
-					disabled={!longURL}
+					disabled={!longURL || !isURLValid}
 					maxlength="50"
 					class="apple-input w-full {!isAliasValid && customURL ? 'border-red-500' : ''}"
 					placeholder="my-awesome-link"
