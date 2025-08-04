@@ -1,3 +1,0 @@
-<!-- This is a placeholder. You should replace this with an actual 1200x630 PNG image -->
-<!-- Create an image with your app branding, the iksi logo, and text like "Free URL Shortener" -->
-<!-- Save it as og-image.png in the static folder -->
