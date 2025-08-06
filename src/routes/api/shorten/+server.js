@@ -2,6 +2,8 @@ import { prisma } from '../../../lib/prisma.js';
 import { rateLimit } from '../../../lib/rateLimit.js';
 import { RATE_LIMIT, SHORT_URL } from '../../../lib/config.js';
 import { addPrefix, isValidURLServer, isValidAlias } from '../../../lib/utils/urlValidation.js';
+import { createURLHash } from '../../../lib/utils/urlHash.js';
+import { encodeURL } from '../../../lib/utils/crypto.js';
 import { randomBytes } from 'crypto';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
@@ -132,14 +134,31 @@ export const POST = async ({ request, getClientAddress }) => {
 
 			shortURL = trimmedCustomURL;
 		} else {
-			const isShortened = await prisma.longURL.findFirst({
-				where: {
-					originalURL: prefixedURL
-				},
-				select: {
-					shortURL: true
-				}
-			});
+			const urlHash = await createURLHash(prefixedURL);
+			
+			let isShortened = null;
+			
+			if (urlHash) {
+				isShortened = await prisma.longURL.findFirst({
+					where: {
+						urlHash: urlHash
+					},
+					select: {
+						shortURL: true
+					}
+				});
+			}
+			
+			if (!isShortened) {
+				isShortened = await prisma.longURL.findFirst({
+					where: {
+						originalURL: prefixedURL
+					},
+					select: {
+						shortURL: true
+					}
+				});
+			}
 
 			if (isShortened) {
 				return new Response(JSON.stringify({ shortURL: isShortened.shortURL }), {
@@ -150,9 +169,12 @@ export const POST = async ({ request, getClientAddress }) => {
 			shortURL = await generateShortURL();
 		}
 
+		const urlHash = await createURLHash(prefixedURL);
+		const encodedURL = await encodeURL(prefixedURL);
 		const url = await prisma.longURL.create({
 			data: {
-				originalURL: prefixedURL,
+				originalURL: encodedURL,
+				urlHash: urlHash,
 				shortURL: shortURL
 			},
 			select: {

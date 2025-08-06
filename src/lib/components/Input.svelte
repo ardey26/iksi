@@ -19,7 +19,6 @@
 	on:keydown={handleKeyDown}
 	class="space-y-4"
 	aria-label="URL Shortening Form"
-	role="form"
 >
 	<fieldset class="space-y-3 sm:space-y-4" aria-label="URL Input Fields">
 		<div class="space-y-1 sm:space-y-2">
