@@ -1,6 +1,6 @@
 <script>
 	import '../app.css';
-	import { Header, Footer } from '../lib/components';
+	import { Header, Footer } from '$lib/components';
 	import { onMount } from 'svelte';
 	import { theme } from '$lib/stores/theme.js';
 	

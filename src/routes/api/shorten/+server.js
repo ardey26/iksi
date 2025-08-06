@@ -1,9 +1,9 @@
-import { prisma } from '../../../lib/prisma.js';
-import { rateLimit } from '../../../lib/rateLimit.js';
-import { RATE_LIMIT, SHORT_URL } from '../../../lib/config.js';
-import { addPrefix, isValidURLServer, isValidAlias } from '../../../lib/utils/urlValidation.js';
-import { createURLHash } from '../../../lib/utils/urlHash.js';
-import { encodeURL } from '../../../lib/utils/crypto.js';
+import { prisma } from '$lib/prisma.js';
+import { rateLimit } from '$lib/rateLimit.js';
+import { RATE_LIMIT, SHORT_URL } from '$lib/config.js';
+import { addPrefix, isValidURLServer, isValidAlias } from '$lib/utils/urlValidation.js';
+import { createURLHash } from '$lib/utils/urlHash.js';
+import { encodeURL } from '$lib/utils/crypto.js';
 import { randomBytes } from 'crypto';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
