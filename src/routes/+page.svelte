@@ -1,5 +1,5 @@
 <script>
-	import { InvalidUrl, Input, ShortenedURL } from '$lib/components/';
+	import { Input, ShortenedURL } from '$lib/components/';
 	import { onMount } from 'svelte';
 	
 	let longURL = '';
@@ -56,7 +56,7 @@
 	};
 </script>
 
-<div class="w-full max-w-md relative px-4 overflow-clip" class:opacity-0={!mounted} class:fade-in-up={mounted}>
+<div class="w-full max-w-md relative px-4" class:opacity-0={!mounted} class:fade-in-up={mounted}>
 	<!-- Ambient light effects -->
 	<div class="absolute -top-20 -left-20 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
 	<div class="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
@@ -64,14 +64,10 @@
 	<!-- Main card with liquid glass effect -->
 	<div class="liquid-glass p-8 space-y-4">		
 
-		<Input bind:longURL bind:customURL bind:isLoading {handleSubmit} />
+		<Input bind:longURL bind:customURL bind:isLoading {handleSubmit} {error} />
 
 		{#if shortURL}
 			<ShortenedURL {shortURL} bind:copied />
-		{/if}
-
-		{#if error}
-			<InvalidUrl {error} />
 		{/if}
 	</div>
 </div>
