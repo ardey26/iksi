@@ -1,6 +1,6 @@
 <script>
 	import '../app.css';
-	import { Header, Footer } from '$lib/components';
+	import { Header, Footer } from '../lib/components';
 	import { onMount } from 'svelte';
 	import { theme } from '$lib/stores/theme.js';
 	
@@ -14,7 +14,7 @@
 	});
 </script>
 
-<div class="min-h-screen flex flex-col" style="background: var(--apple-background);">
+<div class="min-h-screen flex flex-col overflow-clip" style="background: var(--apple-background);">
 	<Header />
 	<main class="flex-1 flex items-center justify-center pt-16 pb-4">
 		<slot />

@@ -5,8 +5,8 @@
 </script>
 
 <div class="fixed top-4 right-4 z-50" transition:fade={{ duration: 300 }}>
-	<div class="glass rounded-2xl p-4 backdrop-blur-xl" 
-		 style="border: 1px solid var(--apple-red); background: rgba(255, 59, 48, 0.1);">
+	<div class="glass rounded-2xl p-4 backdrop-blur-xl shadow-lg" 
+		 style="border: 1px solid var(--apple-red); background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.15)), rgba(255, 59, 48, 0.2); backdrop-filter: blur(20px);">
 		<div class="flex items-center space-x-3">
 			<div class="flex-shrink-0">
 				<svg class="w-5 h-5" style="color: var(--apple-red);" fill="currentColor" viewBox="0 0 20 20">

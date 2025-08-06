@@ -1,7 +1,7 @@
 <script>
 	import { isValidURL, isValidAlias } from '../utils/urlValidation.js';
 	
-	export let handleSubmit, longURL, customURL, isLoading;
+	export let handleSubmit, longURL, customURL, isLoading, error = '';
 	
 	$: isURLValid = longURL ? isValidURL(longURL) : true;
 	$: isAliasValid = customURL ? isValidAlias(customURL) : true;
@@ -36,14 +36,11 @@
 				aria-describedby="longURL-help"
 				aria-label="Enter the URL you want to shorten"
 			/>
-			<div id="longURL-help" class="sr-only">
-				Enter a URL to shorten. You can use just the domain (example.com) or a full URL with https://
-			</div>
 			{#if !isURLValid && longURL}
 				<p class="text-red-500 text-xs mt-1">Please enter a valid URL (e.g., example.com or https://example.com)</p>
 			{/if}
 			<div id="longURL-help" class="sr-only">
-				Enter a valid URL starting with http:// or https:// that you want to make shorter
+				Enter a URL to shorten. You can use just the domain (example.com) or a full URL with https://
 			</div>
 		</div>
 
@@ -51,26 +48,24 @@
 			<label for="customURL" class="block text-sm sm:text-base font-medium" style="color: var(--apple-text);">
 				wanna make a custom one? <span style="color: var(--apple-text-secondary);">(totally optional)</span>
 			</label>
-							
-				<input
-					type="text"
-					name="customURL"
-					id="customURL"
-					bind:value={customURL}
-					disabled={!longURL || !isURLValid}
-					maxlength="50"
-					class="apple-input w-full {!isAliasValid && customURL ? 'border-red-500' : ''}"
-					placeholder="my-awesome-link"
-					aria-describedby="customURL-help"
-					aria-label="Optional custom short link name"
-				/>
-				{#if !isAliasValid && customURL}
-					<p class="text-red-500 text-xs mt-1">Only letters, numbers, hyphens, and underscores allowed (max 50 chars)</p>
-				{/if}
-				<div id="customURL-help" class="sr-only">
-					Optional: Create a custom name for your short link (letters, numbers, and hyphens only)
-				</div>
-			
+			<input
+				type="text"
+				name="customURL"
+				id="customURL"
+				bind:value={customURL}
+				disabled={!longURL || !isURLValid}
+				maxlength="50"
+				class="apple-input w-full {!isAliasValid && customURL ? 'border-red-500' : ''}"
+				placeholder="my-awesome-link"
+				aria-describedby="customURL-help"
+				aria-label="Optional custom short link name"
+			/>
+			{#if !isAliasValid && customURL}
+				<p class="text-red-500 text-xs mt-1">Only letters, numbers, hyphens, and underscores allowed (max 50 chars)</p>
+			{/if}
+			<div id="customURL-help" class="sr-only">
+				Optional: Create a custom name for your short link (letters, numbers, and hyphens only)
+			</div>
 		</div>
 	</fieldset>
 
@@ -89,4 +84,15 @@
 			<span>Make it short!</span>
 		{/if}
 	</button>
+
+	{#if error}
+		<div class="mt-3 p-3 rounded-xl" style="background: rgba(255, 59, 48, 0.1); border: 1px solid var(--apple-red);">
+			<div class="flex items-center space-x-2">
+				<svg class="w-4 h-4 flex-shrink-0" style="color: var(--apple-red);" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+				</svg>
+				<p class="text-sm font-medium" style="color: var(--apple-red);">{error}</p>
+			</div>
+		</div>
+	{/if}
 </form>
