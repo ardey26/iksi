@@ -14,6 +14,7 @@ This version includes significant performance and security optimizations:
 - **Smart Code Splitting** - Optimized Vite configuration for faster builds
 
 ### 🛡️ **Security Improvements**  
+- **URL Encryption** - Long URLs are encrypted before storage using AES-256-GCM for enhanced privacy
 - **Rate Limiting** - Configurable request limits (20 req/min in production)
 - **Input Sanitization** - Comprehensive server-side validation
 - **Security Headers** - XSS protection, content type options, and frame guards
@@ -49,10 +50,13 @@ npm install
 ```
 
 ### **Set Up Environment Variables**
-Create a `.env` file in the project root and add your database connection string:
+Create a `.env` file in the project root and add your database connection string and encryption key:
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/iksi"
+SECRET_KEY="your-32-character-secret-encryption-key"
 ```
+
+**Important:** The SECRET_KEY is used for encrypting URLs. Use a strong, unique 32+ character key in production.
 
 ### **Generate Prisma Client**
 ```sh
@@ -109,6 +113,8 @@ Iksi includes environment-based configuration for optimal performance:
 - **Responsive Design** - Optimized for mobile and desktop devices
 
 ### **Security Features**
+- **URL Encryption** - All long URLs are encrypted using AES-256-GCM before database storage, ensuring privacy even with database access
+- **URL Hash Indexing** - Efficient duplicate detection using SHA-256 with full backward compatibility
 - **Input Validation** - Server and client-side protection against malicious input
 - **SSRF Protection** - Blocks internal network and localhost URLs
 - **Content Security** - Headers and policies to prevent common web attacks

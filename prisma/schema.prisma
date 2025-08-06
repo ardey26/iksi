@@ -11,5 +11,6 @@ model LongURL {
   id          Int      @id @default(autoincrement())
   createdAt   DateTime @default(now())
   originalURL String
-  shortURL    String
+  urlHash     String?  @unique
+  shortURL    String   @unique
 }

@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { prisma } from '../../lib/prisma.js';
+import { decodeURL } from '../../lib/utils/crypto.js';
 
 export const load = async ({ params }) => {
 	const longURL = await prisma.longURL.findFirst({
@@ -15,5 +16,6 @@ export const load = async ({ params }) => {
 		throw error(404, 'not found');
 	}
 
-	throw redirect(302, longURL.originalURL);
+	const decodedURL = await decodeURL(longURL.originalURL);
+	throw redirect(302, decodedURL);
 };
