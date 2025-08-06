@@ -1,5 +1,5 @@
 <script>
-	import { InvalidUrl, Input, ShortenedURL } from '../lib/components/';
+	import { InvalidUrl, Input, ShortenedURL } from '$lib/components/';
 	import { onMount } from 'svelte';
 	
 	let longURL = '';
