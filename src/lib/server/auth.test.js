@@ -1,16 +1,14 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import bcrypt from 'bcrypt';
 
-// Generate test password hash synchronously at module level
+// Generate test password hash
 const testPasswordHash = await bcrypt.hash('test-password', 10);
 
-// Mock the environment module before importing auth
-vi.mock('$env/static/private', () => ({
-	SECRET_KEY: 'test-secret-key-that-is-32-chars!',
-	ADMIN_PASSWORD_HASH: testPasswordHash
-}));
+// Set up process.env before importing auth module
+process.env.SECRET_KEY = 'test-secret-key-that-is-32-chars!';
+process.env.ADMIN_PASSWORD_HASH = testPasswordHash;
 
-// Now import the auth module with the mocked env
+// Now import the auth module
 const { createSession, verifySession, verifyPassword } = await import('./auth.js');
 
 describe('createSession', () => {

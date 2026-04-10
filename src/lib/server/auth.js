@@ -1,17 +1,28 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 import bcrypt from 'bcrypt';
-import { SECRET_KEY, ADMIN_PASSWORD_HASH } from '$env/static/private';
+import dotenv from 'dotenv';
 
-if (!SECRET_KEY || SECRET_KEY.length < 32) {
-	throw new Error('SECRET_KEY must be set and at least 32 characters');
+// Load env vars directly with dotenv to avoid Vite's $ sign interpolation
+dotenv.config();
+
+function getSecretKey() {
+	const key = process.env.SECRET_KEY;
+	if (!key || key.length < 32) {
+		throw new Error('SECRET_KEY must be set and at least 32 characters');
+	}
+	return key;
 }
 
-if (!ADMIN_PASSWORD_HASH) {
-	throw new Error('ADMIN_PASSWORD_HASH must be set');
+function getPasswordHash() {
+	const hash = process.env.ADMIN_PASSWORD_HASH;
+	if (!hash) {
+		throw new Error('ADMIN_PASSWORD_HASH must be set');
+	}
+	return hash;
 }
 
 function sign(sessionId) {
-	return createHmac('sha256', SECRET_KEY).update(sessionId).digest('hex');
+	return createHmac('sha256', getSecretKey()).update(sessionId).digest('hex');
 }
 
 export function createSession() {
@@ -52,5 +63,5 @@ export async function verifyPassword(password) {
 	if (!password) {
 		return false;
 	}
-	return bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+	return bcrypt.compare(password, getPasswordHash());
 }
