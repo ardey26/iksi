@@ -99,15 +99,7 @@ export const POST = async ({ request, getClientAddress }) => {
 
 		if (customURL) {
 			const trimmedCustomURL = customURL.trim();
-			
-			// Blacklist admin endpoint
-			if (trimmedCustomURL === 'admin') {
-				return new Response(JSON.stringify({ error: 'This alias is reserved and cannot be used' }), {
-					status: 400,
-					headers: { 'Content-Type': 'application/json' }
-				});
-			}
-			
+
 			if (trimmedCustomURL.length > 50) {
 				return new Response(JSON.stringify({ error: 'Custom alias is too long (max 50 characters)' }), {
 					status: 400,
