@@ -3,25 +3,99 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  provider    String
+  providerId  String
+  email       String?
+  name        String?
+  avatarUrl   String?
+  showPreview Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions Session[]
+  apiKeys  ApiKey[]
+  links    LongURL[]
+
+  @@unique([provider, providerId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  keyHash    String    @unique
+  keyPreview String
+  name       String?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum SafeBrowsing {
+  UNCHECKED
+  SAFE
+  FLAGGED
 }
 
 model LongURL {
-  id          Int      @id @default(autoincrement())
-  createdAt   DateTime @default(now())
-  originalURL String
-  urlHash     String?  @unique
-  shortURL    String   @unique
+  id           Int          @id @default(autoincrement())
+  createdAt    DateTime     @default(now())
+  originalURL  String
+  urlHash      String?      @unique
+  shortURL     String       @unique
+  ownerId      String?
+  showPreview  Boolean      @default(false)
+  safeBrowsing SafeBrowsing @default(UNCHECKED)
+  deletedAt    DateTime?
+
+  owner  User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  clicks Click[]
 
   @@index([createdAt(sort: Desc)])
   @@index([originalURL])
+  @@index([ownerId])
+}
+
+model Click {
+  id        String   @id @default(cuid())
+  linkId    Int
+  referrer  String?
+  userAgent String?
+  device    String?
+  country   String?
+  createdAt DateTime @default(now())
+
+  link LongURL @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId])
+  @@index([createdAt])
 }
 
 model RateLimit {
-  id        String   @id // IP address or identifier
-  count     Int      @default(1)
-  resetAt   DateTime
+  id      String   @id // IP address or identifier
+  count   Int      @default(1)
+  resetAt DateTime
 
   @@index([resetAt])
 }
