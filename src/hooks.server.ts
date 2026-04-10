@@ -1,15 +1,32 @@
 import type { Handle } from '@sveltejs/kit';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
+import { prisma } from '$lib/prisma.js';
+import { decodeURL } from '$lib/utils/crypto.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
 export const handle: Handle = async ({ event, resolve }) => {
     const host = event.request.headers.get('host')?.split(':')[0] || '';
     const isAdminHost = ADMIN_HOSTS.includes(host);
-    const isAdminRoute = event.url.pathname.startsWith('/admin');
 
-    // Block /admin routes on non-admin hosts
-    if (isAdminRoute && !isAdminHost) {
+    // On non-admin hosts, treat /admin as a potential short link (slug)
+    // This allows "admin" to be a custom short link
+    if (!isAdminHost && event.url.pathname === '/admin') {
+        const longURL = await prisma.longURL.findFirst({
+            where: { shortURL: 'admin' },
+            select: { originalURL: true }
+        });
+
+        if (longURL) {
+            const decodedURL = await decodeURL(longURL.originalURL);
+            throw redirect(302, decodedURL);
+        }
+        // If no short link exists, fall through to 404
+        throw error(404, 'Not found');
+    }
+
+    // Block /admin/* sub-routes on non-admin hosts
+    if (!isAdminHost && event.url.pathname.startsWith('/admin/')) {
         throw error(404, 'Not found');
     }
 
