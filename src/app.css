@@ -139,3 +139,112 @@ input::placeholder {
 a:hover, button.text-sm:hover {
   opacity: 0.8;
 }
+
+.apple-input:disabled {
+	background: rgba(28, 28, 30, 0.5);
+	color: var(--apple-gray-1);
+	cursor: not-allowed;
+}
+
+.apple-input:disabled::placeholder {
+	color: var(--apple-gray-2);
+}
+
+/* Smooth animations */
+@keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translateY(30px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes shimmer {
+	0% {
+		background-position: -200% 0;
+	}
+	100% {
+		background-position: 200% 0;
+	}
+}
+
+.fade-in-up {
+	animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.shimmer {
+	background: linear-gradient(90deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.1) 50%,
+		transparent 100%);
+	background-size: 200% 100%;
+	animation: shimmer 2s infinite;
+}
+
+/* Apple-inspired card */
+.apple-card {
+	background: rgba(28, 28, 30, 0.8);
+	backdrop-filter: blur(30px);
+	-webkit-backdrop-filter: blur(30px);
+	border-radius: 24px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	box-shadow:
+		0 12px 40px rgba(0, 0, 0, 0.4),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Theme toggle button - remove hover effects when inside .glass */
+.theme-toggle {
+	background: var(--apple-surface-secondary);
+	border: 1px solid var(--apple-border);
+	border-radius: 50%;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: none; /* Remove transitions */
+	box-shadow: 0 2px 8px var(--apple-shadow);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	position: relative;
+	overflow: hidden;
+}
+
+/* Remove hover effects from theme toggle */
+.theme-toggle:hover {
+	background: var(--apple-surface-secondary);
+	border: 1px solid var(--apple-border);
+	transform: none;
+}
+
+.theme-toggle:active {
+	transform: scale(0.98);
+}
+
+.theme-toggle svg {
+	width: 16px;
+	height: 16px;
+	color: var(--apple-text);
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Remove footer hover effects - footer uses .glass which should not have hover */
+
+/* Pulse animation for loading states */
+@keyframes pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+.pulse {
+	animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
