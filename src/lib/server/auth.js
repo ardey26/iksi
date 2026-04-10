@@ -1,6 +1,7 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { prisma } from '$lib/prisma.js';
 
 // Load env vars directly with dotenv to avoid Vite's $ sign interpolation
 dotenv.config();
@@ -64,4 +65,50 @@ export async function verifyPassword(password) {
 		return false;
 	}
 	return bcrypt.compare(password, getPasswordHash());
+}
+
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+export async function createUserSession(userId) {
+	const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_MS);
+	const session = await prisma.session.create({
+		data: { userId, expiresAt }
+	});
+	const signature = sign(session.id);
+	return `${session.id}.${signature}`;
+}
+
+export async function verifyUserSession(token) {
+	if (!token || typeof token !== 'string') return null;
+
+	const dotIndex = token.indexOf('.');
+	if (dotIndex === -1) return null;
+
+	const sessionId = token.slice(0, dotIndex);
+	const signature = token.slice(dotIndex + 1);
+
+	const expectedSignature = sign(sessionId);
+
+	try {
+		const sigBuffer = Buffer.from(signature, 'hex');
+		const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+		if (sigBuffer.length !== expectedBuffer.length) return null;
+		if (!timingSafeEqual(sigBuffer, expectedBuffer)) return null;
+	} catch {
+		return null;
+	}
+
+	const result = await prisma.session.findFirst({
+		where: {
+			id: sessionId,
+			expiresAt: { gt: new Date() }
+		},
+		select: { id: true, user: true }
+	});
+
+	return result?.user ?? null;
+}
+
+export async function deleteUserSession(sessionId) {
+	await prisma.session.deleteMany({ where: { id: sessionId } });
 }
