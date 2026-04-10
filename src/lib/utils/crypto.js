@@ -1,5 +1,9 @@
 const ALGORITHM = 'aes-256-gcm';
-const SECRET_KEY = process.env.SECRET_KEY || 'iksi-default-secret-key-please-change-in-production';
+const SECRET_KEY = process.env.SECRET_KEY;
+
+if (!SECRET_KEY || SECRET_KEY.length < 32) {
+	throw new Error('SECRET_KEY environment variable must be set and at least 32 characters');
+}
 
 async function deriveKey(salt) {
 	const { scrypt } = await import('crypto');
