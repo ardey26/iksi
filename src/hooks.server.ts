@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma.js';
-import { decodeURL } from '$lib/utils/crypto.js';
+import { decodeURL } from '$lib/server/crypto.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
