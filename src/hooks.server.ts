@@ -21,8 +21,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             const decodedURL = await decodeURL(longURL.originalURL);
             throw redirect(302, decodedURL);
         }
-        // If no short link exists, fall through to 404
-        throw error(404, 'Not found');
+        // If no short link exists, let the route handle the 404
+        // (this allows custom error page to render)
     }
 
     // Block /admin/* sub-routes on non-admin hosts
