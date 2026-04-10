@@ -1,15 +1,15 @@
-import { randomBytes, createCipheriv, createDecipheriv, scrypt } from 'crypto';
+import { randomBytes, createCipheriv, createDecipheriv, scrypt, createHash } from 'crypto';
 import { promisify } from 'util';
 
 const ALGORITHM = 'aes-256-gcm';
 const SECRET_KEY = process.env.SECRET_KEY;
 
-if (!SECRET_KEY || SECRET_KEY.length < 64) {
-	throw new Error('SECRET_KEY environment variable must be set and at least 64 hex characters (32 bytes)');
+if (!SECRET_KEY || SECRET_KEY.length < 32) {
+	throw new Error('SECRET_KEY environment variable must be set and at least 32 characters');
 }
 
-// Pre-derive key at module load for new encryptions (fast path)
-const ENCRYPTION_KEY = Buffer.from(SECRET_KEY.slice(0, 64), 'hex');
+// Pre-derive key at module load using SHA-256 (fast, deterministic)
+const ENCRYPTION_KEY = createHash('sha256').update(SECRET_KEY).digest();
 
 // For legacy URLs that used per-URL salt with scrypt
 const scryptAsync = promisify(scrypt);
