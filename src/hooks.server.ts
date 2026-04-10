@@ -1,5 +1,5 @@
 import type { Handle } from '@sveltejs/kit';
-import { error, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma.js';
 import { decodeURL } from '$lib/utils/crypto.js';
 
@@ -25,10 +25,8 @@ export const handle: Handle = async ({ event, resolve }) => {
         // (this allows custom error page to render)
     }
 
-    // Block /admin/* sub-routes on non-admin hosts
-    if (!isAdminHost && event.url.pathname.startsWith('/admin/')) {
-        throw error(404, 'Not found');
-    }
+    // For /admin/* sub-routes on non-admin hosts, let the route handle the 404
+    // (route server loads have host checks that throw error(404), which renders custom error page)
 
     // On admin subdomain, redirect root to /admin
     if (isAdminHost && event.url.pathname === '/') {
