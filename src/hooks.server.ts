@@ -1,6 +1,18 @@
 import type { Handle } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
+
+const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
 export const handle: Handle = async ({ event, resolve }) => {
+    // Subdomain routing: Block admin routes on non-admin hosts
+    const host = event.request.headers.get('host')?.split(':')[0] || '';
+    const isAdminHost = ADMIN_HOSTS.includes(host);
+    const isAdminRoute = event.url.pathname.startsWith('/admin');
+
+    if (isAdminRoute && !isAdminHost) {
+        throw error(404, 'Not found');
+    }
+
     if (event.request.method === 'GET' && event.url.pathname.startsWith('/api')) {
         return new Response(null, {
             status: 302,
