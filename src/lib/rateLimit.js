@@ -1,37 +1,62 @@
-// Simple in-memory rate limiter
-const rateLimitStore = new Map();
+// Database-backed rate limiter for horizontal scaling
+import { prisma } from '$lib/prisma.js';
 
-export function rateLimit(identifier, maxRequests = 10, windowMs = 60000) {
-	const now = Date.now();
-	const key = identifier;
-	
-	if (!rateLimitStore.has(key)) {
-		rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
-		return { allowed: true, remaining: maxRequests - 1 };
+export async function rateLimit(identifier, maxRequests = 10, windowMs = 60000) {
+	const now = new Date();
+	const resetAt = new Date(now.getTime() + windowMs);
+
+	try {
+		// Try to upsert the rate limit record
+		const record = await prisma.rateLimit.upsert({
+			where: { id: identifier },
+			create: {
+				id: identifier,
+				count: 1,
+				resetAt: resetAt
+			},
+			update: {
+				// Increment count if within window, reset if expired
+				count: {
+					increment: 1
+				}
+			}
+		});
+
+		// Check if window has expired
+		if (record.resetAt < now) {
+			// Reset the window
+			await prisma.rateLimit.update({
+				where: { id: identifier },
+				data: {
+					count: 1,
+					resetAt: resetAt
+				}
+			});
+			return { allowed: true, remaining: maxRequests - 1 };
+		}
+
+		// Check if over limit
+		if (record.count > maxRequests) {
+			return { allowed: false, remaining: 0 };
+		}
+
+		return { allowed: true, remaining: maxRequests - record.count };
+	} catch (error) {
+		// On database error, allow the request but log it
+		console.error('Rate limit error:', error);
+		return { allowed: true, remaining: maxRequests };
 	}
-	
-	const limit = rateLimitStore.get(key);
-	
-	if (now > limit.resetTime) {
-		// Reset the window
-		rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
-		return { allowed: true, remaining: maxRequests - 1 };
-	}
-	
-	if (limit.count >= maxRequests) {
-		return { allowed: false, remaining: 0 };
-	}
-	
-	limit.count++;
-	return { allowed: true, remaining: maxRequests - limit.count };
 }
 
-// Clean up old entries periodically
-setInterval(() => {
-	const now = Date.now();
-	for (const [key, value] of rateLimitStore.entries()) {
-		if (now > value.resetTime) {
-			rateLimitStore.delete(key);
-		}
+// Cleanup old rate limit entries (run periodically via cron or on cold start)
+export async function cleanupRateLimits() {
+	try {
+		await prisma.rateLimit.deleteMany({
+			where: {
+				resetAt: { lt: new Date() }
+			}
+		});
+	} catch (error) {
+		console.error('Rate limit cleanup error:', error);
 	}
-}, 60000); // Clean up every minute
+}

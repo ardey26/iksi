@@ -5,6 +5,32 @@ import { decodeURL } from '$lib/utils/crypto.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
+// Cache for admin slug lookup (reduces DB queries on hot path)
+let adminSlugCache: { url: string | null; expires: number } | null = null;
+const CACHE_TTL = 60000; // 60 seconds
+
+async function getAdminSlugURL(): Promise<string | null> {
+    const now = Date.now();
+
+    // Return cached result if valid
+    if (adminSlugCache && adminSlugCache.expires > now) {
+        return adminSlugCache.url;
+    }
+
+    // Fetch from database
+    const longURL = await prisma.longURL.findFirst({
+        where: { shortURL: 'admin' },
+        select: { originalURL: true }
+    });
+
+    const url = longURL ? await decodeURL(longURL.originalURL) : null;
+
+    // Cache the result
+    adminSlugCache = { url, expires: now + CACHE_TTL };
+
+    return url;
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
     const host = event.request.headers.get('host')?.split(':')[0] || '';
     const isAdminHost = ADMIN_HOSTS.includes(host);
@@ -12,13 +38,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     // On non-admin hosts, treat /admin as a potential short link (slug)
     // This allows "admin" to be a custom short link
     if (!isAdminHost && event.url.pathname === '/admin') {
-        const longURL = await prisma.longURL.findFirst({
-            where: { shortURL: 'admin' },
-            select: { originalURL: true }
-        });
+        const decodedURL = await getAdminSlugURL();
 
-        if (longURL) {
-            const decodedURL = await decodeURL(longURL.originalURL);
+        if (decodedURL) {
             throw redirect(302, decodedURL);
         }
         // If no short link exists, let the route handle the 404

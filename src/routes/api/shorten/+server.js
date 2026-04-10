@@ -47,7 +47,7 @@ export const POST = async ({ request, getClientAddress }) => {
 	try {
 		// Rate limiting
 		const clientIP = getClientAddress();
-		const rateLimitResult = rateLimit(clientIP, RATE_LIMIT.requests, RATE_LIMIT.windowMs);
+		const rateLimitResult = await rateLimit(clientIP, RATE_LIMIT.requests, RATE_LIMIT.windowMs);
 		
 		if (!rateLimitResult.allowed) {
 			return new Response(JSON.stringify({ error: 'Too many requests. Please wait a minute.' }), {
@@ -170,7 +170,7 @@ export const POST = async ({ request, getClientAddress }) => {
 		}
 
 		const urlHash = await createURLHash(prefixedURL);
-		const encodedURL = await encodeURL(prefixedURL);
+		const encodedURL = encodeURL(prefixedURL);
 		const url = await prisma.longURL.create({
 			data: {
 				originalURL: encodedURL,

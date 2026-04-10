@@ -13,4 +13,15 @@ model LongURL {
   originalURL String
   urlHash     String?  @unique
   shortURL    String   @unique
+
+  @@index([createdAt(sort: Desc)])
+  @@index([originalURL])
+}
+
+model RateLimit {
+  id        String   @id // IP address or identifier
+  count     Int      @default(1)
+  resetAt   DateTime
+
+  @@index([resetAt])
 }
