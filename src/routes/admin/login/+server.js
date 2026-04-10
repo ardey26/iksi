@@ -1,25 +1,30 @@
 import { json } from '@sveltejs/kit';
-import { DASHBOARD_PASSWORD } from '$env/static/private';
+import { createSession, verifyPassword } from '$lib/server/auth.js';
+import { dev } from '$app/environment';
 
 export const POST = async ({ request, cookies }) => {
 	try {
 		const { password } = await request.json();
-		
-		if (password === DASHBOARD_PASSWORD) {
-			cookies.set('admin_authenticated', 'true', {
+
+		const isValid = await verifyPassword(password);
+
+		if (isValid) {
+			const sessionToken = createSession();
+
+			cookies.set('admin_session', sessionToken, {
 				path: '/',
 				httpOnly: true,
-				secure: false, // Set to true in production
+				secure: !dev,
 				sameSite: 'strict',
 				maxAge: 60 * 60 * 24 // 24 hours
 			});
-			
+
 			return json({ success: true });
 		} else {
 			return json({ success: false, error: 'Invalid password' }, { status: 401 });
 		}
-	} catch (error) {
-		console.error('Login error:', error);
+	} catch (err) {
+		console.error('Login error:', err);
 		return json({ success: false, error: 'Login failed' }, { status: 500 });
 	}
 };
