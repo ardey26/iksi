@@ -9,14 +9,26 @@ function requireEnv(name) {
   return val;
 }
 
-export const google = new Google(
-  requireEnv('GOOGLE_CLIENT_ID'),
-  requireEnv('GOOGLE_CLIENT_SECRET'),
-  requireEnv('GOOGLE_REDIRECT_URI')
-);
+let _google;
+export function google() {
+  if (!_google) {
+    _google = new Google(
+      requireEnv('GOOGLE_CLIENT_ID'),
+      requireEnv('GOOGLE_CLIENT_SECRET'),
+      requireEnv('GOOGLE_REDIRECT_URI')
+    );
+  }
+  return _google;
+}
 
-export const twitter = new Twitter(
-  requireEnv('TWITTER_CLIENT_ID'),
-  requireEnv('TWITTER_CLIENT_SECRET'),
-  requireEnv('TWITTER_REDIRECT_URI')
-);
+let _twitter;
+export function twitter() {
+  if (!_twitter) {
+    _twitter = new Twitter(
+      requireEnv('TWITTER_CLIENT_ID'),
+      requireEnv('TWITTER_CLIENT_SECRET'),
+      requireEnv('TWITTER_REDIRECT_URI')
+    );
+  }
+  return _twitter;
+}
