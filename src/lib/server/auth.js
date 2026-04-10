@@ -1,4 +1,4 @@
-import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual, createHash } from 'crypto';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { prisma } from '$lib/prisma.js';
@@ -111,4 +111,16 @@ export async function verifyUserSession(token) {
 
 export async function deleteUserSession(sessionId) {
 	await prisma.session.deleteMany({ where: { id: sessionId } });
+}
+
+export function hashApiKey(rawKey) {
+	return createHash('sha256').update(rawKey).digest('hex');
+}
+
+export function generateApiKey() {
+	const bytes = randomBytes(32);
+	const raw = `ik_${bytes.toString('base64url')}`;
+	const hash = hashApiKey(raw);
+	const preview = `${raw.slice(0, 7)}...`;
+	return { raw, hash, preview };
 }
