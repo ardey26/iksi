@@ -21,19 +21,44 @@ export const load = async ({ cookies, request }) => {
 	}
 
 	try {
-		const totalURLs = await prisma.longURL.count();
-
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
 
-		const todayURLs = await prisma.longURL.count({
-			where: {
-				createdAt: {
-					gte: today
-				}
-			}
-		});
+		const sevenDaysAgo = new Date();
+		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+		sevenDaysAgo.setHours(0, 0, 0, 0);
 
+		// Run all queries in parallel (3 queries instead of 33)
+		const [totalURLs, todayURLs, dailyStats, hourlyStats] = await Promise.all([
+			// Total count
+			prisma.longURL.count(),
+
+			// Today's count
+			prisma.longURL.count({
+				where: { createdAt: { gte: today } }
+			}),
+
+			// Daily counts for last 7 days (single query with groupBy)
+			prisma.$queryRaw`
+				SELECT DATE("createdAt") as date, COUNT(*)::int as count
+				FROM "LongURL"
+				WHERE "createdAt" >= ${sevenDaysAgo}
+				GROUP BY DATE("createdAt")
+				ORDER BY date ASC
+			`,
+
+			// Hourly counts for today (single query with groupBy)
+			prisma.$queryRaw`
+				SELECT EXTRACT(HOUR FROM "createdAt")::int as hour, COUNT(*)::int as count
+				FROM "LongURL"
+				WHERE "createdAt" >= ${today}
+				GROUP BY EXTRACT(HOUR FROM "createdAt")
+				ORDER BY hour ASC
+			`
+		]);
+
+		// Build daily data with labels
+		const dailyMap = new Map(dailyStats.map(d => [d.date.toISOString().split('T')[0], d.count]));
 		const last7Days = [];
 		const dailyData = [];
 
@@ -41,44 +66,20 @@ export const load = async ({ cookies, request }) => {
 			const date = new Date();
 			date.setDate(date.getDate() - i);
 			date.setHours(0, 0, 0, 0);
-
-			const nextDay = new Date(date);
-			nextDay.setDate(nextDay.getDate() + 1);
-
-			const count = await prisma.longURL.count({
-				where: {
-					createdAt: {
-						gte: date,
-						lt: nextDay
-					}
-				}
-			});
+			const dateKey = date.toISOString().split('T')[0];
 
 			last7Days.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
-			dailyData.push(count);
+			dailyData.push(dailyMap.get(dateKey) || 0);
 		}
 
-		const hourlyData = [];
+		// Build hourly data with labels
+		const hourlyMap = new Map(hourlyStats.map(h => [h.hour, h.count]));
 		const hourlyLabels = [];
+		const hourlyData = [];
 
 		for (let hour = 0; hour < 24; hour++) {
-			const startOfHour = new Date();
-			startOfHour.setHours(hour, 0, 0, 0);
-
-			const endOfHour = new Date();
-			endOfHour.setHours(hour + 1, 0, 0, 0);
-
-			const count = await prisma.longURL.count({
-				where: {
-					createdAt: {
-						gte: startOfHour,
-						lt: endOfHour
-					}
-				}
-			});
-
 			hourlyLabels.push(`${hour}:00`);
-			hourlyData.push(count);
+			hourlyData.push(hourlyMap.get(hour) || 0);
 		}
 
 		return {
