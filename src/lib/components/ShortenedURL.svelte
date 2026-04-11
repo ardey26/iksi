@@ -55,8 +55,8 @@
   <button
     type="button"
     on:click={copy}
-    class="w-full py-4 px-5 text-base font-medium rounded-xl transition-all"
-    style="background: var(--accent); color: var(--bg);"
+    class="w-full py-4 px-5 text-base font-medium rounded-xl transition-all flex items-center justify-center"
+    style="background: var(--accent); color: var(--bg); min-height: 56px;"
   >
     {copied ? 'Copied' : 'Copy'}
   </button>
