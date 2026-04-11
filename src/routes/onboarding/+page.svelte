@@ -70,6 +70,8 @@
   .onboarding-container {
     width: 100%;
     padding: 24px;
+    display: flex;
+    justify-content: center;
   }
 
   .onboarding-card {
