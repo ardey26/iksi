@@ -21,6 +21,14 @@
 	// Delete confirmation
 	let deletingSlug = null;
 
+	// API keys state
+	let newKeyName = '';
+	let createdKey = null;
+	let keyError = '';
+	let isCreatingKey = false;
+	let revokingKeyId = null;
+	let keyCopied = false;
+
 	onMount(() => {
 		if (data.isOwner && inputRef) {
 			inputRef.focus();
@@ -148,6 +156,66 @@
 	const truncateURL = (url, maxLength = 40) => {
 		if (url.length <= maxLength) return url;
 		return url.slice(0, maxLength - 3) + '...';
+	};
+
+	const createApiKey = async () => {
+		if (isCreatingKey) return;
+		isCreatingKey = true;
+		keyError = '';
+
+		try {
+			const response = await fetch('/api/keys', {
+				method: 'POST',
+				body: JSON.stringify({ name: newKeyName.trim() || null }),
+				headers: { 'content-type': 'application/json' }
+			});
+
+			const result = await response.json();
+
+			if (response.ok) {
+				createdKey = result.key;
+				newKeyName = '';
+				await invalidateAll();
+			} else {
+				keyError = result.error || 'Failed to create API key';
+				setTimeout(() => { keyError = ''; }, 4000);
+			}
+		} catch (err) {
+			keyError = 'Network error. Please try again.';
+			setTimeout(() => { keyError = ''; }, 4000);
+		} finally {
+			isCreatingKey = false;
+		}
+	};
+
+	const revokeApiKey = async (id) => {
+		try {
+			const response = await fetch(`/api/keys/${id}`, {
+				method: 'DELETE'
+			});
+
+			if (response.ok) {
+				revokingKeyId = null;
+				await invalidateAll();
+			}
+		} catch (err) {
+			console.error('Failed to revoke API key');
+		}
+	};
+
+	const copyApiKey = async () => {
+		if (createdKey) {
+			const success = await copyToClipboard(createdKey);
+			if (success) {
+				keyCopied = true;
+				setTimeout(() => { keyCopied = false; }, 1500);
+			}
+		}
+	};
+
+	const dismissCreatedKey = () => {
+		createdKey = null;
+		keyCopied = false;
 	};
 </script>
 
@@ -282,6 +350,94 @@
 							{/if}
 						</nav>
 					{/if}
+				{/if}
+			</section>
+
+			<!-- API Keys section -->
+			<section class="api-keys-section">
+				<h2 class="section-title">API Keys</h2>
+				<p class="section-description">Create API keys to access the iksi API programmatically.</p>
+
+				<!-- Created key display -->
+				{#if createdKey}
+					<div class="created-key-banner">
+						<div class="created-key-header">
+							<span class="created-key-label">Your new API key</span>
+							<button class="dismiss-btn" on:click={dismissCreatedKey} title="Dismiss">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						</div>
+						<div class="created-key-value">
+							<code>{createdKey}</code>
+							<button class="copy-key-btn" on:click={copyApiKey}>
+								{keyCopied ? 'Copied' : 'Copy'}
+							</button>
+						</div>
+						<p class="created-key-warning">Copy this key now. You will not be able to see it again.</p>
+					</div>
+				{/if}
+
+				<!-- Create new key form -->
+				<div class="create-key-form">
+					<input
+						type="text"
+						class="key-name-input"
+						placeholder="Key name (optional)"
+						bind:value={newKeyName}
+						maxlength="100"
+						on:keydown={(e) => e.key === 'Enter' && createApiKey()}
+					/>
+					<button
+						class="create-key-btn"
+						on:click={createApiKey}
+						disabled={isCreatingKey}
+					>
+						{isCreatingKey ? 'Creating...' : 'Create key'}
+					</button>
+				</div>
+				{#if keyError}
+					<p class="key-error">{keyError}</p>
+				{/if}
+
+				<!-- Existing keys list -->
+				{#if data.apiKeys && data.apiKeys.length > 0}
+					<div class="keys-list">
+						{#each data.apiKeys as key}
+							<div class="key-item">
+								<div class="key-info">
+									<span class="key-name">{key.name || 'Unnamed key'}</span>
+									<code class="key-preview">{key.keyPreview}</code>
+								</div>
+								<div class="key-meta">
+									<span class="key-date">Created {formatDate(key.createdAt)}</span>
+									{#if key.lastUsedAt}
+										<span class="key-date">Last used {formatDate(key.lastUsedAt)}</span>
+									{:else}
+										<span class="key-date key-unused">Never used</span>
+									{/if}
+								</div>
+								<div class="key-actions">
+									{#if revokingKeyId === key.id}
+										<div class="confirm-revoke">
+											<button class="confirm-btn" on:click={() => revokeApiKey(key.id)}>Revoke</button>
+											<button class="cancel-btn" on:click={() => revokingKeyId = null}>Cancel</button>
+										</div>
+									{:else}
+										<button
+											class="revoke-btn"
+											on:click={() => revokingKeyId = key.id}
+										>
+											Revoke
+										</button>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else if !createdKey}
+					<p class="no-keys">No API keys yet.</p>
 				{/if}
 			</section>
 		</div>
@@ -668,6 +824,250 @@
 		color: var(--text-muted);
 	}
 
+	/* API Keys Section */
+	.api-keys-section {
+		width: 100%;
+		padding-top: 24px;
+		border-top: 1px solid var(--border);
+	}
+
+	.section-title {
+		font-size: 18px;
+		font-weight: 500;
+		color: var(--text-primary);
+		margin-bottom: 4px;
+	}
+
+	.section-description {
+		font-size: 14px;
+		color: var(--text-muted);
+		margin-bottom: 24px;
+	}
+
+	.created-key-banner {
+		background: var(--surface);
+		border: 1px solid var(--accent);
+		border-radius: 12px;
+		padding: 16px;
+		margin-bottom: 24px;
+	}
+
+	.created-key-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+	}
+
+	.created-key-label {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--accent);
+	}
+
+	.dismiss-btn {
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		padding: 4px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dismiss-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg);
+	}
+
+	.created-key-value {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		background: var(--bg);
+		border-radius: 8px;
+		padding: 12px;
+		margin-bottom: 12px;
+	}
+
+	.created-key-value code {
+		flex: 1;
+		font-family: monospace;
+		font-size: 13px;
+		color: var(--text-primary);
+		word-break: break-all;
+	}
+
+	.copy-key-btn {
+		padding: 6px 12px;
+		border-radius: 6px;
+		font-size: 12px;
+		font-weight: 500;
+		background: var(--accent);
+		color: white;
+		border: none;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all var(--duration-normal) var(--ease-out);
+	}
+
+	.copy-key-btn:hover {
+		filter: brightness(1.1);
+	}
+
+	.created-key-warning {
+		font-size: 12px;
+		color: var(--error);
+	}
+
+	.create-key-form {
+		display: flex;
+		gap: 12px;
+		margin-bottom: 8px;
+	}
+
+	.key-name-input {
+		flex: 1;
+		padding: 10px 14px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		font-size: 14px;
+		color: var(--text-primary);
+		transition: border-color var(--duration-normal) var(--ease-out);
+	}
+
+	.key-name-input::placeholder {
+		color: var(--text-muted);
+		opacity: 0.5;
+	}
+
+	.key-name-input:focus {
+		outline: none;
+		border-color: var(--border-focus);
+	}
+
+	.create-key-btn {
+		padding: 10px 20px;
+		background: var(--accent);
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all var(--duration-normal) var(--ease-out);
+	}
+
+	.create-key-btn:hover:not(:disabled) {
+		filter: brightness(1.1);
+	}
+
+	.create-key-btn:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+
+	.create-key-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.key-error {
+		font-size: 13px;
+		color: var(--error);
+		margin-bottom: 16px;
+	}
+
+	.keys-list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 24px;
+	}
+
+	.key-item {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 14px 16px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+	}
+
+	.key-info {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.key-name {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--text-primary);
+	}
+
+	.key-preview {
+		font-family: monospace;
+		font-size: 12px;
+		color: var(--text-muted);
+	}
+
+	.key-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		text-align: right;
+	}
+
+	.key-date {
+		font-size: 12px;
+		color: var(--text-muted);
+		white-space: nowrap;
+	}
+
+	.key-unused {
+		font-style: italic;
+	}
+
+	.key-actions {
+		min-width: 80px;
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	.revoke-btn {
+		padding: 6px 12px;
+		border-radius: 6px;
+		font-size: 12px;
+		font-weight: 500;
+		background: none;
+		border: 1px solid var(--border);
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: all var(--duration-normal) var(--ease-out);
+	}
+
+	.revoke-btn:hover {
+		border-color: var(--error);
+		color: var(--error);
+	}
+
+	.confirm-revoke {
+		display: flex;
+		gap: 8px;
+	}
+
+	.no-keys {
+		font-size: 14px;
+		color: var(--text-muted);
+		margin-top: 16px;
+	}
+
 	/* Responsive */
 	@media (max-width: 768px) {
 		.profile-container {
@@ -685,6 +1085,27 @@
 		.links-table th:nth-child(6),
 		.links-table td:nth-child(6) {
 			display: none;
+		}
+
+		.create-key-form {
+			flex-direction: column;
+		}
+
+		.key-item {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 12px;
+		}
+
+		.key-meta {
+			text-align: left;
+			flex-direction: row;
+			gap: 12px;
+		}
+
+		.key-actions {
+			width: 100%;
+			justify-content: flex-start;
 		}
 	}
 </style>

@@ -19,7 +19,7 @@ export const load = async ({ url, locals }) => {
 		...(isOwner ? {} : { listed: true })
 	};
 
-	const [links, total] = await Promise.all([
+	const [links, total, apiKeys] = await Promise.all([
 		prisma.longURL.findMany({
 			where,
 			select: {
@@ -37,7 +37,21 @@ export const load = async ({ url, locals }) => {
 			skip,
 			take: PAGE_SIZE
 		}),
-		prisma.longURL.count({ where })
+		prisma.longURL.count({ where }),
+		// Fetch API keys only for owner
+		isOwner
+			? prisma.apiKey.findMany({
+					where: { userId: profileUser.id },
+					select: {
+						id: true,
+						name: true,
+						keyPreview: true,
+						lastUsedAt: true,
+						createdAt: true
+					},
+					orderBy: { createdAt: 'desc' }
+				})
+			: Promise.resolve([])
 	]);
 
 	// Process links differently for owner vs visitor
@@ -101,6 +115,11 @@ export const load = async ({ url, locals }) => {
 			pageSize: PAGE_SIZE,
 			total,
 			totalPages: Math.ceil(total / PAGE_SIZE)
-		}
+		},
+		apiKeys: apiKeys.map((key) => ({
+			...key,
+			createdAt: key.createdAt.toISOString(),
+			lastUsedAt: key.lastUsedAt?.toISOString() || null
+		}))
 	};
 };
