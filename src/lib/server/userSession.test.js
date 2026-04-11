@@ -42,7 +42,16 @@ describe('verifyUserSession', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('returns user for valid, non-expired session', async () => {
-    const mockUser = { id: 'user_abc', email: 'test@example.com' };
+    const mockUser = {
+      id: 'user_abc',
+      provider: 'google',
+      providerId: 'google_123',
+      email: 'test@example.com',
+      name: 'Test User',
+      avatarUrl: null,
+      username: 'testuser',
+      showPreview: false
+    };
     prisma.session.findFirst.mockResolvedValue({
       id: 'sess_123',
       user: mockUser
@@ -65,7 +74,21 @@ describe('verifyUserSession', () => {
         id: 'sess_123',
         expiresAt: { gt: expect.any(Date) }
       },
-      select: { id: true, user: true }
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            provider: true,
+            providerId: true,
+            email: true,
+            name: true,
+            avatarUrl: true,
+            username: true,
+            showPreview: true
+          }
+        }
+      }
     });
   });
 
