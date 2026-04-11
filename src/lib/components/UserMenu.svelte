@@ -63,8 +63,8 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 50%;
-		border: 2px solid var(--apple-border);
-		background: var(--apple-surface-secondary);
+		border: 1px solid var(--border);
+		background: var(--surface);
 		cursor: pointer;
 		padding: 0;
 		overflow: hidden;
@@ -75,7 +75,7 @@
 	}
 
 	.avatar-btn:hover {
-		border-color: var(--apple-blue);
+		border-color: var(--accent);
 	}
 
 	.avatar-img {
@@ -87,7 +87,7 @@
 	.avatar-fallback {
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: var(--apple-text);
+		color: var(--text-primary);
 	}
 
 	.dropdown-menu {
@@ -96,12 +96,10 @@
 		top: calc(100% + 8px);
 		min-width: 160px;
 		padding: 6px;
-		border-radius: 14px;
-		background: var(--glass-bg);
-		backdrop-filter: blur(40px);
-		-webkit-backdrop-filter: blur(40px);
-		border: 1px solid var(--glass-border);
-		box-shadow: 0 8px 32px var(--glass-shadow);
+		border-radius: 12px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 		z-index: 50;
 	}
 
@@ -111,8 +109,8 @@
 		gap: 10px;
 		width: 100%;
 		padding: 10px 14px;
-		border-radius: 10px;
-		color: var(--apple-text);
+		border-radius: 8px;
+		color: var(--text-primary);
 		background: none;
 		border: none;
 		font-size: 0.875rem;
@@ -123,7 +121,7 @@
 	}
 
 	.dropdown-item:hover {
-		background: var(--apple-surface-secondary);
+		background: var(--bg);
 	}
 
 	.menu-icon {
@@ -131,5 +129,4 @@
 		height: 18px;
 		flex-shrink: 0;
 	}
-
 </style>
