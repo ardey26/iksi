@@ -53,6 +53,7 @@
     customURL = '';
     showCustomAlias = false;
     error = '';
+    isLoading = false;
     // Refocus input after reset
     setTimeout(() => {
       if (inputRef) inputRef.focus();
