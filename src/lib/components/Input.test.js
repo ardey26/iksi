@@ -3,83 +3,83 @@ import { render, screen } from '@testing-library/svelte';
 import Input from './Input.svelte';
 
 describe('Input Component', () => {
-	const defaultProps = {
-		handleSubmit: vi.fn(),
-		longURL: '',
-		customURL: '',
-		isLoading: false
-	};
+  const defaultProps = {
+    handleSubmit: vi.fn(),
+    longURL: '',
+    customURL: '',
+    isLoading: false,
+    error: '',
+    showCustomAlias: false
+  };
 
-	it('should render form elements', () => {
-		render(Input, { props: defaultProps });
-		
-		expect(screen.getByPlaceholderText('long-boring-url.com')).toBeInTheDocument();
-		expect(screen.getByPlaceholderText('my-awesome-link')).toBeInTheDocument();
-		expect(screen.getByText('Make it short!')).toBeInTheDocument();
-	});
+  it('should render main input with placeholder', () => {
+    render(Input, { props: defaultProps });
 
-	it('should disable submit button when URL is empty', () => {
-		render(Input, { props: defaultProps });
-		const submitButton = screen.getByRole('button', { name: /create short link/i });
-		
-		expect(submitButton).toBeDisabled();
-	});
+    expect(screen.getByPlaceholderText('Paste a link')).toBeInTheDocument();
+  });
 
-	it('should enable submit button when valid URL is provided', () => {
-		const props = { ...defaultProps, longURL: 'example.com' };
-		render(Input, { props });
-		const submitButton = screen.getByRole('button', { name: /create short link/i });
-		
-		expect(submitButton).not.toBeDisabled();
-	});
+  it('should show submit button when valid URL is provided', () => {
+    const props = { ...defaultProps, longURL: 'https://example.com' };
+    render(Input, { props });
 
-	it('should show loading state during submission', () => {
-		const props = { ...defaultProps, longURL: 'example.com', isLoading: true };
-		render(Input, { props });
-		
-		expect(screen.getByText('Creating magic...')).toBeInTheDocument();
-		expect(screen.getByLabelText('Creating short link...')).toBeInTheDocument();
-	});
+    expect(screen.getByText('Shorten')).toBeInTheDocument();
+  });
 
-	it('should have proper accessibility attributes', () => {
-		render(Input, { props: defaultProps });
-		
-		const urlInput = screen.getByPlaceholderText('long-boring-url.com');
-		const aliasInput = screen.getByPlaceholderText('my-awesome-link');
-		
-		expect(urlInput).toHaveAttribute('type', 'text');
-		expect(urlInput).toHaveAttribute('required');
-		expect(aliasInput).toHaveAttribute('type', 'text');
-		expect(aliasInput).toHaveAttribute('maxlength', '50');
-	});
+  it('should show custom alias input when showCustomAlias is true', () => {
+    const props = { ...defaultProps, showCustomAlias: true };
+    render(Input, { props });
 
-	it('should show validation error for invalid URL', () => {
-		const props = { ...defaultProps, longURL: 'invalid-url' };
-		render(Input, { props });
-		
-		expect(screen.getByText(/please enter a valid url/i)).toBeInTheDocument();
-	});
+    expect(screen.getByPlaceholderText('your-alias')).toBeInTheDocument();
+  });
 
-	it('should show validation error for invalid alias', () => {
-		const props = { ...defaultProps, longURL: 'example.com', customURL: 'invalid alias!' };
-		render(Input, { props });
-		
-		expect(screen.getByText(/only letters, numbers, hyphens, and underscores allowed/i)).toBeInTheDocument();
-	});
+  it('should hide custom alias input when showCustomAlias is false', () => {
+    render(Input, { props: defaultProps });
 
-	it('should disable alias input when URL is invalid', () => {
-		const props = { ...defaultProps, longURL: 'invalid' };
-		render(Input, { props });
-		
-		const aliasInput = screen.getByPlaceholderText('my-awesome-link');
-		expect(aliasInput).toBeDisabled();
-	});
+    // The alias input exists but is in a hidden container (height: 0)
+    const aliasSection = screen.getByPlaceholderText('your-alias').closest('div[class*="overflow-hidden"]');
+    expect(aliasSection).toHaveStyle({ height: '0' });
+  });
 
-	it('should enable alias input when URL is valid', () => {
-		const props = { ...defaultProps, longURL: 'example.com' };
-		render(Input, { props });
-		
-		const aliasInput = screen.getByPlaceholderText('my-awesome-link');
-		expect(aliasInput).not.toBeDisabled();
-	});
+  it('should show loading spinner during submission', () => {
+    const props = { ...defaultProps, longURL: 'https://example.com', isLoading: true };
+    render(Input, { props });
+
+    // Spinner is rendered inside the submit button during loading
+    const spinner = document.querySelector('.spinner');
+    expect(spinner).toBeInTheDocument();
+  });
+
+  it('should show error message when error prop is set', () => {
+    const props = { ...defaultProps, error: 'Something went wrong' };
+    render(Input, { props });
+
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+  });
+
+  it('should have proper accessibility attributes', () => {
+    const props = { ...defaultProps, showCustomAlias: true };
+    render(Input, { props });
+
+    const urlInput = screen.getByPlaceholderText('Paste a link');
+    const aliasInput = screen.getByPlaceholderText('your-alias');
+
+    expect(urlInput).toHaveAttribute('type', 'text');
+    expect(urlInput).toHaveAttribute('aria-label', 'URL to shorten');
+    expect(aliasInput).toHaveAttribute('type', 'text');
+    expect(aliasInput).toHaveAttribute('maxlength', '50');
+    expect(aliasInput).toHaveAttribute('aria-label', 'Custom alias');
+  });
+
+  it('should show paste button when input is empty', () => {
+    render(Input, { props: defaultProps });
+
+    expect(screen.getByLabelText('Paste from clipboard')).toBeInTheDocument();
+  });
+
+  it('should show clear button when input has content', () => {
+    const props = { ...defaultProps, longURL: 'https://example.com' };
+    render(Input, { props });
+
+    expect(screen.getByLabelText('Clear input')).toBeInTheDocument();
+  });
 });
