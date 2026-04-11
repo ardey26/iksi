@@ -134,7 +134,7 @@ input:focus {
 
 input::placeholder {
   color: var(--text-muted) !important;
-  opacity: 1;
+  opacity: 0.5;
 }
 
 /* Link hover */
