@@ -2,6 +2,17 @@
 export const isDev = process.env.NODE_ENV === 'development';
 export const isProd = process.env.NODE_ENV === 'production';
 
+// Domain configuration
+export const DOMAIN = {
+	base: isProd ? 'iksi.app' : 'localhost:5173',
+	protocol: isProd ? 'https' : 'http'
+};
+
+// Helper to construct profile URL
+export function getProfileUrl(username) {
+	return `${DOMAIN.protocol}://${username}.${DOMAIN.base}`;
+}
+
 // API endpoints
 export const API_BASE = '/api';
 

@@ -1,4 +1,6 @@
 <script>
+	import { getProfileUrl } from '$lib/config.js';
+
 	export let user;
 
 	let open = false;
@@ -21,7 +23,7 @@
 			? user.email.charAt(0).toUpperCase()
 			: '?';
 
-	$: profileUrl = user?.username ? `https://${user.username}.iksi.app` : null;
+	$: profileUrl = user?.username ? getProfileUrl(user.username) : null;
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
