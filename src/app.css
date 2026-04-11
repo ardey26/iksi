@@ -117,12 +117,17 @@ div, span, p, input, button, svg, circle, rect, path {
 }
 
 /* Button hover/active states */
-button:not(:disabled):hover {
+button:not(:disabled):not(.icon-btn):hover {
   filter: brightness(1.1);
 }
 
-button:not(:disabled):active {
+button:not(:disabled):not(.icon-btn):active {
   transform: scale(0.98);
+}
+
+/* Icon buttons - no transform on active (preserves positioning) */
+.icon-btn:active {
+  opacity: 0.7;
 }
 
 /* Input focus styles */
