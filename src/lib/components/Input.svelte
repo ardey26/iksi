@@ -73,6 +73,8 @@
   <div class="h-5">
     {#if error}
       <p class="text-sm fade-in" style="color: var(--error);">{error}</p>
+    {:else if longURL && !isURLValid}
+      <p class="text-sm fade-in" style="color: var(--error);">That doesn't look like a valid link</p>
     {/if}
   </div>
 
