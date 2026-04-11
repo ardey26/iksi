@@ -13,3 +13,4 @@ vite.config.ts.timestamp-*
 /docs
 .claude
 CLAUDE.md
+DESIGN.md
