@@ -20,6 +20,8 @@
 		: user?.email
 			? user.email.charAt(0).toUpperCase()
 			: '?';
+
+	$: profileUrl = user?.username ? `https://${user.username}.iksi.app` : null;
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -46,6 +48,14 @@
 
 	{#if open}
 		<div class="dropdown-menu">
+			{#if profileUrl}
+				<a href={profileUrl} class="dropdown-item" on:click={close}>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="menu-icon">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+					</svg>
+					My Profile
+				</a>
+			{/if}
 			<form method="POST" action="/auth/logout">
 				<button type="submit" class="dropdown-item">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="menu-icon">
@@ -118,6 +128,7 @@
 		cursor: pointer;
 		font-family: inherit;
 		transition: background 0.15s ease;
+		text-decoration: none;
 	}
 
 	.dropdown-item:hover {
