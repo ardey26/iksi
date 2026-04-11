@@ -29,6 +29,9 @@
 	let revokingKeyId = null;
 	let keyCopied = false;
 
+	// Settings state
+	let showPreviewPref = data.currentUser?.showPreview ?? false;
+
 	onMount(() => {
 		if (data.isOwner && inputRef) {
 			inputRef.focus();
@@ -216,6 +219,22 @@
 	const dismissCreatedKey = () => {
 		createdKey = null;
 		keyCopied = false;
+	};
+
+	const updatePreviewPref = async () => {
+		const newValue = !showPreviewPref;
+		showPreviewPref = newValue;
+
+		try {
+			await fetch('/api/preferences', {
+				method: 'PATCH',
+				body: JSON.stringify({ showPreview: newValue }),
+				headers: { 'content-type': 'application/json' }
+			});
+		} catch {
+			// Revert on error
+			showPreviewPref = !newValue;
+		}
 	};
 </script>
 
@@ -439,6 +458,28 @@
 				{:else if !createdKey}
 					<p class="no-keys">No API keys yet.</p>
 				{/if}
+			</section>
+
+			<!-- Settings section -->
+			<section class="settings-section">
+				<h2 class="section-title">Settings</h2>
+				<p class="section-description">Configure your default preferences.</p>
+
+				<div class="settings-list">
+					<label class="setting-item">
+						<div class="setting-info">
+							<span class="setting-name">Show preview page</span>
+							<span class="setting-desc">Always show a preview before redirecting to your links</span>
+						</div>
+						<button
+							class="toggle-btn"
+							class:active={showPreviewPref}
+							on:click={updatePreviewPref}
+						>
+							{showPreviewPref ? 'On' : 'Off'}
+						</button>
+					</label>
+				</div>
 			</section>
 		</div>
 	{:else}
@@ -1066,6 +1107,48 @@
 		font-size: 14px;
 		color: var(--text-muted);
 		margin-top: 16px;
+	}
+
+	/* Settings Section */
+	.settings-section {
+		width: 100%;
+		padding-top: 24px;
+		border-top: 1px solid var(--border);
+	}
+
+	.settings-list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.setting-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 14px 16px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		cursor: pointer;
+	}
+
+	.setting-info {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.setting-name {
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--text-primary);
+	}
+
+	.setting-desc {
+		font-size: 12px;
+		color: var(--text-muted);
 	}
 
 	/* Responsive */
