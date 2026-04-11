@@ -2,6 +2,7 @@ import { redirect, fail } from '@sveltejs/kit';
 import { Prisma } from '@prisma/client';
 import { prisma } from '$lib/prisma.js';
 import { isValidUsername, normalizeUsername } from '$lib/utils/username.js';
+import { getProfileUrl } from '$lib/config.js';
 
 export const load = async ({ locals }) => {
   // Must be logged in
@@ -11,7 +12,7 @@ export const load = async ({ locals }) => {
 
   // If user already has username, redirect to their profile
   if (locals.user.username) {
-    throw redirect(302, `https://${locals.user.username}.iksi.app`);
+    throw redirect(302, getProfileUrl(locals.user.username));
   }
 
   // Generate suggested username from name
@@ -71,6 +72,6 @@ export const actions = {
     }
 
     // Redirect to their new profile
-    throw redirect(302, `https://${username}.iksi.app`);
+    throw redirect(302, getProfileUrl(username));
   }
 };
