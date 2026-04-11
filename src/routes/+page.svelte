@@ -1,8 +1,7 @@
 <script>
   import { Input, ShortenedURL } from '$lib/components/';
   import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
-
+  
   let longURL = '';
   let customURL = '';
   let shortURL = '';
@@ -35,14 +34,15 @@
 
       if (response.ok) {
         shortURL = data.shortURL;
+        // Don't reset isLoading on success - component unmounts anyway
       } else {
         error = data.error || 'Something went wrong';
         setTimeout(() => { error = ''; }, 4000);
+        isLoading = false;
       }
     } catch (err) {
       error = 'Network error. Please try again.';
       setTimeout(() => { error = ''; }, 4000);
-    } finally {
       isLoading = false;
     }
   };
@@ -76,20 +76,16 @@
 
 <div class="w-full max-w-[500px]">
   {#if shortURL}
-    <div in:fade={{ duration: 200, delay: 100 }}>
-      <ShortenedURL {shortURL} on:reset={reset} />
-    </div>
+    <ShortenedURL {shortURL} on:reset={reset} />
   {:else}
-    <div out:fade={{ duration: 100 }}>
-      <Input
-        bind:longURL
-        bind:customURL
-        bind:showCustomAlias
-        bind:inputRef
-        {isLoading}
-        {error}
-        {handleSubmit}
-      />
-    </div>
+    <Input
+      bind:longURL
+      bind:customURL
+      bind:showCustomAlias
+      bind:inputRef
+      {isLoading}
+      {error}
+      {handleSubmit}
+    />
   {/if}
 </div>
