@@ -23,7 +23,7 @@
 
 <div class="relative">
 	<button
-		class="apple-button sign-in-btn"
+		class="sign-in-btn"
 		on:click={toggle}
 		aria-expanded={open}
 		aria-haspopup="true"
@@ -54,9 +54,19 @@
 
 <style>
 	.sign-in-btn {
-		padding: 6px 16px;
-		font-size: 0.8rem;
-		border-radius: 20px;
+		padding: 8px 16px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		border-radius: 10px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		color: var(--text-primary);
+		cursor: pointer;
+		transition: border-color 0.15s ease;
+	}
+
+	.sign-in-btn:hover {
+		border-color: var(--accent);
 	}
 
 	.dropdown-menu {
@@ -65,12 +75,10 @@
 		top: calc(100% + 8px);
 		min-width: 220px;
 		padding: 6px;
-		border-radius: 14px;
-		background: var(--glass-bg);
-		backdrop-filter: blur(40px);
-		-webkit-backdrop-filter: blur(40px);
-		border: 1px solid var(--glass-border);
-		box-shadow: 0 8px 32px var(--glass-shadow);
+		border-radius: 12px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 		z-index: 50;
 	}
 
@@ -79,8 +87,8 @@
 		align-items: center;
 		gap: 10px;
 		padding: 10px 14px;
-		border-radius: 10px;
-		color: var(--apple-text);
+		border-radius: 8px;
+		color: var(--text-primary);
 		text-decoration: none;
 		font-size: 0.875rem;
 		font-weight: 500;
@@ -88,7 +96,7 @@
 	}
 
 	.dropdown-item:hover {
-		background: var(--apple-surface-secondary);
+		background: var(--bg);
 	}
 
 	.provider-icon {
@@ -96,5 +104,4 @@
 		height: 18px;
 		flex-shrink: 0;
 	}
-
 </style>
