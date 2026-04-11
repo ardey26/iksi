@@ -1,6 +1,7 @@
 <script>
   import { Input, ShortenedURL } from '$lib/components/';
   import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
 
   let longURL = '';
   let customURL = '';
@@ -75,16 +76,20 @@
 
 <div class="w-full max-w-[500px]">
   {#if shortURL}
-    <ShortenedURL {shortURL} on:reset={reset} />
+    <div in:fade={{ duration: 200, delay: 100 }}>
+      <ShortenedURL {shortURL} on:reset={reset} />
+    </div>
   {:else}
-    <Input
-      bind:longURL
-      bind:customURL
-      bind:showCustomAlias
-      bind:inputRef
-      {isLoading}
-      {error}
-      {handleSubmit}
-    />
+    <div out:fade={{ duration: 100 }}>
+      <Input
+        bind:longURL
+        bind:customURL
+        bind:showCustomAlias
+        bind:inputRef
+        {isLoading}
+        {error}
+        {handleSubmit}
+      />
+    </div>
   {/if}
 </div>
