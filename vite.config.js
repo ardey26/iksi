@@ -6,7 +6,14 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	build: {
 		target: 'es2020',
-		cssCodeSplit: true
+		cssCodeSplit: true,
+		minify: 'esbuild',
+		esbuild: {
+			minifyIdentifiers: true,
+			minifySyntax: true,
+			minifyWhitespace: true,
+			drop: ['console', 'debugger']
+		}
 	},
 	css: {
 		devSourcemap: false
