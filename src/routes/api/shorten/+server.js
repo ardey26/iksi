@@ -135,30 +135,19 @@ export const POST = async ({ request, getClientAddress }) => {
 			shortURL = trimmedCustomURL;
 		} else {
 			const urlHash = await createURLHash(prefixedURL);
-			
-			let isShortened = null;
-			
-			if (urlHash) {
-				isShortened = await prisma.longURL.findFirst({
-					where: {
-						urlHash: urlHash
-					},
-					select: {
-						shortURL: true
-					}
-				});
-			}
-			
-			if (!isShortened) {
-				isShortened = await prisma.longURL.findFirst({
-					where: {
-						originalURL: prefixedURL
-					},
-					select: {
-						shortURL: true
-					}
-				});
-			}
+
+			// Single query with OR to check both hash and exact URL match
+			const isShortened = await prisma.longURL.findFirst({
+				where: {
+					OR: [
+						{ urlHash: urlHash },
+						{ originalURL: prefixedURL }
+					]
+				},
+				select: {
+					shortURL: true
+				}
+			});
 
 			if (isShortened) {
 				return new Response(JSON.stringify({ shortURL: isShortened.shortURL }), {

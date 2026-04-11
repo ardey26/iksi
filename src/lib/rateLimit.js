@@ -42,9 +42,9 @@ export async function rateLimit(identifier, maxRequests = 10, windowMs = 60000) 
 
 		return { allowed: true, remaining: maxRequests - record.count };
 	} catch (error) {
-		// On database error, allow the request but log it
+		// On database error, deny the request (fail-closed)
 		console.error('Rate limit error:', error);
-		return { allowed: true, remaining: maxRequests };
+		return { allowed: false, remaining: 0 };
 	}
 }
 

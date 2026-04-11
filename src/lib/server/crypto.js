@@ -20,21 +20,16 @@ async function deriveLegacyKey(salt) {
 
 // New fast encode - no scrypt, key pre-derived
 export function encodeURL(url) {
-	try {
-		const iv = randomBytes(16);
-		const cipher = createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+	const iv = randomBytes(16);
+	const cipher = createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
 
-		let encrypted = cipher.update(url, 'utf8', 'hex');
-		encrypted += cipher.final('hex');
+	let encrypted = cipher.update(url, 'utf8', 'hex');
+	encrypted += cipher.final('hex');
 
-		const authTag = cipher.getAuthTag();
+	const authTag = cipher.getAuthTag();
 
-		// Format: iv:authTag:encrypted (3 parts = new format)
-		return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
-	} catch (error) {
-		console.error('URL encoding error:', error);
-		return url;
-	}
+	// Format: iv:authTag:encrypted (3 parts = new format)
+	return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
 }
 
 // Decode handles both legacy (4 parts with scrypt) and new format (3 parts)
