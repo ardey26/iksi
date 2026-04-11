@@ -1,73 +1,90 @@
 <script>
-	import { Input, ShortenedURL } from '$lib/components/';
-	import { onMount } from 'svelte';
-	
-	let longURL = '';
-	let shortURL = '';
-	let customURL = '';
-	let isLoading = false;
-	let error = '';
-	let copied = false;
-	let mounted = false;
+  import { Input, ShortenedURL } from '$lib/components/';
+  import { onMount } from 'svelte';
 
-	onMount(() => {
-		mounted = true;
-	});
+  let longURL = '';
+  let customURL = '';
+  let shortURL = '';
+  let isLoading = false;
+  let error = '';
+  let showCustomAlias = false;
+  let inputRef;
 
-	const handleSubmit = async (e) => {
-		if (isLoading) return; // Prevent double submissions
-		
-		isLoading = true;
-		error = '';
-		shortURL = ''; // Clear previous result
-		
-		try {
-			const response = await fetch('/api/shorten', {
-				method: 'POST',
-				body: JSON.stringify({ longURL: longURL.trim(), customURL: customURL.trim() }),
-				headers: {
-					'content-type': 'application/json'
-				}
-			});
-			
-			const data = await response.json();
+  onMount(() => {
+    // Auto-focus input on mount
+    if (inputRef) {
+      inputRef.focus();
+    }
+  });
 
-			if (response.ok) {
-				shortURL = data.shortURL;
-				// Clear form on success
-				longURL = '';
-				customURL = '';
-			} else {
-				error = data.error || 'Something went wrong';
-				// Auto-clear error after 5 seconds
-				setTimeout(() => {
-					error = '';
-				}, 5000);
-			}
-		} catch (err) {
-			console.error('Network error:', err);
-			error = 'Network error. Please check your connection and try again.';
-			setTimeout(() => {
-				error = '';
-			}, 5000);
-		} finally {
-			isLoading = false;
-		}
-	};
+  const handleSubmit = async () => {
+    if (isLoading) return;
+
+    isLoading = true;
+    error = '';
+
+    try {
+      const response = await fetch('/api/shorten', {
+        method: 'POST',
+        body: JSON.stringify({ longURL: longURL.trim(), customURL: customURL.trim() }),
+        headers: { 'content-type': 'application/json' }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        shortURL = data.shortURL;
+      } else {
+        error = data.error || 'Something went wrong';
+        setTimeout(() => { error = ''; }, 4000);
+      }
+    } catch (err) {
+      error = 'Network error. Please try again.';
+      setTimeout(() => { error = ''; }, 4000);
+    } finally {
+      isLoading = false;
+    }
+  };
+
+  const reset = () => {
+    shortURL = '';
+    longURL = '';
+    customURL = '';
+    showCustomAlias = false;
+    error = '';
+    // Refocus input after reset
+    setTimeout(() => {
+      if (inputRef) inputRef.focus();
+    }, 50);
+  };
+
+  const handleKeydown = (e) => {
+    if (e.key === 'Escape') {
+      if (shortURL) {
+        reset();
+      } else {
+        longURL = '';
+        customURL = '';
+        error = '';
+      }
+    }
+  };
 </script>
 
-<div class="w-full max-w-md relative px-4" class:opacity-0={!mounted} class:fade-in-up={mounted}>
-	<!-- Ambient light effects -->
-	<div class="absolute -top-20 -left-20 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-	<div class="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
-	
-	<!-- Main card with liquid glass effect -->
-	<div class="liquid-glass p-8 space-y-4">		
+<svelte:window on:keydown={handleKeydown} />
 
-		<Input bind:longURL bind:customURL bind:isLoading {handleSubmit} {error} />
-
-		{#if shortURL}
-			<ShortenedURL {shortURL} bind:copied />
-		{/if}
-	</div>
+<div class="w-full max-w-[500px]">
+  {#if shortURL}
+    <ShortenedURL {shortURL} on:reset={reset} />
+  {:else}
+    <Input
+      bind:longURL
+      bind:customURL
+      bind:showCustomAlias
+      bind:inputRef
+      {isLoading}
+      {error}
+      {handleSubmit}
+    />
+  {/if}
 </div>
