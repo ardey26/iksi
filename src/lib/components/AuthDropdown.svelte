@@ -54,10 +54,11 @@
 
 <style>
 	.sign-in-btn {
-		padding: 8px 16px;
+		height: 36px;
+		padding: 0 16px;
 		font-size: 0.875rem;
 		font-weight: 500;
-		border-radius: 10px;
+		border-radius: 18px;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		color: var(--text-primary);

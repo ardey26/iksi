@@ -3,7 +3,7 @@
 </script>
 
 <button
-  class="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
+  class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
   style="background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);"
   on:click={toggleTheme}
   aria-label="Toggle theme"

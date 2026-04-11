@@ -60,8 +60,8 @@
 
 <style>
 	.avatar-btn {
-		width: 32px;
-		height: 32px;
+		width: 36px;
+		height: 36px;
 		border-radius: 50%;
 		border: 1px solid var(--border);
 		background: var(--surface);
