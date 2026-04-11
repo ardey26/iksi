@@ -99,7 +99,7 @@
 		border-radius: 12px;
 		background: var(--surface);
 		border: 1px solid var(--border);
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 		z-index: 50;
 	}
 
