@@ -11,12 +11,15 @@ export function isValidURL(url) {
 		const prefixed = addPrefix(url.trim());
 		const urlObj = new URL(prefixed);
 		const hostname = urlObj.hostname;
-		
+
+		const isIksiURL = hostname === 'iksi.app' || hostname.endsWith('.iksi.app');
+
 		return ['http:', 'https:'].includes(urlObj.protocol) &&
 		       hostname.length > 0 &&
 		       hostname.includes('.') &&
 		       !hostname.startsWith('.') &&
 		       !hostname.endsWith('.') &&
+		       !isIksiURL &&
 		       hostname.split('.').length >= 2 &&
 		       hostname.split('.').every(part => part.length > 0);
 	} catch {
@@ -28,15 +31,18 @@ export function isValidURLServer(prefixedURL) {
 	try {
 		const url = new URL(prefixedURL);
 		const hostname = url.hostname;
-		
-		return ['http:', 'https:'].includes(url.protocol) && 
-		       hostname.length > 0 && 
+
+		const isIksiURL = hostname === 'iksi.app' || hostname.endsWith('.iksi.app');
+
+		return ['http:', 'https:'].includes(url.protocol) &&
+		       hostname.length > 0 &&
 		       hostname.includes('.') &&
 		       !hostname.startsWith('.') &&
 		       !hostname.endsWith('.') &&
-		       !hostname.includes('localhost') && 
+		       !hostname.includes('localhost') &&
 		       !hostname.includes('127.0.0.1') &&
 		       !hostname.includes('0.0.0.0') &&
+		       !isIksiURL &&
 		       hostname.split('.').length >= 2 &&
 		       hostname.split('.').every(part => part.length > 0);
 	} catch {
