@@ -133,7 +133,8 @@ input:focus {
 }
 
 input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-muted) !important;
+  opacity: 1;
 }
 
 /* Link hover */
