@@ -75,7 +75,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="w-full max-w-[500px]">
+<div class="w-full max-w-[500px] px-4">
   {#if shortURL}
     <ShortenedURL {shortURL} on:reset={reset} />
   {:else}
