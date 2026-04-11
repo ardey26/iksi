@@ -93,6 +93,10 @@
     font-size: 14px;
   }
 
+  form {
+    width: 100%;
+  }
+
   .input-group {
     margin-bottom: 16px;
   }
