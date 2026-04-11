@@ -11,6 +11,13 @@ declare namespace App {
       username: string | null;
       showPreview: boolean;
     } | null;
+    profileUsername: string | null;
+    profileUser: {
+      id: string;
+      username: string;
+      name: string | null;
+      avatarUrl: string | null;
+    } | null;
   }
 }
 

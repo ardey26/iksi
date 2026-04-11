@@ -3,8 +3,10 @@ import { redirect } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma.js';
 import { decodeURL } from '$lib/server/crypto.js';
 import { verifyUserSession, hashApiKey } from '$lib/server/auth.js';
+import { RESERVED_USERNAMES } from '$lib/utils/username.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
+const MAIN_HOSTS = ['iksi.app', 'localhost', 'www.iksi.app'];
 
 // Cache for admin slug lookup (reduces DB queries on hot path)
 let adminSlugCache: { url: string | null; expires: number } | null = null;
@@ -97,9 +99,49 @@ export const handle: Handle = async ({ event, resolve }) => {
         });
     }
 
-    // --- Existing logic below (unchanged except API redirect scope) ---
+    // --- Host detection and profile subdomain routing ---
     const host = event.request.headers.get('host')?.split(':')[0] || '';
     const isAdminHost = ADMIN_HOSTS.includes(host);
+    const isMainHost = MAIN_HOSTS.includes(host);
+
+    // Initialize profile locals
+    event.locals.profileUsername = null;
+    event.locals.profileUser = null;
+
+    // Profile subdomain detection
+    // Pattern: username.iksi.app or username.localhost
+    if (!isAdminHost && !isMainHost) {
+        const match = host.match(/^([a-z0-9-]+)\.(iksi\.app|localhost)$/);
+        if (match) {
+            const profileUsername = match[1];
+
+            // Skip reserved usernames (admin, api, cdn, etc.) without DB query
+            if (!RESERVED_USERNAMES.includes(profileUsername)) {
+                event.locals.profileUsername = profileUsername;
+
+                // Look up the profile user
+                const profileUser = await prisma.user.findUnique({
+                    where: { username: profileUsername },
+                    select: {
+                        id: true,
+                        username: true,
+                        name: true,
+                        avatarUrl: true
+                    }
+                });
+
+                // profileUser could be null if username doesn't exist - routes handle 404
+                event.locals.profileUser = profileUser;
+
+                // Rewrite path to /profile routes
+                const url = new URL(event.request.url);
+                url.pathname = '/profile' + url.pathname;
+                event.request = new Request(url, event.request);
+            }
+        }
+    }
+
+    // --- Existing logic below (unchanged except API redirect scope) ---
 
     // On non-admin hosts, treat /admin as a potential short link (slug)
     // This allows "admin" to be a custom short link
