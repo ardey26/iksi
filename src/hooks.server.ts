@@ -64,6 +64,7 @@ export const handle: Handle = async ({ event, resolve }) => {
                                 email: true,
                                 name: true,
                                 avatarUrl: true,
+                                username: true,
                                 showPreview: true
                             }
                         }
@@ -80,6 +81,20 @@ export const handle: Handle = async ({ event, resolve }) => {
                 }
             }
         }
+    }
+
+    // Redirect to onboarding if user is logged in but has no username
+    // Skip for onboarding page itself, auth routes, and API routes
+    const pathname = event.url.pathname;
+    const skipOnboarding = pathname.startsWith('/onboarding') ||
+                           pathname.startsWith('/auth') ||
+                           pathname.startsWith('/api');
+
+    if (event.locals.user && !event.locals.user.username && !skipOnboarding) {
+        return new Response(null, {
+            status: 302,
+            headers: { Location: '/onboarding' }
+        });
     }
 
     // --- Existing logic below (unchanged except API redirect scope) ---

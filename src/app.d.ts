@@ -8,7 +8,10 @@ declare namespace App {
       email: string | null;
       name: string | null;
       avatarUrl: string | null;
+      username: string | null;
       showPreview: boolean;
     } | null;
   }
 }
+
+export {};

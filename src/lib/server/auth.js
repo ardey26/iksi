@@ -103,7 +103,21 @@ export async function verifyUserSession(token) {
 			id: sessionId,
 			expiresAt: { gt: new Date() }
 		},
-		select: { id: true, user: true }
+		select: {
+			id: true,
+			user: {
+				select: {
+					id: true,
+					provider: true,
+					providerId: true,
+					email: true,
+					name: true,
+					avatarUrl: true,
+					username: true,
+					showPreview: true
+				}
+			}
+		}
 	});
 
 	return result?.user ?? null;
