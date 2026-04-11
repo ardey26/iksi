@@ -1,6 +1,4 @@
 <script>
-	import SEO from '$lib/components/SEO.svelte';
-	
 	let password = '';
 	let error = '';
 	let loading = false;
@@ -32,22 +30,7 @@
 			loading = false;
 		}
 	};
-	
-	const structuredData = {
-		"@context": "https://schema.org",
-		"@type": "WebPage",
-		"name": "Admin Login - iksi",
-		"description": "Admin login for iksi URL shortener dashboard.",
-		"url": "https://iksi.vercel.app/admin/login"
-	};
 </script>
-
-<SEO 
-	title="Admin Login - iksi URL Shortener"
-	description="Admin login for accessing the iksi URL shortener dashboard."
-	canonical="https://iksi.vercel.app/admin/login"
-	{structuredData}
-/>
 
 <section class="w-full max-w-md relative px-4" aria-label="Admin Login">
 	<div class="liquid-glass p-8 fade-in-up">

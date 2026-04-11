@@ -1,8 +1,69 @@
 <script>
   import '../app.css';
-  import { ThemeToggle } from '../lib/components';
+  import { ThemeToggle, SEO } from '../lib/components';
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { theme } from '$lib/stores/theme.js';
+
+  const HOMEPAGE_STRUCTURED_DATA = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': 'https://www.iksi.app/#website',
+        url: 'https://www.iksi.app/',
+        name: 'iksi',
+        description: 'Free URL shortener. Transform long links into clean, shareable short URLs.',
+        inLanguage: 'en'
+      },
+      {
+        '@type': 'WebApplication',
+        '@id': 'https://www.iksi.app/#app',
+        name: 'iksi',
+        url: 'https://www.iksi.app/',
+        applicationCategory: 'UtilitiesApplication',
+        operatingSystem: 'Any',
+        browserRequirements: 'Requires JavaScript. Requires HTML5.',
+        description: 'A fast, free URL shortener with custom aliases and instant redirects. No registration required.',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        author: { '@type': 'Person', name: 'Andre de Jesus' }
+      }
+    ]
+  };
+
+  function seoForRoute(pathname, host) {
+    const isAdminHost = host === 'admin.iksi.app' || host === 'admin.localhost';
+    if (isAdminHost || pathname.startsWith('/admin')) {
+      return {
+        title: 'iksi admin',
+        description: 'iksi admin area.',
+        canonical: `https://admin.iksi.app${pathname}`,
+        ogImage: 'https://www.iksi.app/og-image.png',
+        structuredData: null,
+        noindex: true
+      };
+    }
+    if (pathname === '/') {
+      return {
+        title: 'iksi — free URL shortener. Make long links short.',
+        description: 'iksi turns long URLs into clean, shareable short links in seconds. Free, no signup, custom aliases, instant redirects.',
+        canonical: 'https://www.iksi.app/',
+        ogImage: 'https://www.iksi.app/og-image.png',
+        structuredData: HOMEPAGE_STRUCTURED_DATA,
+        noindex: false
+      };
+    }
+    return {
+      title: 'iksi — free URL shortener',
+      description: 'iksi turns long URLs into clean, shareable short links in seconds.',
+      canonical: `https://www.iksi.app${pathname}`,
+      ogImage: 'https://www.iksi.app/og-image.png',
+      structuredData: null,
+      noindex: true
+    };
+  }
+
+  $: seo = seoForRoute($page.url.pathname, $page.url.host);
 
   onMount(() => {
     if (typeof window !== 'undefined') {
@@ -12,6 +73,15 @@
     }
   });
 </script>
+
+<SEO
+  title={seo.title}
+  description={seo.description}
+  canonical={seo.canonical}
+  ogImage={seo.ogImage}
+  structuredData={seo.structuredData}
+  noindex={seo.noindex}
+/>
 
 <div class="min-h-screen flex flex-col relative" style="background: var(--bg);">
   <!-- Brand mark: top-left, small, confident -->

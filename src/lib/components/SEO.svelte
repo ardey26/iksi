@@ -7,6 +7,7 @@
 	export let ogType = 'website';
 	export let twitterCard = 'summary_large_image';
 	export let structuredData = null;
+	export let noindex = false;
 </script>
 
 <svelte:head>
@@ -16,9 +17,8 @@
 	<meta name="description" content={description} />
 	<meta name="keywords" content={keywords} />
 	<meta name="author" content="Andre de Jesus" />
-	<meta name="robots" content="index, follow" />
+	<meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
 	<meta name="language" content="English" />
-	<meta name="revisit-after" content="7 days" />
 	
 	<!-- Canonical URL -->
 	{#if canonical}
@@ -27,16 +27,19 @@
 	
 	<!-- Open Graph / Facebook -->
 	<meta property="og:type" content={ogType} />
-	<meta property="og:url" content={canonical || 'https://iksi.vercel.app'} />
+	<meta property="og:url" content={canonical || 'https://www.iksi.app'} />
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:image" content={ogImage} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="iksi — a fast, free URL shortener" />
 	<meta property="og:site_name" content="iksi" />
 	<meta property="og:locale" content="en_US" />
 	
 	<!-- Twitter -->
 	<meta property="twitter:card" content={twitterCard} />
-	<meta property="twitter:url" content={canonical || 'https://iksi.vercel.app'} />
+	<meta property="twitter:url" content={canonical || 'https://www.iksi.app'} />
 	<meta property="twitter:title" content={title} />
 	<meta property="twitter:description" content={description} />
 	<meta property="twitter:image" content={ogImage} />

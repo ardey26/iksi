@@ -1,5 +1,4 @@
 <script>
-	import SEO from '$lib/components/SEO.svelte';
 	import { onMount } from 'svelte';
 	
 	export let data;
@@ -118,21 +117,7 @@
 		});
 	});
 	
-	const structuredData = {
-		"@context": "https://schema.org",
-		"@type": "WebPage",
-		"name": "Admin Dashboard - iksi",
-		"description": "Admin dashboard for iksi URL shortener analytics and management.",
-		"url": "https://iksi.vercel.app/admin"
-	};
 </script>
-
-<SEO 
-	title="Admin Dashboard - iksi URL Shortener"
-	description="Admin dashboard for managing and viewing analytics of the iksi URL shortener service."
-	canonical="https://iksi.vercel.app/admin"
-	{structuredData}
-/>
 
 <section class="w-full max-w-6xl relative px-4" aria-label="Admin Dashboard">
 	<div class="space-y-6 fade-in-up">

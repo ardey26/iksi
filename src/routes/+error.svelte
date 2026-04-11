@@ -1,22 +1,3 @@
-<script>
-	import SEO from '$lib/components/SEO.svelte';
-	
-	const structuredData = {
-		"@context": "https://schema.org",
-		"@type": "WebPage",
-		"name": "Page Not Found - iksi",
-		"description": "The page you're looking for doesn't exist. Return to iksi homepage to shorten your URLs.",
-		"url": "https://iksi.vercel.app/404"
-	};
-</script>
-
-<SEO 
-	title="Page Not Found - iksi URL Shortener"
-	description="The page you're looking for doesn't exist. Return to iksi homepage to shorten your URLs for free."
-	canonical="https://iksi.vercel.app/404"
-	{structuredData}
-/>
-
 <section class="w-full max-w-md relative px-4" aria-label="Error Page">
 	<article class="liquid-glass p-8 space-y-6 fade-in-up text-center">
 		<header>
