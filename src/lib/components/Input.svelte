@@ -87,6 +87,8 @@
     <input
       bind:this={inputRef}
       type="text"
+      id="url"
+      name="url"
       bind:value={longURL}
       on:keydown={handleKeydown}
       placeholder="Paste a link"
@@ -184,6 +186,8 @@
       </span>
       <input
         type="text"
+        id="alias"
+        name="alias"
         bind:value={customURL}
         placeholder="your-alias"
         maxlength="50"
