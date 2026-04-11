@@ -49,7 +49,7 @@
         {/if}
       </div>
 
-      <button type="submit" class="btn btn-primary" disabled={isSubmitting}>
+      <button type="submit" class="submit-btn" disabled={isSubmitting}>
         {#if isSubmitting}
           <span class="spinner"></span>
         {:else}
@@ -68,10 +68,7 @@
 
 <style>
   .onboarding-container {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
     padding: 24px;
   }
 
@@ -131,12 +128,21 @@
     text-align: right;
   }
 
+  /* Prevent autofill from changing background */
+  .input-wrapper input:-webkit-autofill,
+  .input-wrapper input:-webkit-autofill:hover,
+  .input-wrapper input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+    -webkit-text-fill-color: var(--text-primary);
+  }
+
   .input-suffix {
     padding: 16px 20px 16px 0;
     color: var(--text-muted);
     font-size: 18px;
     user-select: none;
     white-space: nowrap;
+    background: transparent;
   }
 
   .input-wrapper input::placeholder {
@@ -151,7 +157,7 @@
     text-align: left;
   }
 
-  .btn {
+  .submit-btn {
     width: 100%;
     padding: 16px 20px;
     min-height: 56px;
@@ -163,16 +169,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .btn-primary {
     background: var(--accent);
     color: white;
+    text-transform: none;
+    transition: filter var(--duration-normal) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
+  }
+
+  .submit-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+
+  .submit-btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .username-rules {
