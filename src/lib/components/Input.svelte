@@ -132,18 +132,17 @@
     <button
       type="submit"
       disabled={!canSubmit}
-      class="w-full py-4 px-5 text-base font-medium rounded-xl transition-all"
+      class="w-full py-4 px-5 text-base font-medium rounded-xl transition-all flex items-center justify-center"
       style="
         background: var(--accent);
         color: var(--bg);
         transition-duration: var(--duration-normal);
+        min-height: 56px;
       "
       class:opacity-50={isLoading}
     >
       {#if isLoading}
-        <div class="flex items-center justify-center">
-          <div class="spinner"></div>
-        </div>
+        <div class="spinner"></div>
       {:else}
         Shorten
       {/if}
@@ -158,7 +157,7 @@
       style="color: var(--text-muted);"
       on:click={() => { showCustomAlias = !showCustomAlias; }}
     >
-      {showCustomAlias ? 'Remove custom alias' : 'Use custom alias'}
+      {showCustomAlias ? 'Never mind' : 'Want a custom link?'}
     </button>
   </div>
 
@@ -179,7 +178,7 @@
         class="absolute left-4 text-base"
         style="color: var(--text-muted);"
       >
-        iksi.co/
+        iksi.app/
       </span>
       <input
         type="text"
