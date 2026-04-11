@@ -98,12 +98,14 @@
   }
 
   .input-group {
+    width: 100%;
     margin-bottom: 16px;
   }
 
   .input-wrapper {
     display: flex;
     align-items: center;
+    width: 100%;
     background: var(--surface);
     border-radius: 12px;
     border: 1px solid var(--border);
