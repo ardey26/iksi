@@ -19,22 +19,12 @@
     <!-- Custom iksi mark: two chain links almost touching (Creation of Adam) -->
     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" style="color: var(--text-muted);">
       <circle cx="12" cy="12" r="11" fill="currentColor" />
-      <!-- Upper-left link (rotated pill shape) -->
-      <rect
-        x="5" y="7" width="7" height="4" rx="2"
-        transform="rotate(-45 8.5 9)"
-        stroke="var(--bg)"
-        stroke-width="1.5"
-        fill="none"
-      />
-      <!-- Lower-right link (rotated pill shape) -->
-      <rect
-        x="12" y="13" width="7" height="4" rx="2"
-        transform="rotate(-45 15.5 15)"
-        stroke="var(--bg)"
-        stroke-width="1.5"
-        fill="none"
-      />
+      <g transform="rotate(-45 12 12)" stroke="var(--bg)" stroke-width="1.5" fill="none">
+        <!-- Left chain link -->
+        <rect x="4" y="10" width="7" height="4" rx="2" />
+        <!-- Right chain link -->
+        <rect x="13" y="10" width="7" height="4" rx="2" />
+      </g>
     </svg>
     <span class="text-sm font-medium tracking-tight" style="color: var(--text-muted);">iksi</span>
   </div>
