@@ -15,6 +15,7 @@ model User {
   email       String?
   name        String?
   avatarUrl   String?
+  username    String?  @unique
   showPreview Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -67,6 +68,7 @@ model LongURL {
   ownerId      String?
   showPreview  Boolean      @default(false)
   safeBrowsing SafeBrowsing @default(UNCHECKED)
+  listed       Boolean      @default(false)
   deletedAt    DateTime?
 
   owner  User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
