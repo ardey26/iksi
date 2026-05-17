@@ -1,6 +1,6 @@
 <script>
-	import '../app.css';
-	import { Header } from '../lib/components';
+	import '../../app.css';
+	import { Header } from '$lib/components';
 	import { onMount } from 'svelte';
 	import { theme } from '$lib/stores/theme.js';
 
@@ -16,9 +16,13 @@
 	});
 </script>
 
+<svelte:head>
+	<title>{data.profileUser.name || `@${data.profileUser.username}`} | iksi</title>
+</svelte:head>
+
 <div class="min-h-screen flex flex-col overflow-clip" style="background: var(--bg);">
-	<Header user={data.user} />
-	<main class="flex-1 flex items-center justify-center pt-16 pb-4">
+	<Header user={data.currentUser} />
+	<main class="flex-1 flex flex-col pt-16 pb-4">
 		<slot />
 	</main>
 </div>
