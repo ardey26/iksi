@@ -78,7 +78,7 @@
     {/if}
   </div>
 
-  <!-- Main URL input -->
+  <!-- Main URL input with inline action -->
   <div
     class="relative transition-all"
     class:shake={shakeInput}
@@ -92,24 +92,46 @@
       bind:value={longURL}
       on:keydown={handleKeydown}
       placeholder="Paste a link"
-      class="w-full py-4 px-5 pr-12 text-lg rounded-xl outline-none transition-all"
+      class="w-full py-4 pl-5 pr-16 text-lg rounded-xl outline-none transition-all"
       style="
         background: var(--surface);
         border: 1px solid {longURL && !isURLValid ? 'var(--error)' : isURLValid ? 'var(--accent)' : 'var(--border)'};
         color: var(--text-primary);
         transition-duration: var(--duration-normal);
+        min-height: 60px;
       "
       class:glow-accent={isURLValid}
       class:glow-error={longURL && !isURLValid}
       aria-label="URL to shorten"
     />
 
-    {#if longURL}
-      <!-- Clear button (only when there's content to clear) -->
+    <!-- Right-side inline action: submit / clear / loading -->
+    {#if isLoading}
+      <div
+        class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center"
+        style="width: 44px; height: 44px;"
+        aria-hidden="true"
+      >
+        <div class="spinner"></div>
+      </div>
+    {:else if isURLValid}
+      <button
+        type="submit"
+        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg flex items-center justify-center"
+        style="width: 44px; height: 44px; color: var(--accent);"
+        aria-label="Shorten link"
+        title="Shorten (Enter)"
+      >
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14" />
+          <path d="M13 6l6 6-6 6" />
+        </svg>
+      </button>
+    {:else if longURL}
       <button
         type="button"
-        class="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg"
-        style="color: var(--text-muted);"
+        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg flex items-center justify-center"
+        style="width: 44px; height: 44px; color: var(--text-muted);"
         on:click={clearInput}
         aria-label="Clear input"
       >
@@ -120,75 +142,59 @@
     {/if}
   </div>
 
-  <!-- Submit button (always visible, disabled until URL is valid) -->
-  <button
-    type="submit"
-    disabled={!canSubmit}
-    class="w-full py-4 px-5 text-base font-medium rounded-xl transition-all flex items-center justify-center"
-    style="
-      background: var(--accent);
-      color: var(--bg);
-      transition-duration: var(--duration-normal);
-      min-height: 56px;
-      opacity: {canSubmit ? 1 : 0.5};
-      cursor: {canSubmit ? 'pointer' : 'not-allowed'};
-    "
-  >
-    {#if isLoading}
-      <div class="spinner"></div>
-    {:else}
-      Shorten
-    {/if}
-  </button>
-
-  <!-- Custom alias toggle -->
-  <div class="text-center">
-    <button
-      type="button"
-      class="text-sm transition-colors hover:underline"
-      style="color: var(--text-muted);"
-      on:click={() => { showCustomAlias = !showCustomAlias; }}
-    >
-      {showCustomAlias ? 'Never mind' : 'Want a custom link?'}
-    </button>
-  </div>
-
-  <!-- Custom alias input (space reserved) -->
+  <!-- Custom alias: single-row morph (no vertical shift) -->
   <div
-    class="transition-all overflow-hidden"
-    style="
-      height: {showCustomAlias ? '60px' : '0'};
-      opacity: {showCustomAlias ? 1 : 0};
-      transition-duration: var(--duration-slow);
-    "
+    class="flex items-center justify-start"
+    style="min-height: 44px;"
   >
-    <div
-      class="relative flex items-center"
-      class:shake={shakeAlias}
-    >
-      <span
-        class="absolute left-4 text-base"
+    {#if !showCustomAlias}
+      <button
+        type="button"
+        class="text-sm transition-colors hover:underline"
         style="color: var(--text-muted);"
+        on:click={() => { showCustomAlias = true; }}
       >
-        iksi.app/
-      </span>
-      <input
-        type="text"
-        id="alias"
-        name="alias"
-        bind:value={customURL}
-        placeholder="your-alias"
-        maxlength="50"
-        class="w-full py-4 pl-[5.5rem] pr-4 text-base rounded-xl outline-none transition-all"
+        Want a custom link?
+      </button>
+    {:else}
+      <div
+        class="alias-chip flex items-center rounded-lg"
+        class:shake={shakeAlias}
+        class:glow-error={customURL && !isAliasValid}
         style="
           background: var(--surface);
           border: 1px solid {customURL && !isAliasValid ? 'var(--error)' : 'var(--border)'};
-          color: var(--text-primary);
           transition-duration: var(--duration-normal);
+          height: 44px;
+          width: 100%;
+          max-width: 380px;
         "
-        class:glow-error={customURL && !isAliasValid}
-        aria-label="Custom alias"
-      />
-    </div>
+      >
+        <span class="pl-3 text-sm whitespace-nowrap" style="color: var(--text-muted);">iksi.app/</span>
+        <input
+          type="text"
+          id="alias"
+          name="alias"
+          bind:value={customURL}
+          placeholder="your-alias"
+          maxlength="50"
+          class="flex-1 min-w-0 px-1 text-sm bg-transparent outline-none"
+          style="color: var(--text-primary); height: 100%;"
+          aria-label="Custom alias"
+        />
+        <button
+          type="button"
+          class="flex items-center justify-center flex-shrink-0"
+          style="width: 36px; height: 100%; color: var(--text-muted);"
+          on:click={() => { showCustomAlias = false; customURL = ''; }}
+          aria-label="Cancel custom alias"
+          title="Cancel"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    {/if}
   </div>
 </form>

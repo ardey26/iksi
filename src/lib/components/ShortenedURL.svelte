@@ -131,10 +131,10 @@
   <!-- Reserved error space (matching Input) -->
   <div class="h-5"></div>
 
-  <!-- Result display (same dimensions as input) -->
+  <!-- Result display with inline actions (same dimensions as input) -->
   <div
-    class="w-full py-4 px-5 rounded-xl cursor-pointer transition-all glow-accent"
-    style="background: var(--surface); border: 1px solid var(--accent);"
+    class="w-full pl-5 pr-3 rounded-xl cursor-pointer transition-all glow-accent flex items-center gap-2"
+    style="background: var(--surface); border: 1px solid var(--accent); min-height: 60px;"
     on:click={copy}
     on:keydown={(e) => e.key === 'Enter' && copy()}
     role="button"
@@ -142,51 +142,59 @@
     aria-label="Click to copy shortened URL"
   >
     <p
-      class="text-lg font-medium truncate"
+      class="text-lg font-medium truncate flex-1"
       style="color: var(--accent);"
     >
       {displayURL}
     </p>
+
+    <div class="flex items-center gap-1 flex-shrink-0">
+      <button
+        type="button"
+        on:click|stopPropagation={copy}
+        class="rounded-lg flex items-center justify-center"
+        style="width: 44px; height: 44px; color: var(--accent);"
+        aria-label={copied ? 'Copied' : 'Copy link'}
+        title={copied ? 'Copied' : 'Copy link'}
+      >
+        {#if copied}
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 13l4 4L19 7" />
+          </svg>
+        {:else}
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        {/if}
+      </button>
+      <button
+        type="button"
+        on:click|stopPropagation={openQR}
+        class="rounded-lg flex items-center justify-center"
+        style="width: 44px; height: 44px; color: var(--accent);"
+        aria-haspopup="dialog"
+        aria-label="Show QR code"
+        title="Show QR code"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <path d="M14 14h3v3h-3z" />
+          <path d="M20 14h1v3" />
+          <path d="M14 20h3v1" />
+          <path d="M20 20h1v1" />
+        </svg>
+      </button>
+    </div>
   </div>
 
-  <!-- Copy + QR row (same position as submit) -->
-  <div class="flex items-stretch gap-3" style="min-height: 56px;">
-    <button
-      type="button"
-      on:click={copy}
-      class="flex-1 py-4 px-5 text-base font-medium rounded-xl transition-all flex items-center justify-center"
-      style="background: var(--accent); color: var(--bg);"
-    >
-      {copied ? 'Copied' : 'Copy'}
-    </button>
-    <button
-      type="button"
-      on:click={openQR}
-      class="rounded-xl transition-all flex items-center justify-center"
-      style="
-        width: 56px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        color: var(--text-muted);
-      "
-      aria-haspopup="dialog"
-      aria-label="Show QR code"
-      title="Show QR code"
-    >
-      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <path d="M14 14h3v3h-3z" />
-        <path d="M20 14h1v3" />
-        <path d="M14 20h3v1" />
-        <path d="M20 20h1v1" />
-      </svg>
-    </button>
-  </div>
-
-  <!-- Reset link (same position as custom alias toggle) -->
-  <div class="text-center">
+  <!-- Reset link (matches Input's alias row height for state-swap parity) -->
+  <div
+    class="flex items-center justify-center"
+    style="min-height: 44px;"
+  >
     <button
       type="button"
       class="text-sm transition-colors hover:underline"

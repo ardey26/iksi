@@ -87,6 +87,10 @@ export const POST = async ({ request, getClientAddress }) => {
 		}
 
 		let shortURL;
+		// Only store a urlHash for auto-generated shortens (so dedup-by-hash works).
+		// Custom aliases intentionally store NULL so the user can have multiple
+		// custom shorts pointing at the same long URL without tripping the unique constraint.
+		let urlHashForStore = null;
 
 		const prefixedURL = addPrefix(longURL.trim());
 
@@ -136,17 +140,9 @@ export const POST = async ({ request, getClientAddress }) => {
 		} else {
 			const urlHash = await createURLHash(prefixedURL);
 
-			// Single query with OR to check both hash and exact URL match
 			const isShortened = await prisma.longURL.findFirst({
-				where: {
-					OR: [
-						{ urlHash: urlHash },
-						{ originalURL: prefixedURL }
-					]
-				},
-				select: {
-					shortURL: true
-				}
+				where: { urlHash: urlHash },
+				select: { shortURL: true }
 			});
 
 			if (isShortened) {
@@ -156,24 +152,42 @@ export const POST = async ({ request, getClientAddress }) => {
 			}
 
 			shortURL = await generateShortURL();
+			urlHashForStore = urlHash;
 		}
 
-		const urlHash = await createURLHash(prefixedURL);
 		const encodedURL = encodeURL(prefixedURL);
-		const url = await prisma.longURL.create({
-			data: {
-				originalURL: encodedURL,
-				urlHash: urlHash,
-				shortURL: shortURL
-			},
-			select: {
-				shortURL: true
+
+		try {
+			const url = await prisma.longURL.create({
+				data: {
+					originalURL: encodedURL,
+					urlHash: urlHashForStore,
+					shortURL: shortURL
+				},
+				select: {
+					shortURL: true
+				}
+			});
+
+			return new Response(JSON.stringify({ shortURL: url.shortURL }), {
+				headers: { 'Content-Type': 'application/json' }
+			});
+		} catch (err) {
+			// Concurrent insert race: another request claimed this urlHash a moment ago.
+			// Look up what they got and return that instead of failing.
+			if (err.code === 'P2002' && urlHashForStore && err.meta?.target?.includes?.('urlHash')) {
+				const existing = await prisma.longURL.findFirst({
+					where: { urlHash: urlHashForStore },
+					select: { shortURL: true }
+				});
+				if (existing) {
+					return new Response(JSON.stringify({ shortURL: existing.shortURL }), {
+						headers: { 'Content-Type': 'application/json' }
+					});
+				}
 			}
-		});
-		
-		return new Response(JSON.stringify({ shortURL: url.shortURL }), {
-			headers: { 'Content-Type': 'application/json' }
-		});
+			throw err;
+		}
 		
 		} catch (error) {
 		console.error('Error in shorten API:', error);

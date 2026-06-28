@@ -22,7 +22,7 @@ describe('Input Component', () => {
     const props = { ...defaultProps, longURL: 'https://example.com' };
     render(Input, { props });
 
-    expect(screen.getByText('Shorten')).toBeInTheDocument();
+    expect(screen.getByLabelText('Shorten link')).toBeInTheDocument();
   });
 
   it('should show custom alias input when showCustomAlias is true', () => {
@@ -35,9 +35,9 @@ describe('Input Component', () => {
   it('should hide custom alias input when showCustomAlias is false', () => {
     render(Input, { props: defaultProps });
 
-    // The alias input exists but is in a hidden container (height: 0)
-    const aliasSection = screen.getByPlaceholderText('your-alias').closest('div[class*="overflow-hidden"]');
-    expect(aliasSection).toHaveStyle({ height: '0' });
+    // Alias input is only rendered when toggle is open
+    expect(screen.queryByPlaceholderText('your-alias')).not.toBeInTheDocument();
+    expect(screen.getByText('Want a custom link?')).toBeInTheDocument();
   });
 
   it('should show loading spinner during submission', () => {
@@ -70,14 +70,15 @@ describe('Input Component', () => {
     expect(aliasInput).toHaveAttribute('aria-label', 'Custom alias');
   });
 
-  it('should show paste button when input is empty', () => {
+  it('should show no inline action when input is empty', () => {
     render(Input, { props: defaultProps });
 
-    expect(screen.getByLabelText('Paste from clipboard')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Shorten link')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Clear input')).not.toBeInTheDocument();
   });
 
-  it('should show clear button when input has content', () => {
-    const props = { ...defaultProps, longURL: 'https://example.com' };
+  it('should show clear button when input has invalid content', () => {
+    const props = { ...defaultProps, longURL: 'not-a-url' };
     render(Input, { props });
 
     expect(screen.getByLabelText('Clear input')).toBeInTheDocument();
