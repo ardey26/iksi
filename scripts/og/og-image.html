@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>iksi og image</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Tokens mirror DESIGN.md — dark theme */
+  :root {
+    --bg: #0A0A0B;
+    --surface: #141416;
+    --border: #27272A;
+    --text-primary: #FAFAFA;
+    --text-muted: #A1A1AA;
+    --accent: #3B82F6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; background: var(--bg); }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 72px 88px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Faint hairline grid — luxurious utility, not gradient */
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 88px 88px;
+    pointer-events: none;
+  }
+
+  .top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+  }
+  .mark { width: 28px; height: 28px; color: var(--text-muted); }
+  .wordmark {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text-muted);
+  }
+
+  .middle {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .headline {
+    font-size: 96px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 0.95;
+    color: var(--text-primary);
+    max-width: 900px;
+  }
+  .headline em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .sub {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    color: var(--text-muted);
+    max-width: 760px;
+  }
+
+  .bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    position: relative;
+  }
+  .url {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+  .url .slash { color: var(--text-muted); }
+  .meta {
+    font-size: 16px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <svg class="mark" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="11" fill="currentColor" />
+      <g transform="rotate(-45 12 12)" stroke="#0A0A0B" stroke-width="1.5" fill="none">
+        <rect x="4" y="10" width="7" height="4" rx="2" />
+        <rect x="13" y="10" width="7" height="4" rx="2" />
+      </g>
+    </svg>
+    <span class="wordmark">iksi</span>
+  </div>
+
+  <div class="middle">
+    <h1 class="headline">make long links<br/>feel <em>short</em>.</h1>
+    <p class="sub">a fast, free url shortener. no signup, custom aliases, instant redirects.</p>
+  </div>
+
+  <div class="bottom">
+    <span class="url">iksi.app<span class="slash">/</span>your-link</span>
+  </div>
+</body>
+</html>
