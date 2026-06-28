@@ -61,14 +61,15 @@
   };
 
   const handleKeydown = (e) => {
-    if (e.key === 'Escape') {
-      if (shortURL) {
-        reset();
-      } else {
-        longURL = '';
-        customURL = '';
-        error = '';
-      }
+    if (e.key !== 'Escape') return;
+    // If a modal dialog is open (e.g., QR code), let it handle Escape itself.
+    if (typeof document !== 'undefined' && document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+    if (shortURL) {
+      reset();
+    } else {
+      longURL = '';
+      customURL = '';
+      error = '';
     }
   };
 </script>
