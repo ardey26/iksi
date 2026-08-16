@@ -9,25 +9,9 @@
     if (val === null) next.delete(key); else next.set(key, val);
     goto(`?${next.toString()}`, { keepFocus: true, noScroll: true });
   }
-  function onBotsChange(e: Event) {
-    const checked = (e.currentTarget as HTMLInputElement).checked;
-    setParam('bots', checked ? '1' : null);
-  }
 </script>
 
 <section class="space-y-8">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-medium" style="color: var(--text-primary);">Analytics</h1>
-    <label class="flex items-center gap-2 text-sm" style="color: var(--text-muted);">
-      <input
-        type="checkbox"
-        checked={data.includeBots}
-        on:change={onBotsChange}
-      />
-      Include bots
-    </label>
-  </div>
-
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
     {#each [
       { label: 'Total URLs', value: data.kpis.totalURLs },
