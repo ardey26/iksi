@@ -65,6 +65,8 @@
 
   $: seo = seoForRoute($page.url.pathname, $page.url.host);
   $: isAdminSurface = ($page.url.host === 'admin.iksi.app' || $page.url.host === 'admin.localhost' || $page.url.host.startsWith('admin.localhost:')) || $page.url.pathname.startsWith('/admin');
+  $: isAppSurface = $page.url.pathname.startsWith('/dashboard') || $page.url.pathname.startsWith('/@') || $page.url.pathname === '/login' || $page.url.pathname === '/logout' || $page.url.pathname.startsWith('/auth/');
+  $: skipRootChrome = isAdminSurface || isAppSurface;
 
   onMount(() => {
     if (typeof window !== 'undefined') {
@@ -84,7 +86,7 @@
   noindex={seo.noindex}
 />
 
-{#if isAdminSurface}
+{#if skipRootChrome}
   <slot />
 {:else}
   <div class="min-h-screen flex flex-col relative" style="background: var(--bg);">

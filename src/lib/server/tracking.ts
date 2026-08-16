@@ -37,7 +37,11 @@ export function normalizeReferrer(referer: string | null | undefined): string | 
   }
 }
 
-export async function recordClick(urlId: number, event: RequestEvent): Promise<void> {
+export async function recordClick(
+  urlId: number,
+  event: RequestEvent,
+  opts?: { surface?: 'direct' | 'profile' | 'api'; profileId?: number; rowId?: number }
+): Promise<void> {
   try {
     // Dynamic import: vi.mock hoisting is not reliable through SvelteKit's $lib alias,
     // and dynamic import lets the test-time mock replace the module registry entry.
@@ -49,7 +53,16 @@ export async function recordClick(urlId: number, event: RequestEvent): Promise<v
 
     await prisma.$transaction([
       prisma.click.create({
-        data: { urlId, referrer, country, browser, device }
+        data: {
+          urlId,
+          referrer,
+          country,
+          browser,
+          device,
+          surface: opts?.surface,
+          profileId: opts?.profileId,
+          rowId: opts?.rowId
+        }
       }),
       prisma.longURL.update({
         where: { id: urlId },
@@ -58,5 +71,17 @@ export async function recordClick(urlId: number, event: RequestEvent): Promise<v
     ]);
   } catch (err) {
     console.error('recordClick failed', err);
+  }
+}
+
+export async function recordProfileView(profileId: number, event: RequestEvent): Promise<void> {
+  try {
+    const { prisma } = await import('$lib/prisma.js');
+    const h = event.request.headers;
+    const referrer = normalizeReferrer(h.get('referer'));
+    const country = h.get('x-vercel-ip-country') || null;
+    await prisma.profileView.create({ data: { profileId, referrer, country } });
+  } catch (err) {
+    console.error('recordProfileView failed', err);
   }
 }

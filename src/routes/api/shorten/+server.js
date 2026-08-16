@@ -4,7 +4,9 @@ import { RATE_LIMIT, SHORT_URL } from '$lib/config.js';
 import { addPrefix, isValidURLServer, isValidAlias } from '$lib/utils/urlValidation.js';
 import { createURLHash } from '$lib/utils/urlHash.js';
 import { encodeURL } from '$lib/server/crypto.js';
+import { verifyUserSession } from '$lib/server/user-auth';
 import { randomBytes } from 'crypto';
+import { checkURL } from '$lib/server/safe-browsing';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -43,7 +45,7 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 };
 
 
-export const POST = async ({ request, getClientAddress }) => {
+export const POST = async ({ request, getClientAddress, cookies }) => {
 	try {
 		// Rate limiting
 		const clientIP = getClientAddress();
@@ -70,6 +72,7 @@ export const POST = async ({ request, getClientAddress }) => {
 		}
 
 		const { longURL, customURL } = await request.json();
+		const uid = verifyUserSession(cookies.get('user_session'));
 
 		// Input validation
 		if (!longURL || typeof longURL !== 'string') {
@@ -162,12 +165,27 @@ export const POST = async ({ request, getClientAddress }) => {
 				data: {
 					originalURL: encodedURL,
 					urlHash: urlHashForStore,
-					shortURL: shortURL
+					shortURL: shortURL,
+					userId: uid
 				},
 				select: {
 					shortURL: true
 				}
 			});
+
+			// Fire safe-browsing async; failures never block shorten response
+			checkURL(prefixedURL).then(async (verdict) => {
+				await prisma.longURL.update({
+					where: { shortURL: url.shortURL },
+					data: { safeVerdict: verdict, safeCheckedAt: new Date() }
+				});
+				if (verdict !== 'safe' && verdict !== 'pending') {
+					await prisma.profileRow.updateMany({
+						where: { link: { shortURL: url.shortURL } },
+						data: { quarantined: true }
+					});
+				}
+			}).catch(() => {});
 
 			return new Response(JSON.stringify({ shortURL: url.shortURL }), {
 				headers: { 'Content-Type': 'application/json' }

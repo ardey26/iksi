@@ -144,3 +144,51 @@ describe('getUABreakdown', () => {
     expect(out.devices).toEqual([{ device: 'desktop', count: 90 }, { device: 'mobile', count: 40 }]);
   });
 });
+
+import { getProfileStats, getProfileTimeSeries } from './stats';
+
+describe('getProfileStats', () => {
+  it('returns views, clicks, ctr, rowClicks with bot exclusion', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    (prisma.$queryRaw as any).mockResolvedValueOnce([{ count: 100 }]); // views
+    (prisma.$queryRaw as any).mockResolvedValueOnce([{ count: 25 }]);  // clicks
+    (prisma.$queryRaw as any).mockResolvedValueOnce([
+      { rowId: 1, count: 15 },
+      { rowId: 2, count: 10 }
+    ]);
+
+    const s = await getProfileStats(42, { includeBots: false });
+    expect(s).toEqual({
+      views: 100,
+      clicks: 25,
+      ctr: 0.25,
+      rowClicks: [ { rowId: 1, count: 15 }, { rowId: 2, count: 10 } ]
+    });
+  });
+
+  it('ctr is 0 when views is 0', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    (prisma.$queryRaw as any).mockResolvedValueOnce([{ count: 0 }]);
+    (prisma.$queryRaw as any).mockResolvedValueOnce([{ count: 0 }]);
+    (prisma.$queryRaw as any).mockResolvedValueOnce([]);
+    const s = await getProfileStats(1, { includeBots: false });
+    expect(s.ctr).toBe(0);
+  });
+});
+
+describe('getProfileTimeSeries', () => {
+  it('returns aligned labels, views, clicks arrays for the window', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    const end = new Date('2026-08-16T12:00:00Z');
+    (prisma.$queryRaw as any).mockResolvedValueOnce([
+      { day: new Date('2026-08-15T00:00:00Z'), count: 5 }
+    ]);
+    (prisma.$queryRaw as any).mockResolvedValueOnce([
+      { day: new Date('2026-08-16T00:00:00Z'), count: 2 }
+    ]);
+    const s = await getProfileTimeSeries(1, { days: 3 as any, endDate: end });
+    expect(s.labels).toHaveLength(3);
+    expect(s.views).toEqual([0, 5, 0]);
+    expect(s.clicks).toEqual([0, 0, 2]);
+  });
+});

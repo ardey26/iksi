@@ -208,3 +208,78 @@ export async function getUABreakdown(opts: { includeBots: boolean }): Promise<UA
 
   return { browsers, devices };
 }
+
+export type ProfileStats = {
+  views: number;
+  clicks: number;
+  ctr: number;
+  rowClicks: Array<{ rowId: number; count: number }>;
+};
+
+export async function getProfileStats(profileId: number, opts: { includeBots: boolean }): Promise<ProfileStats> {
+  const { prisma } = await import('$lib/prisma.js');
+  const botFilter = opts.includeBots ? Prisma.empty : Prisma.sql`AND "device" IS DISTINCT FROM 'bot'`;
+
+  const [viewsRow] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+    SELECT COUNT(*)::int AS count FROM "ProfileView" WHERE "profileId" = ${profileId}
+  `);
+  const [clicksRow] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+    SELECT COUNT(*)::int AS count FROM "Click" WHERE "profileId" = ${profileId} ${botFilter}
+  `);
+  const perRow = await prisma.$queryRaw<Array<{ rowId: number; count: number }>>(Prisma.sql`
+    SELECT "rowId", COUNT(*)::int AS count
+    FROM "Click"
+    WHERE "profileId" = ${profileId} AND "rowId" IS NOT NULL ${botFilter}
+    GROUP BY "rowId"
+    ORDER BY count DESC
+  `);
+
+  const views = viewsRow?.count ?? 0;
+  const clicks = clicksRow?.count ?? 0;
+  const ctr = views > 0 ? clicks / views : 0;
+  return { views, clicks, ctr, rowClicks: perRow };
+}
+
+export type ProfileTimeSeries = { labels: string[]; views: number[]; clicks: number[] };
+
+export async function getProfileTimeSeries(
+  profileId: number,
+  opts: { days: 7 | 30 | 90; endDate?: Date; includeBots?: boolean }
+): Promise<ProfileTimeSeries> {
+  const { prisma } = await import('$lib/prisma.js');
+  const end = opts.endDate ?? new Date();
+  const endDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+  const start = new Date(endDay);
+  start.setUTCDate(start.getUTCDate() - (opts.days - 1));
+  const upper = new Date(endDay.getTime() + 86400000);
+  const botFilter = opts.includeBots ? Prisma.empty : Prisma.sql`AND "device" IS DISTINCT FROM 'bot'`;
+
+  const viewsRows = await prisma.$queryRaw<Array<{ day: Date; count: number }>>(Prisma.sql`
+    SELECT DATE_TRUNC('day', "createdAt") AS day, COUNT(*)::int AS count
+    FROM "ProfileView"
+    WHERE "profileId" = ${profileId} AND "createdAt" >= ${start} AND "createdAt" < ${upper}
+    GROUP BY day ORDER BY day
+  `);
+  const clicksRows = await prisma.$queryRaw<Array<{ day: Date; count: number }>>(Prisma.sql`
+    SELECT DATE_TRUNC('day', "createdAt") AS day, COUNT(*)::int AS count
+    FROM "Click"
+    WHERE "profileId" = ${profileId} AND "createdAt" >= ${start} AND "createdAt" < ${upper} ${botFilter}
+    GROUP BY day ORDER BY day
+  `);
+
+  const vMap = new Map(viewsRows.map(r => [r.day.toISOString().slice(0, 10), r.count]));
+  const cMap = new Map(clicksRows.map(r => [r.day.toISOString().slice(0, 10), r.count]));
+
+  const labels: string[] = [];
+  const views: number[] = [];
+  const clicks: number[] = [];
+  for (let i = 0; i < opts.days; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    const k = d.toISOString().slice(0, 10);
+    labels.push(k);
+    views.push(vMap.get(k) ?? 0);
+    clicks.push(cMap.get(k) ?? 0);
+  }
+  return { labels, views, clicks };
+}

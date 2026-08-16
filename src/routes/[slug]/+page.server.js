@@ -36,7 +36,16 @@ export const load = async (event) => {
 	redirectCache.set(slug, { url: decodedURL, expires: now + CACHE_TTL });
 
 	if (!isHead) {
-		const p = recordClick(longURL.id, event);
+		const surface = event.url.searchParams.get('s');
+		const pid = Number(event.url.searchParams.get('p'));
+		const rid = Number(event.url.searchParams.get('r'));
+		const opts = surface === 'profile' && Number.isInteger(pid) && Number.isInteger(rid)
+			? { surface: 'profile', profileId: pid, rowId: rid }
+			: surface === 'api'
+				? { surface: 'api' }
+				: { surface: 'direct' };
+
+		const p = recordClick(longURL.id, event, opts);
 		if (platform?.context?.waitUntil) {
 			platform.context.waitUntil(p);
 		} else {
