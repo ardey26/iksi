@@ -80,6 +80,31 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       ]);
       return json({ ok: true });
     }
+    case 'reorderRows': {
+      const { orderedIds } = body;
+      if (!Array.isArray(orderedIds) || !orderedIds.every((x) => Number.isInteger(x))) {
+        return json({ error: 'Invalid order' }, { status: 400 });
+      }
+      // Verify all rows belong to this profile
+      const rows = await prisma.profileRow.findMany({
+        where: { id: { in: orderedIds }, profileId: p.id },
+        select: { id: true }
+      });
+      if (rows.length !== orderedIds.length) return json({ error: 'Rows not owned' }, { status: 403 });
+      // Two-phase update to sidestep the (profileId, position) uniqueness during renumber.
+      // Phase 1: bump every touched row to a temporary high offset.
+      // Phase 2: assign final 0..N-1 positions.
+      const offset = 1000000;
+      await prisma.$transaction([
+        ...orderedIds.map((id, i) =>
+          prisma.profileRow.update({ where: { id }, data: { position: offset + i } })
+        ),
+        ...orderedIds.map((id, i) =>
+          prisma.profileRow.update({ where: { id }, data: { position: i } })
+        )
+      ]);
+      return json({ ok: true });
+    }
     case 'deleteRow': {
       const { rowId } = body;
       const row = await prisma.profileRow.findUnique({ where: { id: rowId } });

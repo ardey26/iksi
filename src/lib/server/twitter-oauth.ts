@@ -81,7 +81,10 @@ export async function fetchMe(accessToken: string): Promise<TwitterUser> {
     'https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username',
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-  if (!res.ok) throw new Error(`Twitter /users/me failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '(no body)');
+    throw new Error(`Twitter /users/me failed: ${res.status} — ${body}`);
+  }
   const json = await res.json();
   const d = json.data;
   return {

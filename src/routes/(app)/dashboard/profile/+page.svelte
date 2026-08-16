@@ -8,113 +8,142 @@
   let accent = data.profile?.accent ?? '#3B82F6';
   let publicClicks = !!data.profile?.publicClicks;
 
-  let newRowLinkId: number | '' = data.ownedLinks[0]?.id ?? '';
-  let newRowTitle = '';
+  let saving = false;
+  let saved = false;
+  let dirty = false;
+
+  $: {
+    const orig = {
+      displayName: data.profile?.displayName ?? '',
+      bio: data.profile?.bio ?? '',
+      avatarUrl: data.profile?.avatarUrl ?? '',
+      theme: data.profile?.theme ?? 'default',
+      accent: data.profile?.accent ?? '#3B82F6',
+      publicClicks: !!data.profile?.publicClicks
+    };
+    dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
+      || theme !== orig.theme || accent !== orig.accent || publicClicks !== orig.publicClicks;
+  }
 
   async function saveProfile() {
+    if (!dirty || saving) return;
+    saving = true;
     const res = await fetch('/dashboard/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'updateProfile', displayName, bio, avatarUrl, theme, accent, publicClicks })
     });
-    if (!res.ok) alert('Save failed'); else location.reload();
+    saving = false;
+    if (res.ok) {
+      saved = true;
+      setTimeout(() => location.reload(), 400);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      alert(body.error || 'Save failed');
+    }
   }
 
-  async function post(payload: any) {
-    const res = await fetch('/dashboard/profile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) location.reload(); else alert('Failed');
-  }
-
-  function confirmDelete(rowId: number) {
-    if (confirm('Delete row?')) post({ action: 'deleteRow', rowId });
-  }
+  const themes = [
+    { id: 'default', label: 'Dark' },
+    { id: 'light', label: 'Light' },
+    { id: 'mono', label: 'Mono' }
+  ];
 </script>
 
-<section class="max-w-3xl mx-auto space-y-10">
-  <h1 class="text-xl font-medium" style="color: var(--text-primary);">Profile</h1>
+<svelte:head><title>Profile — iksi</title></svelte:head>
 
+<section class="w-full max-w-2xl mx-auto space-y-12">
+  <header>
+    <p class="text-sm mb-8" style="color: var(--text-muted);">
+      <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
+    </p>
+    <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Profile</h1>
+  </header>
+
+  <!-- Identity -->
   <div class="space-y-4">
-    <h2 class="text-sm uppercase tracking-wide" style="color: var(--text-muted);">Details</h2>
-    <label class="block">
-      <span class="text-sm" style="color: var(--text-muted);">Display name</span>
-      <input type="text" bind:value={displayName} maxlength="80"
-             class="mt-1 w-full px-3 py-2 rounded-md" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);" />
-    </label>
-    <label class="block">
-      <span class="text-sm" style="color: var(--text-muted);">Bio (≤200 chars)</span>
-      <textarea bind:value={bio} maxlength="200" rows="3"
-                class="mt-1 w-full px-3 py-2 rounded-md" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);"></textarea>
-    </label>
-    <label class="block">
-      <span class="text-sm" style="color: var(--text-muted);">Avatar URL</span>
-      <input type="url" bind:value={avatarUrl}
-             class="mt-1 w-full px-3 py-2 rounded-md" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);" />
-    </label>
-    <div class="flex gap-6">
-      <label class="block">
-        <span class="text-sm" style="color: var(--text-muted);">Theme</span>
-        <select bind:value={theme} class="mt-1 px-3 py-2 rounded-md" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">
-          <option value="default">default (dark)</option>
-          <option value="light">light</option>
-          <option value="mono">mono</option>
-        </select>
+    <div>
+      <h2 class="text-base font-medium" style="color: var(--text-primary);">Identity</h2>
+      <p class="text-sm mt-1" style="color: var(--text-muted);">How you show up on your public page.</p>
+    </div>
+    <div class="rounded-xl p-6 space-y-5" style="background: var(--surface); border: 1px solid var(--border);">
+      <label class="block space-y-2">
+        <span class="text-sm" style="color: var(--text-muted);">Display name</span>
+        <input type="text" bind:value={displayName} maxlength="80" placeholder={data.user.twitterHandle}
+               class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
+               style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
       </label>
-      <label class="block">
-        <span class="text-sm" style="color: var(--text-muted);">Accent</span>
-        <input type="color" bind:value={accent} class="mt-1 h-10 w-16 rounded-md" style="background: var(--surface); border: 1px solid var(--border);" />
+
+      <label class="block space-y-2">
+        <span class="text-sm flex items-baseline justify-between" style="color: var(--text-muted);">
+          <span>Bio</span>
+          <span class="text-xs tabular-nums">{bio.length}/200</span>
+        </span>
+        <textarea bind:value={bio} maxlength="200" rows="3" placeholder="A line or two about you."
+                  class="w-full px-3 py-2.5 rounded-md text-base outline-none resize-none transition-colors"
+                  style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);"></textarea>
+      </label>
+
+      <label class="block space-y-2">
+        <span class="text-sm" style="color: var(--text-muted);">Avatar URL</span>
+        <input type="url" bind:value={avatarUrl} placeholder="https://..."
+               class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
+               style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
       </label>
     </div>
-    <label class="flex items-center gap-2 text-sm" style="color: var(--text-muted);">
-      <input type="checkbox" bind:checked={publicClicks} />
-      Show click counts publicly
-    </label>
-    <button on:click={saveProfile} class="px-4 py-2 rounded-md text-sm font-medium" style="background: var(--accent); color: white;">
-      Save profile
-    </button>
   </div>
 
+  <!-- Appearance -->
   <div class="space-y-4">
-    <h2 class="text-sm uppercase tracking-wide" style="color: var(--text-muted);">Rows</h2>
-    <ul class="space-y-2">
-      {#each data.profile?.rows ?? [] as row}
-        <li class="flex items-center gap-3 p-3 rounded-md" style="background: var(--surface); border: 1px solid var(--border);">
-          <span class="flex-1 truncate" style={`color: ${row.enabled ? 'var(--text-primary)' : 'var(--text-muted)'};`}>
-            <strong>{row.title}</strong>
-            <span class="text-xs" style="color: var(--text-muted);">→ /{row.link?.shortURL ?? '(deleted)'}</span>
-          </span>
-          <button class="text-xs" style="color: var(--text-muted);" on:click={() => post({ action: 'moveRow', rowId: row.id, direction: 'up' })}>↑</button>
-          <button class="text-xs" style="color: var(--text-muted);" on:click={() => post({ action: 'moveRow', rowId: row.id, direction: 'down' })}>↓</button>
-          <button class="text-xs" style="color: var(--accent);" on:click={() => post({ action: 'toggleRow', rowId: row.id, enabled: !row.enabled })}>
-            {row.enabled ? 'Hide' : 'Show'}
-          </button>
-          <button class="text-xs" style="color: var(--error);" on:click={() => confirmDelete(row.id)}>Delete</button>
-        </li>
-      {/each}
-    </ul>
-
-    <div class="flex gap-2 items-end">
-      <label class="block flex-1">
-        <span class="text-sm" style="color: var(--text-muted);">Link</span>
-        <select bind:value={newRowLinkId} class="mt-1 w-full px-3 py-2 rounded-md" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">
-          {#each data.ownedLinks as l}
-            <option value={l.id}>{l.shortURL}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="block flex-1">
-        <span class="text-sm" style="color: var(--text-muted);">Title</span>
-        <input type="text" bind:value={newRowTitle} maxlength="80" class="mt-1 w-full px-3 py-2 rounded-md" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);" />
-      </label>
-      <button
-        class="px-4 py-2 rounded-md text-sm font-medium"
-        style="background: var(--accent); color: white;"
-        disabled={!newRowLinkId || !newRowTitle}
-        on:click={() => post({ action: 'addRow', linkId: newRowLinkId, title: newRowTitle })}
-      >Add row</button>
+    <div>
+      <h2 class="text-base font-medium" style="color: var(--text-primary);">Appearance</h2>
+      <p class="text-sm mt-1" style="color: var(--text-muted);">Look and feel of your public page.</p>
     </div>
+    <div class="rounded-xl p-6 space-y-6" style="background: var(--surface); border: 1px solid var(--border);">
+      <div class="space-y-3">
+        <span class="text-sm" style="color: var(--text-muted);">Theme</span>
+        <div class="flex gap-2">
+          {#each themes as t}
+            <button
+              type="button"
+              on:click={() => theme = t.id}
+              class="flex-1 py-2.5 rounded-md text-sm transition-colors"
+              style="background: {theme === t.id ? 'var(--text-primary)' : 'var(--bg)'}; color: {theme === t.id ? 'var(--bg)' : 'var(--text-primary)'}; border: 1px solid {theme === t.id ? 'var(--text-primary)' : 'var(--border)'}; cursor: pointer;"
+            >{t.label}</button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-sm" style="color: var(--text-muted);">Accent</span>
+        <label class="relative w-10 h-10 rounded-full overflow-hidden cursor-pointer" style="background: {accent}; border: 1px solid var(--border);">
+          <input type="color" bind:value={accent} class="absolute inset-0 opacity-0 cursor-pointer" />
+        </label>
+        <span class="text-sm tabular-nums" style="color: var(--text-muted);">{accent.toUpperCase()}</span>
+      </div>
+
+      <label class="flex items-start gap-3 text-sm cursor-pointer">
+        <input type="checkbox" bind:checked={publicClicks} class="mt-0.5" />
+        <span style="color: var(--text-primary);">
+          Show click counts publicly
+          <span class="block text-xs mt-0.5" style="color: var(--text-muted);">Visitors see how many times each row was clicked.</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Save profile changes: last thing on the page -->
+  <div class="flex items-center gap-3 pt-4" style="border-top: 1px solid var(--border);">
+    <button
+      on:click={saveProfile}
+      disabled={!dirty || saving}
+      class="px-5 py-2.5 rounded-md text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
+      style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
+    >
+      {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
+    </button>
+    {#if dirty && !saving}
+      <span class="text-xs" style="color: var(--text-muted);">Unsaved changes</span>
+    {/if}
   </div>
 </section>

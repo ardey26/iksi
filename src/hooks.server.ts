@@ -70,7 +70,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         "script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://adservice.google.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
-        "img-src 'self' data: https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+        "img-src 'self' data: https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://pbs.twimg.com https://abs.twimg.com",
         "connect-src 'self' https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
         "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
         "frame-ancestors 'none'"

@@ -143,19 +143,37 @@ export const POST = async ({ request, getClientAddress, cookies }) => {
 		} else {
 			const urlHash = await createURLHash(prefixedURL);
 
-			const isShortened = await prisma.longURL.findFirst({
-				where: { urlHash: urlHash },
-				select: { shortURL: true }
-			});
-
-			if (isShortened) {
-				return new Response(JSON.stringify({ shortURL: isShortened.shortURL }), {
-					headers: { 'Content-Type': 'application/json' }
+			if (uid !== null) {
+				// Logged-in: dedupe only against links THIS user already owns.
+				// urlHash is NOT stored on new rows (would collide with the global unique
+				// constraint if another user already shortened the same URL). Trade-off:
+				// no dedupe for this user's future shortens of the same URL, in exchange
+				// for guaranteed ownership.
+				const mine = await prisma.longURL.findFirst({
+					where: { userId: uid, urlHash: urlHash },
+					select: { shortURL: true }
 				});
+				if (mine) {
+					return new Response(JSON.stringify({ shortURL: mine.shortURL }), {
+						headers: { 'Content-Type': 'application/json' }
+					});
+				}
+				shortURL = await generateShortURL();
+				urlHashForStore = null;
+			} else {
+				// Anonymous: keep the global-dedupe behaviour.
+				const isShortened = await prisma.longURL.findFirst({
+					where: { urlHash: urlHash },
+					select: { shortURL: true }
+				});
+				if (isShortened) {
+					return new Response(JSON.stringify({ shortURL: isShortened.shortURL }), {
+						headers: { 'Content-Type': 'application/json' }
+					});
+				}
+				shortURL = await generateShortURL();
+				urlHashForStore = urlHash;
 			}
-
-			shortURL = await generateShortURL();
-			urlHashForStore = urlHash;
 		}
 
 		const encodedURL = encodeURL(prefixedURL);

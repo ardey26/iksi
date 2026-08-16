@@ -1,12 +1,26 @@
 <script lang="ts">
   export let data;
 
-  let handle = (data.user.twitterHandle ?? '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
+  function sanitize(v: string) {
+    return v.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
+  }
+
+  let handle = sanitize(data.user.twitterHandle ?? '');
   let error = '';
   let loading = false;
 
+  const HANDLE_RE = /^[a-z0-9_-]{3,30}$/;
+  $: valid = HANDLE_RE.test(handle);
+  $: preview = handle || 'yourhandle';
+
+  function onInput(e: Event) {
+    handle = sanitize((e.currentTarget as HTMLInputElement).value);
+    error = '';
+  }
+
   async function submit(e: SubmitEvent) {
     e.preventDefault();
+    if (!valid || loading) return;
     loading = true; error = '';
     try {
       const res = await fetch('/dashboard/claim', {
@@ -24,30 +38,56 @@
 
 <svelte:head><title>Claim your handle — iksi</title></svelte:head>
 
-<section class="max-w-md mx-auto pt-16">
-  <h1 class="text-lg mb-2" style="color: var(--text-primary);">Claim your handle</h1>
-  <p class="text-sm mb-6" style="color: var(--text-muted);">Your profile will live at iksi.app/@handle. 3–30 characters, lowercase letters/numbers/underscore/hyphen.</p>
-  <form on:submit={submit} class="space-y-4">
-    <div class="flex items-stretch rounded-md overflow-hidden" style="border: 1px solid var(--border); background: var(--surface);">
-      <span class="px-3 py-3 text-sm flex items-center" style="color: var(--text-muted); border-right: 1px solid var(--border);">iksi.app/@</span>
-      <input
-        type="text"
-        bind:value={handle}
-        required
-        minlength="3"
-        maxlength="30"
-        class="flex-1 px-3 py-3 outline-none"
-        style="background: transparent; color: var(--text-primary);"
-      />
+<div class="flex-1 flex items-center justify-center px-4 pb-24">
+<section class="w-full max-w-md">
+  <div class="text-center mb-10">
+    <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">
+      Claim your handle
+    </h1>
+  </div>
+
+  <form on:submit={submit} class="space-y-5">
+    <div>
+      <div class="flex items-stretch rounded-xl overflow-hidden transition-colors"
+           style="border: 1px solid {error ? 'var(--error)' : valid ? 'var(--accent)' : 'var(--border)'}; background: var(--surface);">
+        <span class="pl-4 pr-2 flex items-center text-base tabular-nums" style="color: var(--text-muted);">iksi.app/@</span>
+        <input
+          type="text"
+          value={handle}
+          on:input={onInput}
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          required
+          minlength="3"
+          maxlength="30"
+          placeholder="handle"
+          class="flex-1 py-4 pr-4 outline-none text-base bg-transparent"
+          style="color: var(--text-primary);"
+        />
+      </div>
+      <p class="mt-2 text-xs" style="color: var(--text-muted);">
+        3–30 characters. Lowercase letters, numbers, <code style="font-family: inherit;">_</code>, <code style="font-family: inherit;">-</code>.
+      </p>
     </div>
-    {#if error}<p class="text-sm" style="color: var(--error);">{error}</p>{/if}
+
+    <div class="rounded-xl px-4 py-3 text-sm" style="background: var(--surface); border: 1px dashed var(--border); color: var(--text-muted);">
+      Preview: <span style="color: var(--text-primary);">iksi.app/@{preview}</span>
+    </div>
+
+    {#if error}
+      <p class="text-sm" style="color: var(--error);">{error}</p>
+    {/if}
+
     <button
       type="submit"
-      disabled={loading || handle.length < 3}
-      class="w-full text-base font-medium px-4 py-3 rounded-md"
-      style="background: var(--accent); color: white;"
+      disabled={!valid || loading}
+      class="w-full text-base font-medium px-4 py-4 rounded-xl transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+      style="background: var(--text-primary); color: var(--bg);"
     >
-      {loading ? 'Claiming…' : 'Claim'}
+      {loading ? 'Claiming…' : `Claim @${handle || '…'}`}
     </button>
   </form>
 </section>
+</div>

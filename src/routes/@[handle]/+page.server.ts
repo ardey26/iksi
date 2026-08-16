@@ -33,7 +33,8 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
     id: r.id,
     title: r.title,
     href: r.link ? `/${r.link.shortURL}?s=profile&p=${p.id}&r=${r.id}` : null,
-    destination: r.link ? await decodeURL(r.link.originalURL) : null
+    destination: r.link ? await decodeURL(r.link.originalURL) : null,
+    clicks: p.publicClicks && r.link ? r.link.clickCount : null
   })));
 
   // Fire-and-forget profile view (do not block)
@@ -49,6 +50,7 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
     avatarUrl: p.avatarUrl,
     theme: p.theme,
     accent: p.accent,
+    publicClicks: p.publicClicks,
     rows
   };
 };
