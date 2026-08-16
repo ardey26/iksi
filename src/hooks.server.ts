@@ -5,71 +5,62 @@ import { decodeURL } from '$lib/server/crypto.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
-// Cache for admin slug lookup (reduces DB queries on hot path)
+// Cache for admin slug lookup on non-admin hosts (allows "admin" as a custom short link)
 let adminSlugCache: { url: string | null; expires: number } | null = null;
-const CACHE_TTL = 60000; // 60 seconds
+const CACHE_TTL = 60000;
 
 async function getAdminSlugURL(): Promise<string | null> {
     const now = Date.now();
-
-    // Return cached result if valid
-    if (adminSlugCache && adminSlugCache.expires > now) {
-        return adminSlugCache.url;
-    }
-
-    // Fetch from database
+    if (adminSlugCache && adminSlugCache.expires > now) return adminSlugCache.url;
     const longURL = await prisma.longURL.findFirst({
         where: { shortURL: 'admin' },
         select: { originalURL: true }
     });
-
     const url = longURL ? await decodeURL(longURL.originalURL) : null;
-
-    // Cache the result
     adminSlugCache = { url, expires: now + CACHE_TTL };
-
     return url;
+}
+
+function isAdminGroupRoute(routeId: string | null): boolean {
+    return !!routeId && routeId.startsWith('/(admin)');
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
     const host = event.request.headers.get('host')?.split(':')[0] || '';
     const isAdminHost = ADMIN_HOSTS.includes(host);
+    const routeId = event.route.id;
+    const inAdminGroup = isAdminGroupRoute(routeId);
 
-    // On non-admin hosts, treat /admin as a potential short link (slug)
-    // This allows "admin" to be a custom short link
+    // 1. Host gating: admin routes only reachable on admin hosts.
+    if (inAdminGroup && !isAdminHost) {
+        return new Response('Not Found', { status: 404 });
+    }
+
+    // 2. On admin subdomain, redirect root to /admin (dashboard). Any other
+    //    non-admin-group route is 404 so the public homepage/slugs don't leak.
+    if (isAdminHost && !inAdminGroup) {
+        if (event.url.pathname === '/') {
+            return new Response(null, { status: 302, headers: { Location: '/admin' } });
+        }
+        if (routeId !== null) {
+            return new Response('Not Found', { status: 404 });
+        }
+    }
+
+    // 3. Special case: "admin" as a custom short link on the public host.
     if (!isAdminHost && event.url.pathname === '/admin') {
         const decodedURL = await getAdminSlugURL();
-
-        if (decodedURL) {
-            throw redirect(302, decodedURL);
-        }
-        // If no short link exists, let the route handle the 404
-        // (this allows custom error page to render)
+        if (decodedURL) throw redirect(302, decodedURL);
     }
 
-    // For /admin/* sub-routes on non-admin hosts, let the route handle the 404
-    // (route server loads have host checks that throw error(404), which renders custom error page)
-
-    // On admin subdomain, redirect root to /admin
-    if (isAdminHost && event.url.pathname === '/') {
-        return new Response(null, {
-            status: 302,
-            headers: { Location: '/admin' }
-        });
-    }
-
+    // 4. Block direct GETs to /api on the public host.
     if (event.request.method === 'GET' && event.url.pathname.startsWith('/api')) {
-        return new Response(null, {
-            status: 302,
-            headers: {
-                Location: '/'
-            }
-        });
+        return new Response(null, { status: 302, headers: { Location: '/' } });
     }
 
     const response = await resolve(event);
-    
-    // Add security and performance headers
+
+    // Security + performance headers (unchanged from before)
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('X-Frame-Options', 'DENY');
     response.headers.set('X-XSS-Protection', '1; mode=block');
@@ -85,10 +76,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         "frame-ancestors 'none'"
     ].join('; '));
 
-    // Cache control for static assets
     if (event.url.pathname.startsWith('/static/') || event.url.pathname.includes('.')) {
         response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     }
-    
+
     return response;
 };

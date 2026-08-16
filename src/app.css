@@ -15,6 +15,13 @@
   --text-muted: #A1A1AA;
   --accent: #3B82F6;
   --error: #EF4444;
+
+  /* Data visualization */
+  --chart-1: var(--accent);
+  --chart-2: #A78BFA;
+  --chart-3: var(--text-muted);
+  --chart-grid: var(--border);
+  --chart-axis: var(--text-muted);
 }
 
 /* Light theme */
@@ -27,6 +34,13 @@
   --text-muted: #52525B;
   --accent: #2563EB;
   --error: #DC2626;
+
+  /* Data visualization */
+  --chart-1: var(--accent);
+  --chart-2: #7C3AED;
+  --chart-3: var(--text-muted);
+  --chart-grid: var(--border);
+  --chart-axis: var(--text-muted);
 }
 
 * {
