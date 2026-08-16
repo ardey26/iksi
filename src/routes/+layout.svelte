@@ -33,7 +33,7 @@
 
   function seoForRoute(pathname, host) {
     const isAdminHost = host === 'admin.iksi.app' || host === 'admin.localhost';
-    if (isAdminHost || pathname.startsWith('/admin')) {
+    if (isAdminHost) {
       return {
         title: 'iksi admin',
         description: 'iksi admin area.',
