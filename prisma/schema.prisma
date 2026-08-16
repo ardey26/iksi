@@ -8,41 +8,125 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model LongURL {
+model User {
+  id            Int       @id @default(autoincrement())
+  twitterId     String    @unique
+  twitterHandle String
+  createdAt     DateTime  @default(now())
+  handle        Handle?
+  profile       Profile?
+  links         LongURL[]
+}
+
+model Handle {
+  id        Int      @id @default(autoincrement())
+  handle    String   @unique
+  userId    Int      @unique
+  claimedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Profile {
+  id           Int           @id @default(autoincrement())
+  userId       Int           @unique
+  displayName  String?
+  bio          String?
+  avatarUrl    String?
+  theme        String        @default("default")
+  accent       String        @default("#3B82F6")
+  publicClicks Boolean       @default(false)
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rows         ProfileRow[]
+  views        ProfileView[]
+  clicks       Click[]
+}
+
+model ProfileRow {
   id          Int      @id @default(autoincrement())
+  profileId   Int
+  linkId      Int?
+  title       String
+  enabled     Boolean  @default(true)
+  quarantined Boolean  @default(false)
+  position    Int
   createdAt   DateTime @default(now())
-  originalURL String
-  urlHash     String?  @unique
-  shortURL    String   @unique
-  clickCount  Int      @default(0)
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  link        LongURL? @relation(fields: [linkId], references: [id], onDelete: SetNull)
   clicks      Click[]
+
+  @@index([profileId, position])
+}
+
+model ProfileView {
+  id        BigInt   @id @default(autoincrement())
+  profileId Int
+  createdAt DateTime @default(now())
+  referrer  String?
+  country   String?
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt(sort: Desc)])
+}
+
+model HandleClaimRateLimit {
+  id      String   @id
+  count   Int      @default(1)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
+model LongURL {
+  id            Int          @id @default(autoincrement())
+  createdAt     DateTime     @default(now())
+  originalURL   String
+  urlHash       String?      @unique
+  shortURL      String       @unique
+  clickCount    Int          @default(0)
+  userId        Int?
+  safeVerdict   String?
+  safeCheckedAt DateTime?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clicks        Click[]
+  profileRows   ProfileRow[]
 
   @@index([createdAt(sort: Desc)])
   @@index([originalURL])
   @@index([clickCount(sort: Desc)])
+  @@index([userId])
+  @@index([safeCheckedAt])
 }
 
 model Click {
-  id        BigInt   @id @default(autoincrement())
+  id        BigInt      @id @default(autoincrement())
   urlId     Int
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
   referrer  String?
   country   String?
   browser   String?
   device    String?
-  url       LongURL  @relation(fields: [urlId], references: [id], onDelete: Cascade)
+  surface   String?
+  profileId Int?
+  rowId     Int?
+  url       LongURL     @relation(fields: [urlId], references: [id], onDelete: Cascade)
+  profile   Profile?    @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  row       ProfileRow? @relation(fields: [rowId], references: [id], onDelete: SetNull)
 
   @@index([urlId, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@index([country])
   @@index([referrer])
   @@index([device])
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([rowId, createdAt(sort: Desc)])
+  @@index([surface])
 }
 
 model RateLimit {
-  id        String   @id // IP address or identifier
-  count     Int      @default(1)
-  resetAt   DateTime
+  id      String   @id // IP address or identifier
+  count   Int      @default(1)
+  resetAt DateTime
 
   @@index([resetAt])
 }

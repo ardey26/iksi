@@ -1,9 +1,12 @@
 <script>
   import '../app.css';
   import { ThemeToggle, SEO } from '../lib/components';
+  import UserMenu from '$lib/components/UserMenu.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { theme } from '$lib/stores/theme.js';
+
+  export let data;
 
   const HOMEPAGE_STRUCTURED_DATA = {
     '@context': 'https://schema.org',
@@ -65,6 +68,11 @@
 
   $: seo = seoForRoute($page.url.pathname, $page.url.host);
   $: isAdminSurface = ($page.url.host === 'admin.iksi.app' || $page.url.host === 'admin.localhost' || $page.url.host.startsWith('admin.localhost:')) || $page.url.pathname.startsWith('/admin');
+  $: onLoginPage = $page.url.pathname === '/login';
+  $: isProfilePage = $page.url.pathname.startsWith('/@');
+  // Public homepage + login use a full-height centered layout.
+  // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
+  $: centerContent = $page.url.pathname === '/' || onLoginPage;
 
   onMount(() => {
     if (typeof window !== 'undefined') {
@@ -86,31 +94,47 @@
 
 {#if isAdminSurface}
   <slot />
+{:else if isProfilePage}
+  <!-- Profile pages render their own themed background + no site chrome -->
+  <slot />
 {:else}
   <div class="min-h-screen flex flex-col relative" style="background: var(--bg);">
-    <!-- Brand mark: top-left, small, confident -->
-    <div class="fixed top-6 left-6 z-50 flex items-center gap-2">
-      <!-- Custom iksi mark: two chain links almost touching (Creation of Adam) -->
+    <!-- Brand mark: top-left -->
+    <a href="/" class="fixed top-6 left-6 z-50 flex items-center gap-2 hover:opacity-70 transition-opacity">
       <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" style="color: var(--text-muted);">
         <circle cx="12" cy="12" r="11" fill="currentColor" />
         <g transform="rotate(-45 12 12)" stroke="var(--bg)" stroke-width="1.5" fill="none">
-          <!-- Left chain link -->
           <rect x="4" y="10" width="7" height="4" rx="2" />
-          <!-- Right chain link -->
           <rect x="13" y="10" width="7" height="4" rx="2" />
         </g>
       </svg>
       <span class="text-sm font-medium tracking-tight" style="color: var(--text-muted);">iksi</span>
-    </div>
+    </a>
+
+    <!-- Right: UserMenu when signed in, Sign in link when not -->
+    {#if !onLoginPage}
+      <div class="fixed top-6 right-6 z-50">
+        {#if data?.user}
+          <UserMenu user={data.user} />
+        {:else}
+          <a href="/login" class="text-sm hover:opacity-70 transition-opacity" style="color: var(--text-muted);">Sign in</a>
+        {/if}
+      </div>
+    {/if}
 
     <!-- Theme toggle: bottom-right -->
     <div class="fixed bottom-6 right-6 z-50">
       <ThemeToggle />
     </div>
 
-    <!-- Main content: centered -->
-    <main class="flex-1 flex items-center justify-center px-4">
-      <slot />
-    </main>
+    {#if centerContent}
+      <main class="flex-1 flex items-center justify-center px-4">
+        <slot />
+      </main>
+    {:else}
+      <main class="flex-1 flex flex-col pt-24 pb-24 px-4">
+        <slot />
+      </main>
+    {/if}
   </div>
 {/if}

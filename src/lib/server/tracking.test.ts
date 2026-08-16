@@ -6,12 +6,13 @@ vi.mock('$lib/prisma.js', () => {
     prisma: {
       $transaction: txn,
       click: { create: vi.fn((args) => args) },
-      longURL: { update: vi.fn((args) => args) }
+      longURL: { update: vi.fn((args) => args) },
+      profileView: { create: vi.fn() }
     }
   };
 });
 
-import { parseUA, normalizeReferrer, recordClick } from './tracking';
+import { parseUA, normalizeReferrer, recordClick, recordProfileView } from './tracking';
 
 describe('parseUA', () => {
   it('returns Chrome/desktop for a standard Chrome UA', () => {
@@ -116,5 +117,55 @@ describe('recordClick', () => {
 
     const event = { request: { headers: new Headers() } } as any;
     await expect(recordClick(1, event)).resolves.toBeUndefined();
+  });
+});
+
+describe('recordClick with opts', () => {
+  it('writes surface/profileId/rowId when provided', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    (prisma.$transaction as any).mockClear();
+    const event = { request: { headers: new Headers({ 'user-agent': 'Mozilla/5.0 Chrome/120.0' }) } } as any;
+    await recordClick(7, event, { surface: 'profile', profileId: 3, rowId: 11 });
+
+    const ops = (prisma.$transaction as any).mock.calls[0][0];
+    expect(ops[0]).toMatchObject({
+      data: expect.objectContaining({
+        urlId: 7,
+        surface: 'profile',
+        profileId: 3,
+        rowId: 11
+      })
+    });
+  });
+
+  it('leaves surface/profileId/rowId as undefined when opts omitted', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    (prisma.$transaction as any).mockClear();
+    const event = { request: { headers: new Headers() } } as any;
+    await recordClick(1, event);
+    const ops = (prisma.$transaction as any).mock.calls[0][0];
+    expect(ops[0].data.surface).toBeUndefined();
+    expect(ops[0].data.profileId).toBeUndefined();
+  });
+});
+
+describe('recordProfileView', () => {
+  it('creates a ProfileView row with referrer + country', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    (prisma.profileView.create as any).mockClear();
+    const event = {
+      request: { headers: new Headers({ referer: 'https://x.com/', 'x-vercel-ip-country': 'US' }) }
+    } as any;
+    await recordProfileView(42, event);
+    expect(prisma.profileView.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ profileId: 42, referrer: 'x.com', country: 'US' })
+    }));
+  });
+
+  it('swallows errors', async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    (prisma.profileView.create as any).mockRejectedValueOnce(new Error('boom'));
+    const event = { request: { headers: new Headers() } } as any;
+    await expect(recordProfileView(1, event)).resolves.toBeUndefined();
   });
 });
