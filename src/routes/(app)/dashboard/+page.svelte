@@ -67,23 +67,27 @@
         <h2 class="text-base font-medium" style="color: var(--text-primary);">Traffic</h2>
         <p class="text-sm mt-1" style="color: var(--text-muted);">All-time activity on your public page.</p>
       </div>
-      <div class="rounded-xl px-6 py-6" style="background: var(--surface); border: 1px solid var(--border);">
-        <p class="text-2xl leading-relaxed" style="color: var(--text-primary);">
-          {#if totalViews === 0}
-            <span style="color: var(--text-muted);">No one's stopped by yet.</span>
-          {:else}
-            <span class="font-semibold tabular-nums">{fmt(totalViews)}</span>
-            <span style="color: var(--text-muted);">{totalViews === 1 ? 'visit' : 'visits'}</span>
-            <span style="color: var(--text-muted);"> · </span>
-            <span class="font-semibold tabular-nums">{fmt(totalClicks)}</span>
-            <span style="color: var(--text-muted);">{totalClicks === 1 ? 'click' : 'clicks'}</span>
-            {#if totalViews > 0}
-              <span style="color: var(--text-muted);"> · </span>
-              <span class="font-semibold tabular-nums">{ctr}%</span>
-              <span style="color: var(--text-muted);">clickthrough</span>
-            {/if}
-          {/if}
-        </p>
+      <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
+        {#if totalViews === 0}
+          <p class="px-6 py-8 text-sm text-center" style="color: var(--text-muted);">
+            No one's stopped by yet. Share <span style="color: var(--text-primary);">iksi.app/@{data.user.handle}</span> to get traffic.
+          </p>
+        {:else}
+          <div class="grid grid-cols-3 divide-x" style="--tw-divide-opacity: 1;">
+            <div class="px-6 py-5" style="border-color: var(--border);">
+              <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(totalViews)}</div>
+              <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{totalViews === 1 ? 'Visit' : 'Visits'}</div>
+            </div>
+            <div class="px-6 py-5" style="border-color: var(--border);">
+              <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(totalClicks)}</div>
+              <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{totalClicks === 1 ? 'Click' : 'Clicks'}</div>
+            </div>
+            <div class="px-6 py-5" style="border-color: var(--border);">
+              <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{ctr}<span class="text-xl" style="color: var(--text-muted);">%</span></div>
+              <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">Clickthrough</div>
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
