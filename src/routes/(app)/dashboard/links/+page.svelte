@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Input } from '$lib/components';
+
   export let data;
 
   let editing: number | null = null;
@@ -58,29 +60,14 @@
     return v;
   }
 
-  // Inline shortener
+  // Inline shortener — reuses the shared Input component in compact mode
   let newLongURL = '';
   let newAlias = '';
   let shortening = false;
   let shortenError = '';
 
-  // Rough URL validity: has a dot, no whitespace, at least 3 chars after protocol strip.
-  // Server does the real validation; this just gates the button.
-  function looksLikeURL(s: string) {
-    const trimmed = s.trim();
-    if (trimmed.length < 4) return false;
-    if (/\s/.test(trimmed)) return false;
-    const stripped = trimmed.replace(/^https?:\/\//i, '');
-    return stripped.includes('.') && stripped.length > 2;
-  }
-  const ALIAS_RE = /^[a-zA-Z0-9_-]{1,50}$/;
-  $: aliasValid = newAlias === '' || ALIAS_RE.test(newAlias);
-  $: urlValid = looksLikeURL(newLongURL);
-  $: canShorten = urlValid && aliasValid && !shortening;
-
-  async function shorten(e: SubmitEvent) {
-    e.preventDefault();
-    if (!canShorten) return;
+  async function shorten() {
+    if (shortening) return;
     shortening = true;
     shortenError = '';
     try {
@@ -190,49 +177,15 @@
       <p class="text-sm mt-1" style="color: var(--text-muted);">Shorten a URL below. Everything you own shows up here.</p>
     </div>
 
-    <!-- Inline shortener -->
-    <form on:submit={shorten} class="space-y-2">
-      <input
-        type="url"
-        bind:value={newLongURL}
-        placeholder="https://example.com/very/long/link"
-        class="w-full px-4 py-3 text-base rounded-lg outline-none transition-colors"
-        style="background: var(--surface); border: 1px solid {shortenError ? 'var(--error)' : 'var(--border)'}; color: var(--text-primary);"
-        required
-      />
-
-      <div class="flex gap-2">
-        <div class="flex items-stretch flex-1 rounded-lg overflow-hidden transition-colors"
-             style="background: var(--surface); border: 1px solid {!aliasValid ? 'var(--error)' : 'var(--border)'};">
-          <span class="pl-3 pr-1 flex items-center text-sm" style="color: var(--text-muted);">iksi.app/</span>
-          <input
-            type="text"
-            bind:value={newAlias}
-            placeholder="custom alias (optional)"
-            maxlength="50"
-            class="flex-1 py-3 pr-3 text-sm bg-transparent outline-none"
-            style="color: var(--text-primary);"
-            autocomplete="off"
-            autocorrect="off"
-            spellcheck="false"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={!canShorten}
-          class="px-5 py-3 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
-          style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
-        >
-          {shortening ? 'Shortening…' : 'Shorten'}
-        </button>
-      </div>
-
-      {#if shortenError}
-        <p class="text-xs" style="color: var(--error);">{shortenError}</p>
-      {:else if newAlias && !aliasValid}
-        <p class="text-xs" style="color: var(--error);">Alias must be letters, numbers, <code style="font-family: inherit;">_</code> or <code style="font-family: inherit;">-</code> only.</p>
-      {/if}
-    </form>
+    <!-- Inline shortener (reuses homepage Input in compact mode) -->
+    <Input
+      compact={true}
+      bind:longURL={newLongURL}
+      bind:customURL={newAlias}
+      isLoading={shortening}
+      error={shortenError}
+      handleSubmit={shorten}
+    />
 
   {#if data.links.length === 0}
     <div class="py-12 text-center rounded-xl" style="background: var(--surface); border: 1px solid var(--border);">

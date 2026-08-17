@@ -9,6 +9,9 @@
   export let handleSubmit;
   export let inputRef = null;
 
+  // Compact variant: dashboard-embedded (no reserved error space, alias always shown, tighter type).
+  export let compact = false;
+
   let shakeInput = false;
   let shakeAlias = false;
 
@@ -68,15 +71,17 @@
   };
 </script>
 
-<form on:submit|preventDefault={submit} class="space-y-4">
-  <!-- Error message space (reserved, no layout shift) -->
-  <div class="h-5">
-    {#if error}
-      <p class="text-sm fade-in" style="color: var(--error);">{error}</p>
-    {:else if longURL && !isURLValid}
-      <p class="text-sm fade-in" style="color: var(--error);">That doesn't look like a valid link</p>
-    {/if}
-  </div>
+<form on:submit|preventDefault={submit} class:space-y-3={compact} class:space-y-4={!compact}>
+  <!-- Error message space (reserved on default; inline-only on compact so parent controls layout) -->
+  {#if !compact}
+    <div class="h-5">
+      {#if error}
+        <p class="text-sm fade-in" style="color: var(--error);">{error}</p>
+      {:else if longURL && !isURLValid}
+        <p class="text-sm fade-in" style="color: var(--error);">That doesn't look like a valid link</p>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Main URL input with inline action -->
   <div
@@ -91,17 +96,27 @@
       name="url"
       bind:value={longURL}
       on:keydown={handleKeydown}
-      placeholder="Paste a link"
-      class="w-full py-4 pl-5 pr-16 text-lg rounded-xl outline-none transition-all"
+      placeholder={compact ? 'https://example.com/very/long/link' : 'Paste a link'}
+      class="w-full outline-none transition-all"
+      class:py-4={!compact}
+      class:pl-5={!compact}
+      class:pr-16={!compact}
+      class:text-lg={!compact}
+      class:rounded-xl={!compact}
+      class:py-3={compact}
+      class:pl-4={compact}
+      class:pr-14={compact}
+      class:text-base={compact}
+      class:rounded-lg={compact}
       style="
         background: var(--surface);
         border: 1px solid {longURL && !isURLValid ? 'var(--error)' : isURLValid ? 'var(--accent)' : 'var(--border)'};
         color: var(--text-primary);
         transition-duration: var(--duration-normal);
-        min-height: 60px;
+        min-height: {compact ? 48 : 60}px;
       "
-      class:glow-accent={isURLValid}
-      class:glow-error={longURL && !isURLValid}
+      class:glow-accent={isURLValid && !compact}
+      class:glow-error={longURL && !isURLValid && !compact}
       aria-label="URL to shorten"
     />
 
@@ -142,32 +157,17 @@
     {/if}
   </div>
 
-  <!-- Custom alias: single-row morph (no vertical shift) -->
-  <div
-    class="flex items-center justify-start"
-    style="min-height: 44px;"
-  >
-    {#if !showCustomAlias}
-      <button
-        type="button"
-        class="text-sm transition-colors hover:underline"
-        style="color: var(--text-muted);"
-        on:click={() => { showCustomAlias = true; }}
-      >
-        Want a custom link?
-      </button>
-    {:else}
+  <!-- Custom alias: reveal-style on default, always-visible on compact -->
+  {#if compact}
+    <div class="flex gap-2">
       <div
-        class="alias-chip flex items-center rounded-lg"
+        class="alias-chip flex items-center rounded-lg flex-1 min-w-0"
         class:shake={shakeAlias}
-        class:glow-error={customURL && !isAliasValid}
         style="
           background: var(--surface);
           border: 1px solid {customURL && !isAliasValid ? 'var(--error)' : 'var(--border)'};
           transition-duration: var(--duration-normal);
           height: 44px;
-          width: 100%;
-          max-width: 380px;
         "
       >
         <span class="pl-3 text-sm whitespace-nowrap" style="color: var(--text-muted);">iksi.app/</span>
@@ -176,25 +176,86 @@
           id="alias"
           name="alias"
           bind:value={customURL}
-          placeholder="your-alias"
+          placeholder="custom alias (optional)"
           maxlength="50"
           class="flex-1 min-w-0 px-1 text-sm bg-transparent outline-none"
           style="color: var(--text-primary); height: 100%;"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
           aria-label="Custom alias"
         />
+      </div>
+      <button
+        type="submit"
+        disabled={!canSubmit}
+        class="px-5 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+        style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer; height: 44px;"
+      >
+        {isLoading ? 'Shortening…' : 'Shorten'}
+      </button>
+    </div>
+    {#if error}
+      <p class="text-xs" style="color: var(--error);">{error}</p>
+    {:else if longURL && !isURLValid}
+      <p class="text-xs" style="color: var(--error);">That doesn't look like a valid link.</p>
+    {:else if customURL && !isAliasValid}
+      <p class="text-xs" style="color: var(--error);">Alias must be letters, numbers, <code style="font-family: inherit;">_</code> or <code style="font-family: inherit;">-</code>.</p>
+    {/if}
+  {:else}
+    <div
+      class="flex items-center justify-start"
+      style="min-height: 44px;"
+    >
+      {#if !showCustomAlias}
         <button
           type="button"
-          class="flex items-center justify-center flex-shrink-0"
-          style="width: 36px; height: 100%; color: var(--text-muted);"
-          on:click={() => { showCustomAlias = false; customURL = ''; }}
-          aria-label="Cancel custom alias"
-          title="Cancel"
+          class="text-sm transition-colors hover:underline"
+          style="color: var(--text-muted);"
+          on:click={() => { showCustomAlias = true; }}
         >
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          Want a custom link?
         </button>
-      </div>
-    {/if}
-  </div>
+      {:else}
+        <div
+          class="alias-chip flex items-center rounded-lg"
+          class:shake={shakeAlias}
+          class:glow-error={customURL && !isAliasValid}
+          style="
+            background: var(--surface);
+            border: 1px solid {customURL && !isAliasValid ? 'var(--error)' : 'var(--border)'};
+            transition-duration: var(--duration-normal);
+            height: 44px;
+            width: 100%;
+            max-width: 380px;
+          "
+        >
+          <span class="pl-3 text-sm whitespace-nowrap" style="color: var(--text-muted);">iksi.app/</span>
+          <input
+            type="text"
+            id="alias"
+            name="alias"
+            bind:value={customURL}
+            placeholder="your-alias"
+            maxlength="50"
+            class="flex-1 min-w-0 px-1 text-sm bg-transparent outline-none"
+            style="color: var(--text-primary); height: 100%;"
+            aria-label="Custom alias"
+          />
+          <button
+            type="button"
+            class="flex items-center justify-center flex-shrink-0"
+            style="width: 36px; height: 100%; color: var(--text-muted);"
+            on:click={() => { showCustomAlias = false; customURL = ''; }}
+            aria-label="Cancel custom alias"
+            title="Cancel"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </form>
