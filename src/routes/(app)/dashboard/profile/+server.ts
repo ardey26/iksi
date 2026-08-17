@@ -4,7 +4,7 @@ import { verifyUserSession } from '$lib/server/user-auth';
 import { checkURL } from '$lib/server/safe-browsing';
 import { decodeURL } from '$lib/server/crypto.js';
 
-const THEMES = new Set(['default', 'light', 'mono']);
+const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 async function requireProfile(uid: number) {

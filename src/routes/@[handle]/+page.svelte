@@ -16,6 +16,22 @@
     if (n < 1000000) return Math.round(n / 1000) + 'k';
     return (n / 1000000).toFixed(1) + 'M';
   }
+
+  // Dark by default; only 'light' flips.
+  $: isLight = data.theme === 'light';
+  $: paletteStyle = isLight
+    ? `--accent: ${data.accent};
+       --bg: color-mix(in srgb, ${data.accent} 8%, #fff);
+       --surface: color-mix(in srgb, ${data.accent} 14%, #fafafa);
+       --border: color-mix(in srgb, ${data.accent} 30%, transparent);
+       --text-primary: color-mix(in srgb, #0a0a0b 92%, ${data.accent} 8%);
+       --text-muted: color-mix(in srgb, #0a0a0b 55%, ${data.accent} 45%);`
+    : `--accent: ${data.accent};
+       --bg: color-mix(in srgb, ${data.accent} 8%, #000);
+       --surface: color-mix(in srgb, ${data.accent} 16%, #0a0a0b);
+       --border: color-mix(in srgb, ${data.accent} 25%, transparent);
+       --text-primary: color-mix(in srgb, #ffffff 96%, ${data.accent} 4%);
+       --text-muted: color-mix(in srgb, #ffffff 60%, ${data.accent} 40%);`;
 </script>
 
 <svelte:head>
@@ -24,19 +40,11 @@
 </svelte:head>
 
 <!--
-  The whole palette on the public page is derived from the user's chosen accent hex.
-  Backgrounds/surfaces are dark shades of the accent; borders + muted text carry a
-  subtle tint of the same hue. All via CSS color-mix — no per-hex classes needed.
+  The whole palette on the public page is derived from the user's chosen accent hex
+  + dark/light mode. All via CSS color-mix — no per-hex classes needed.
 -->
 <div class="iksi-profile min-h-screen flex flex-col items-center px-4 pt-20 pb-8"
-     style="--accent: {data.accent};
-            --bg: color-mix(in srgb, {data.accent} 8%, #000);
-            --surface: color-mix(in srgb, {data.accent} 16%, #0a0a0b);
-            --border: color-mix(in srgb, {data.accent} 25%, transparent);
-            --text-primary: color-mix(in srgb, #ffffff 96%, {data.accent} 4%);
-            --text-muted: color-mix(in srgb, #ffffff 60%, {data.accent} 40%);
-            background: var(--bg);
-            color: var(--text-primary);">
+     style="{paletteStyle} background: var(--bg); color: var(--text-primary);">
 
   <!-- Share button top-right -->
   <button
