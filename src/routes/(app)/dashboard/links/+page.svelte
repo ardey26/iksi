@@ -4,11 +4,21 @@
 
   export let data;
 
-  // Local mutable copies for optimistic UI. Refreshed whenever `data` changes.
-  let links: any[] = [];
-  let rows: any[] = [];
-  $: links = [...data.links];
-  $: rows = [...(data.profile?.rows ?? [])];
+  // Local mutable copies for optimistic UI. Only re-sync when the underlying
+  // loader data reference actually changes — otherwise we clobber pending
+  // optimistic updates (e.g. a freshly prepended link disappearing on select change).
+  let links: any[] = [...data.links];
+  let rows: any[] = [...(data.profile?.rows ?? [])];
+  let _linksRef = data.links;
+  let _rowsRef = data.profile?.rows;
+  $: if (data.links !== _linksRef) {
+    _linksRef = data.links;
+    links = [...data.links];
+  }
+  $: if (data.profile?.rows !== _rowsRef) {
+    _rowsRef = data.profile?.rows;
+    rows = [...(data.profile?.rows ?? [])];
+  }
 
   let editing: number | null = null;
   let editValue = '';
@@ -119,7 +129,13 @@
   }
 
   // Profile row management
-  let newRowLinkId: number | '' = links[0]?.id ?? '';
+  let newRowLinkId: number | '' = '';
+  // Keep the selection in sync with the current link list: default to the first
+  // link, and re-target if the current pick is no longer in the list
+  // (e.g. after the user shortens their first link, or deletes the selected one).
+  $: if (links.length > 0 && !links.some((l) => l.id === newRowLinkId)) {
+    newRowLinkId = links[0].id;
+  }
   let newRowTitle = '';
   let dragIndex: number | null = null;
   let dragOverIndex: number | null = null;
