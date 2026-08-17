@@ -50,6 +50,12 @@
     });
     saving = false;
     if (res.ok) {
+      // Server may have normalized the avatar URL (e.g. Google Drive rewrite);
+      // reflect that back into the input.
+      const body = await res.json().catch(() => ({}));
+      if (typeof body.avatarUrl === 'string' || body.avatarUrl === null) {
+        avatarUrl = body.avatarUrl ?? '';
+      }
       saved = true;
       await invalidateAll();
       setTimeout(() => { saved = false; }, 1400);
