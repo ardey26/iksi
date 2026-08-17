@@ -1,17 +1,21 @@
 import type { PageServerLoad } from './$types';
-import { getProfileStats, getProfileTimeSeries } from '$lib/server/stats';
 
 export const load: PageServerLoad = async ({ parent }) => {
   const { user } = await parent();
-  if (!user.handle) return { user, stats: null, timeSeries: null };
+  if (!user.handle || !user.profileId) return { user, stats: null };
 
-  const { prisma } = await import('$lib/prisma.js');
-  const profile = await prisma.profile.findUnique({ where: { userId: user.id } });
-  if (!profile) return { user, stats: null, timeSeries: null };
+  // Stream: page shell renders immediately; the KPI numbers arrive when the DB responds.
+  const stats = (async () => {
+    const { prisma } = await import('$lib/prisma.js');
+    const rows = await prisma.$queryRaw<Array<{ views: number; clicks: number }>>`
+      SELECT
+        (SELECT COUNT(*)::int FROM "ProfileView" WHERE "profileId" = ${user.profileId}) AS views,
+        (SELECT COUNT(*)::int FROM "Click" WHERE "profileId" = ${user.profileId} AND "device" IS DISTINCT FROM 'bot') AS clicks
+    `;
+    const views = rows[0]?.views ?? 0;
+    const clicks = rows[0]?.clicks ?? 0;
+    return { views, clicks, ctr: views > 0 ? clicks / views : 0 };
+  })();
 
-  const [stats, timeSeries] = await Promise.all([
-    getProfileStats(profile.id, { includeBots: false }),
-    getProfileTimeSeries(profile.id, { days: 7 })
-  ]);
-  return { user, stats, timeSeries };
+  return { user, streamed: { stats } };
 };

@@ -5,14 +5,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   const { prisma } = await import('$lib/prisma.js');
   const profile = await prisma.profile.findUnique({
     where: { userId: user.id },
-    include: {
-      rows: { orderBy: { position: 'asc' }, include: { link: { select: { shortURL: true, originalURL: true } } } }
-    }
+    select: { displayName: true, bio: true, avatarUrl: true, theme: true, accent: true, publicClicks: true }
   });
-  const ownedLinks = await prisma.longURL.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true, shortURL: true, originalURL: true }
-  });
-  return { user, profile, ownedLinks };
+  return { user, profile };
 };

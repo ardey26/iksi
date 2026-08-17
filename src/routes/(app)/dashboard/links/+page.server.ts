@@ -19,6 +19,21 @@ export const load: PageServerLoad = async ({ parent }) => {
     })
   ]);
 
-  const decoded = await Promise.all(links.map(async l => ({ ...l, originalURL: await decodeURL(l.originalURL) })));
+  const decoded = await Promise.all(
+    links.map(async (l) => {
+      let plain: string;
+      try {
+        plain = await decodeURL(l.originalURL);
+        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(plain)) {
+          console.warn(`[links] decodeURL yielded non-URL for shortURL="${l.shortURL}"`);
+          plain = '';
+        }
+      } catch (err) {
+        console.error(`[links] decodeURL threw for shortURL="${l.shortURL}"`, err);
+        plain = '';
+      }
+      return { ...l, originalURL: plain };
+    })
+  );
   return { user, links: decoded, profile };
 };

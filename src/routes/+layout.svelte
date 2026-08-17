@@ -3,7 +3,7 @@
   import { ThemeToggle, SEO } from '../lib/components';
   import UserMenu from '$lib/components/UserMenu.svelte';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page, navigating } from '$app/stores';
   import { theme } from '$lib/stores/theme.js';
 
   export let data;
@@ -91,6 +91,29 @@
   structuredData={seo.structuredData}
   noindex={seo.noindex}
 />
+
+<!-- Top-of-page navigation progress bar; only visible during a route change -->
+{#if $navigating}
+  <div class="nav-progress" aria-hidden="true"></div>
+{/if}
+
+<style>
+  .nav-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: var(--accent);
+    z-index: 100;
+    animation: nav-progress-slide 900ms ease-in-out infinite;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  @keyframes nav-progress-slide {
+    0%   { left: -30%; width: 30%; }
+    50%  { left: 40%;  width: 30%; }
+    100% { left: 100%; width: 30%; }
+  }
+</style>
 
 {#if isAdminSurface}
   <slot />

@@ -202,16 +202,20 @@
                   {/if}
                 </button>
 
-                <a
-                  href={l.originalURL}
-                  target="_blank"
-                  rel="noopener"
-                  class="block text-sm truncate hover:opacity-70 transition-opacity"
-                  style="color: var(--text-muted);"
-                  title={l.originalURL}
-                >
-                  <span style="color: var(--text-primary); opacity: 0.7;">{hostOf(l.originalURL)}</span><span style="opacity: 0.5;">{l.originalURL.replace(/^https?:\/\/(www\.)?[^/]+/, '') || '/'}</span>
-                </a>
+                {#if l.originalURL}
+                  <a
+                    href={l.originalURL}
+                    target="_blank"
+                    rel="noopener"
+                    class="block text-sm truncate hover:opacity-70 transition-opacity"
+                    style="color: var(--text-muted);"
+                    title={l.originalURL}
+                  >
+                    <span style="color: var(--text-primary); opacity: 0.7;">{hostOf(l.originalURL)}</span><span style="opacity: 0.5;">{l.originalURL.replace(/^https?:\/\/(www\.)?[^/]+/, '') || '/'}</span>
+                  </a>
+                {:else}
+                  <span class="block text-sm truncate italic" style="color: var(--text-muted); opacity: 0.6;" title="This link was encoded with a different secret and can no longer be decoded.">destination unavailable</span>
+                {/if}
               </div>
 
               <!-- RIGHT: stats + actions -->

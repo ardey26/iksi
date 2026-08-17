@@ -2,9 +2,6 @@
   export let data;
 
   $: publicUrl = data.user.handle ? `iksi.app/@${data.user.handle}` : null;
-  $: totalViews = data.stats?.views ?? 0;
-  $: totalClicks = data.stats?.clicks ?? 0;
-  $: ctr = data.stats ? (data.stats.ctr * 100).toFixed(1) : '0.0';
 
   let copied = false;
   async function copyPublicUrl() {
@@ -60,34 +57,46 @@
     {/if}
   </header>
 
-  <!-- SECTION: Traffic -->
-  {#if data.stats}
+  <!-- SECTION: Traffic (streamed) -->
+  {#if data.streamed?.stats}
     <div class="space-y-4">
       <div>
         <h2 class="text-base font-medium" style="color: var(--text-primary);">Traffic</h2>
         <p class="text-sm mt-1" style="color: var(--text-muted);">All-time activity on your public page.</p>
       </div>
       <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
-        {#if totalViews === 0}
-          <p class="px-6 py-8 text-sm text-center" style="color: var(--text-muted);">
-            No one's stopped by yet. Share <span style="color: var(--text-primary);">iksi.app/@{data.user.handle}</span> to get traffic.
-          </p>
-        {:else}
+        {#await data.streamed.stats}
+          <!-- Skeleton: keeps layout stable, subtle pulse -->
           <div class="grid grid-cols-3 divide-x" style="--tw-divide-opacity: 1;">
-            <div class="px-6 py-5" style="border-color: var(--border);">
-              <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(totalViews)}</div>
-              <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{totalViews === 1 ? 'Visit' : 'Visits'}</div>
-            </div>
-            <div class="px-6 py-5" style="border-color: var(--border);">
-              <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(totalClicks)}</div>
-              <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{totalClicks === 1 ? 'Click' : 'Clicks'}</div>
-            </div>
-            <div class="px-6 py-5" style="border-color: var(--border);">
-              <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{ctr}<span class="text-xl" style="color: var(--text-muted);">%</span></div>
-              <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">Clickthrough</div>
-            </div>
+            {#each [0, 1, 2] as _}
+              <div class="px-6 py-5 animate-pulse" style="border-color: var(--border);">
+                <div class="h-8 rounded" style="background: var(--border); width: 60%;"></div>
+                <div class="mt-3 h-3 rounded" style="background: var(--border); width: 40%;"></div>
+              </div>
+            {/each}
           </div>
-        {/if}
+        {:then s}
+          {#if s.views === 0}
+            <p class="px-6 py-8 text-sm text-center" style="color: var(--text-muted);">
+              No one's stopped by yet. Share <span style="color: var(--text-primary);">iksi.app/@{data.user.handle}</span> to get traffic.
+            </p>
+          {:else}
+            <div class="grid grid-cols-3 divide-x" style="--tw-divide-opacity: 1;">
+              <div class="px-6 py-5" style="border-color: var(--border);">
+                <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(s.views)}</div>
+                <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{s.views === 1 ? 'Visit' : 'Visits'}</div>
+              </div>
+              <div class="px-6 py-5" style="border-color: var(--border);">
+                <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(s.clicks)}</div>
+                <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{s.clicks === 1 ? 'Click' : 'Clicks'}</div>
+              </div>
+              <div class="px-6 py-5" style="border-color: var(--border);">
+                <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{(s.ctr * 100).toFixed(1)}<span class="text-xl" style="color: var(--text-muted);">%</span></div>
+                <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">Clickthrough</div>
+              </div>
+            </div>
+          {/if}
+        {/await}
       </div>
     </div>
   {/if}
