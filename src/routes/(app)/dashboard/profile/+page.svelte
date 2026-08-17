@@ -127,10 +127,10 @@
         </div>
 
         <div class="flex items-center gap-2">
-          {#each [{ id: 'dark' as const, label: 'Dark' }, { id: 'light' as const, label: 'Light' }] as m}
+          {#each [{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }] as m}
             <button
               type="button"
-              on:click={() => mode = m.id}
+              on:click={() => (mode = m.id)}
               class="px-4 py-2 rounded-md text-sm transition-colors"
               style="background: {mode === m.id ? 'var(--text-primary)' : 'var(--bg)'}; color: {mode === m.id ? 'var(--bg)' : 'var(--text-primary)'}; border: 1px solid {mode === m.id ? 'var(--text-primary)' : 'var(--border)'}; cursor: pointer;"
             >{m.label}</button>
