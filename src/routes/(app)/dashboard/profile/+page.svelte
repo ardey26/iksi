@@ -57,11 +57,12 @@
   }
 
   // Palette derivation (must mirror /@handle logic exactly).
-  // brightness 0 = pure black base, 100 = pure white base.
+  // brightness 0..100 drives bg lightness. Text flips to black once bg brightness >= 30.
   $: paletteStyle = (() => {
     const b = Math.max(0, Math.min(100, brightness));
     const surfB = Math.max(0, Math.min(100, b + 6));
-    const invB = 100 - b;
+    const textLight = b < 30; // true → white text, false → black text
+    const invB = textLight ? 100 : 0;
     return `--accent: ${accent};
             --p-bg: color-mix(in srgb, ${accent} 8%, color-mix(in srgb, #fff ${b}%, #000));
             --p-surface: color-mix(in srgb, ${accent} 14%, color-mix(in srgb, #fff ${surfB}%, #000));

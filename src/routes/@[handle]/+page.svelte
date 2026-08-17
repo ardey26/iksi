@@ -28,7 +28,8 @@
   }
   $: b = brightnessOf(data.theme);
   $: surfB = Math.max(0, Math.min(100, b + 6));
-  $: invB = 100 - b;
+  // Text flips to black once bg brightness >= 30 (readability threshold).
+  $: invB = b < 30 ? 100 : 0;
   $: paletteStyle =
     `--accent: ${data.accent};
      --bg: color-mix(in srgb, ${data.accent} 8%, color-mix(in srgb, #fff ${b}%, #000));
