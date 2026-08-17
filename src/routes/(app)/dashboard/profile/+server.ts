@@ -59,8 +59,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       }
       const last = await prisma.profileRow.aggregate({ where: { profileId: p.id }, _max: { position: true } });
       const position = (last._max.position ?? -1) + 1;
-      await prisma.profileRow.create({ data: { profileId: p.id, linkId, title, position } });
-      return json({ ok: true });
+      const created = await prisma.profileRow.create({
+        data: { profileId: p.id, linkId, title, position },
+        include: { link: { select: { shortURL: true } } }
+      });
+      return json({ ok: true, row: created });
     }
     case 'toggleRow': {
       const { rowId, enabled } = body;

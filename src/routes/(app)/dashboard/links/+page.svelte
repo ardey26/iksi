@@ -1,7 +1,14 @@
 <script lang="ts">
   import { Input } from '$lib/components';
+  import { invalidateAll } from '$app/navigation';
 
   export let data;
+
+  // Local mutable copies for optimistic UI. Refreshed whenever `data` changes.
+  let links: any[] = [];
+  let rows: any[] = [];
+  $: links = [...data.links];
+  $: rows = [...(data.profile?.rows ?? [])];
 
   let editing: number | null = null;
   let editValue = '';
@@ -16,23 +23,37 @@
     editValue = '';
   }
   async function saveEdit(id: number) {
+    const prev = links.find((l) => l.id === id)?.originalURL;
+    // Optimistic
+    links = links.map((l) => (l.id === id ? { ...l, originalURL: editValue } : l));
+    editing = null;
     const res = await fetch('/dashboard/links', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, originalURL: editValue })
     });
-    if (res.ok) location.reload();
-    else alert('Failed to save.');
+    if (!res.ok) {
+      // Revert
+      links = links.map((l) => (l.id === id ? { ...l, originalURL: prev } : l));
+      alert('Failed to save.');
+    }
   }
   async function del(id: number, short: string) {
     if (!confirm(`Delete iksi.app/${short}? Rows on your profile that reference it will show "link removed".`)) return;
+    const prev = links;
+    links = links.filter((l) => l.id !== id);
     const res = await fetch('/dashboard/links', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id })
     });
-    if (res.ok) location.reload();
-    else alert('Failed to delete.');
+    if (!res.ok) {
+      links = prev;
+      alert('Failed to delete.');
+    } else {
+      // Refresh rows in case any pointed at this link (loader nulls their linkId).
+      invalidateAll();
+    }
   }
   async function copy(id: number, short: string) {
     try {
@@ -80,7 +101,13 @@
       if (res.ok) {
         newLongURL = '';
         newAlias = '';
-        location.reload();
+        if (body.link) {
+          // Prepend the new link instantly (no reload).
+          links = [body.link, ...links];
+        } else {
+          // Fallback: refresh loader data (dedupe path — no `link` in payload).
+          invalidateAll();
+        }
       } else {
         shortenError = body.error || 'Could not shorten.';
       }
@@ -92,31 +119,53 @@
   }
 
   // Profile row management
-  let newRowLinkId: number | '' = data.links[0]?.id ?? '';
+  let newRowLinkId: number | '' = links[0]?.id ?? '';
   let newRowTitle = '';
-
-  // Local mutable copy of rows for optimistic drag-and-drop
-  let rows: any[] = [...(data.profile?.rows ?? [])];
   let dragIndex: number | null = null;
   let dragOverIndex: number | null = null;
 
-  async function rowAction(payload: any, reloadOnDone = true) {
+  async function rowAction(payload: any) {
     const res = await fetch('/dashboard/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (res.ok) {
-      if (reloadOnDone) location.reload();
-      return true;
-    }
+    if (res.ok) return await res.json().catch(() => ({}));
     const body = await res.json().catch(() => ({}));
     alert(body.error || 'Failed');
-    return false;
+    return null;
   }
 
-  function confirmDeleteRow(rowId: number, title: string) {
-    if (confirm(`Remove "${title}" from your public page?`)) rowAction({ action: 'deleteRow', rowId });
+  async function toggleRow(row: any) {
+    const next = !row.enabled;
+    rows = rows.map((r) => (r.id === row.id ? { ...r, enabled: next } : r));
+    const ok = await rowAction({ action: 'toggleRow', rowId: row.id, enabled: next });
+    if (!ok) {
+      // Revert
+      rows = rows.map((r) => (r.id === row.id ? { ...r, enabled: !next } : r));
+    }
+  }
+
+  async function confirmDeleteRow(rowId: number, title: string) {
+    if (!confirm(`Remove "${title}" from your public page?`)) return;
+    const prev = rows;
+    rows = rows.filter((r) => r.id !== rowId);
+    const ok = await rowAction({ action: 'deleteRow', rowId });
+    if (!ok) rows = prev;
+  }
+
+  async function addRow() {
+    if (!newRowLinkId || !newRowTitle.trim()) return;
+    const title = newRowTitle.trim();
+    const linkId = Number(newRowLinkId);
+    newRowTitle = '';
+    const result = await rowAction({ action: 'addRow', linkId, title });
+    if (result?.row) {
+      rows = [...rows, result.row];
+    } else if (result === null) {
+      // Restore text so the user doesn't lose it on failure.
+      newRowTitle = title;
+    }
   }
 
   function onDragStart(e: DragEvent, index: number) {
@@ -152,7 +201,7 @@
     rows = next;
 
     // Persist
-    const ok = await rowAction({ action: 'reorderRows', orderedIds: rows.map((r) => r.id) }, false);
+    const ok = await rowAction({ action: 'reorderRows', orderedIds: rows.map((r) => r.id) });
     if (!ok) {
       // Revert on failure
       rows = [...(data.profile?.rows ?? [])];
@@ -187,13 +236,13 @@
       handleSubmit={shorten}
     />
 
-  {#if data.links.length === 0}
+  {#if links.length === 0}
     <div class="py-12 text-center rounded-xl" style="background: var(--surface); border: 1px solid var(--border);">
       <p class="text-sm" style="color: var(--text-muted);">Nothing yet. Paste a URL above to make your first short link.</p>
     </div>
   {:else}
     <ul class="rounded-xl overflow-hidden divide-y" style="background: var(--surface); border: 1px solid var(--border); --tw-divide-opacity: 1;">
-      {#each data.links as l (l.id)}
+      {#each links as l (l.id)}
         <li class="group px-4 py-4 transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_3%,transparent)]"
             style="border-color: var(--border);"
             role="listitem">
@@ -364,7 +413,7 @@
                   role="switch"
                   aria-checked={row.enabled}
                   aria-label={row.enabled ? 'Hide from public page' : 'Show on public page'}
-                  on:click={() => rowAction({ action: 'toggleRow', rowId: row.id, enabled: !row.enabled })}
+                  on:click={() => toggleRow(row)}
                   class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
                   style="background: {row.enabled ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
                 >
@@ -410,10 +459,10 @@
                 <select bind:value={newRowLinkId}
                         class="appearance-none w-full pl-2 pr-7 py-1.5 rounded-md text-xs font-mono outline-none"
                         style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);">
-                  {#if data.links.length === 0}
+                  {#if links.length === 0}
                     <option value="" disabled>No links</option>
                   {/if}
-                  {#each data.links as l}
+                  {#each links as l}
                     <option value={l.id}>iksi.app/{l.shortURL}</option>
                   {/each}
                 </select>
@@ -428,7 +477,7 @@
                 class="text-xs font-medium hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
                 style="color: var(--accent); background: transparent; border: none; cursor: pointer; padding: 0;"
                 disabled={!newRowLinkId || !newRowTitle}
-                on:click={() => rowAction({ action: 'addRow', linkId: newRowLinkId, title: newRowTitle })}
+                on:click={addRow}
               >Add</button>
             </td>
           </tr>
@@ -436,8 +485,8 @@
       </table>
     </div>
 
-    {#if data.links.length === 0}
-      <p class="text-xs" style="color: var(--text-muted);">Shorten a URL from the homepage first — you'll be able to add it as a row here.</p>
+    {#if links.length === 0}
+      <p class="text-xs" style="color: var(--text-muted);">Shorten a URL above first — you'll be able to add it as a row here.</p>
     {/if}
   </div>
 </section>

@@ -187,7 +187,11 @@ export const POST = async ({ request, getClientAddress, cookies }) => {
 					userId: uid
 				},
 				select: {
-					shortURL: true
+					id: true,
+					shortURL: true,
+					clickCount: true,
+					createdAt: true,
+					safeVerdict: true
 				}
 			});
 
@@ -205,7 +209,17 @@ export const POST = async ({ request, getClientAddress, cookies }) => {
 				}
 			}).catch(() => {});
 
-			return new Response(JSON.stringify({ shortURL: url.shortURL }), {
+			return new Response(JSON.stringify({
+				shortURL: url.shortURL,
+				link: {
+					id: url.id,
+					shortURL: url.shortURL,
+					originalURL: prefixedURL,
+					clickCount: url.clickCount,
+					createdAt: url.createdAt,
+					safeVerdict: url.safeVerdict
+				}
+			}), {
 				headers: { 'Content-Type': 'application/json' }
 			});
 		} catch (err) {

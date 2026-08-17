@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { invalidateAll } from '$app/navigation';
+
   export let data;
 
   // Reuse `theme` column: numeric-in-string 0..100 (brightness). Legacy values map:
@@ -49,7 +51,8 @@
     saving = false;
     if (res.ok) {
       saved = true;
-      setTimeout(() => location.reload(), 400);
+      await invalidateAll();
+      setTimeout(() => { saved = false; }, 1400);
     } else {
       const body = await res.json().catch(() => ({}));
       alert(body.error || 'Save failed');
