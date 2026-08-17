@@ -58,6 +58,35 @@
     return v;
   }
 
+  // Inline shortener
+  let newLongURL = '';
+  let shortening = false;
+  let shortenError = '';
+  async function shorten(e: SubmitEvent) {
+    e.preventDefault();
+    if (!newLongURL.trim() || shortening) return;
+    shortening = true;
+    shortenError = '';
+    try {
+      const res = await fetch('/api/shorten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ longURL: newLongURL.trim(), customURL: '' })
+      });
+      const body = await res.json();
+      if (res.ok) {
+        newLongURL = '';
+        location.reload();
+      } else {
+        shortenError = body.error || 'Could not shorten.';
+      }
+    } catch {
+      shortenError = 'Network error.';
+    } finally {
+      shortening = false;
+    }
+  }
+
   // Profile row management
   let newRowLinkId: number | '' = data.links[0]?.id ?? '';
   let newRowTitle = '';
@@ -141,13 +170,37 @@
   <div class="space-y-4">
     <div>
       <h2 class="text-base font-medium" style="color: var(--text-primary);">Your short URLs</h2>
-      <p class="text-sm mt-1" style="color: var(--text-muted);">Everything you've shortened while signed in.</p>
+      <p class="text-sm mt-1" style="color: var(--text-muted);">Shorten a URL below. Everything you own shows up here.</p>
     </div>
 
+    <!-- Inline shortener -->
+    <form on:submit={shorten} class="space-y-2">
+      <div class="flex gap-2">
+        <input
+          type="url"
+          bind:value={newLongURL}
+          placeholder="https://example.com/very/long/link"
+          class="flex-1 px-4 py-3 text-base rounded-lg outline-none transition-colors"
+          style="background: var(--surface); border: 1px solid {shortenError ? 'var(--error)' : 'var(--border)'}; color: var(--text-primary);"
+          required
+        />
+        <button
+          type="submit"
+          disabled={!newLongURL.trim() || shortening}
+          class="px-5 py-3 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+          style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
+        >
+          {shortening ? 'Shortening…' : 'Shorten'}
+        </button>
+      </div>
+      {#if shortenError}
+        <p class="text-xs" style="color: var(--error);">{shortenError}</p>
+      {/if}
+    </form>
+
   {#if data.links.length === 0}
-    <div class="py-16 text-center space-y-3 rounded-xl" style="background: var(--surface); border: 1px solid var(--border);">
-      <p class="text-base" style="color: var(--text-muted);">Shorten a URL on the homepage while signed in and it'll appear here.</p>
-      <a href="/" class="inline-block text-sm underline" style="color: var(--text-primary);">Go to homepage</a>
+    <div class="py-12 text-center rounded-xl" style="background: var(--surface); border: 1px solid var(--border);">
+      <p class="text-sm" style="color: var(--text-muted);">Nothing yet. Paste a URL above to make your first short link.</p>
     </div>
   {:else}
     <ul class="rounded-xl overflow-hidden divide-y" style="background: var(--surface); border: 1px solid var(--border); --tw-divide-opacity: 1;">
