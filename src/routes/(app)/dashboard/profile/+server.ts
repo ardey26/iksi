@@ -27,10 +27,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       if (bio && bio.length > 200) return json({ error: 'Bio ≤200 chars' }, { status: 400 });
       if (theme && !THEMES.has(theme)) return json({ error: 'Unknown theme' }, { status: 400 });
       if (accent && !HEX_RE.test(accent)) return json({ error: 'Accent must be #RRGGBB' }, { status: 400 });
-      await prisma.profile.update({
-        where: { id: p.id },
-        data: { displayName, bio, avatarUrl, theme, accent, publicClicks: !!publicClicks }
-      });
+      const data: Record<string, unknown> = { displayName, bio, avatarUrl, theme, accent };
+      if (typeof publicClicks === 'boolean') data.publicClicks = publicClicks;
+      await prisma.profile.update({ where: { id: p.id }, data });
       return json({ ok: true });
     }
     case 'addRow': {

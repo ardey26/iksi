@@ -6,7 +6,6 @@
   let avatarUrl = data.profile?.avatarUrl ?? '';
   let theme = data.profile?.theme ?? 'default';
   let accent = data.profile?.accent ?? '#3B82F6';
-  let publicClicks = !!data.profile?.publicClicks;
 
   let saving = false;
   let saved = false;
@@ -18,11 +17,10 @@
       bio: data.profile?.bio ?? '',
       avatarUrl: data.profile?.avatarUrl ?? '',
       theme: data.profile?.theme ?? 'default',
-      accent: data.profile?.accent ?? '#3B82F6',
-      publicClicks: !!data.profile?.publicClicks
+      accent: data.profile?.accent ?? '#3B82F6'
     };
     dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
-      || theme !== orig.theme || accent !== orig.accent || publicClicks !== orig.publicClicks;
+      || theme !== orig.theme || accent !== orig.accent;
   }
 
   async function saveProfile() {
@@ -31,7 +29,7 @@
     const res = await fetch('/dashboard/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'updateProfile', displayName, bio, avatarUrl, theme, accent, publicClicks })
+      body: JSON.stringify({ action: 'updateProfile', displayName, bio, avatarUrl, theme, accent })
     });
     saving = false;
     if (res.ok) {
@@ -122,13 +120,6 @@
         <span class="text-sm tabular-nums" style="color: var(--text-muted);">{accent.toUpperCase()}</span>
       </div>
 
-      <label class="flex items-start gap-3 text-sm cursor-pointer">
-        <input type="checkbox" bind:checked={publicClicks} class="mt-0.5" />
-        <span style="color: var(--text-primary);">
-          Show click counts publicly
-          <span class="block text-xs mt-0.5" style="color: var(--text-muted);">Visitors see how many times each row was clicked.</span>
-        </span>
-      </label>
     </div>
   </div>
 
