@@ -5,6 +5,14 @@ import { checkURL } from '$lib/server/safe-browsing';
 import { decodeURL } from '$lib/server/crypto.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
+
+// theme can be a numeric brightness string ("0".."100") OR a legacy name.
+function validTheme(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  if (THEMES.has(v)) return true;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 && n <= 100 && String(n) === v;
+}
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 async function requireProfile(uid: number) {
@@ -27,7 +35,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       if (bio && bio.length > 200) return json({ error: 'Bio ≤200 chars' }, { status: 400 });
       if (accent && !HEX_RE.test(accent)) return json({ error: 'Accent must be #RRGGBB' }, { status: 400 });
       const data: Record<string, unknown> = { displayName, bio, avatarUrl, accent };
-      if (typeof theme === 'string' && THEMES.has(theme)) data.theme = theme;
+      if (validTheme(theme)) data.theme = theme;
       if (typeof publicClicks === 'boolean') data.publicClicks = publicClicks;
       await prisma.profile.update({ where: { id: p.id }, data });
       return json({ ok: true });

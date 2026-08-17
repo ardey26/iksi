@@ -17,21 +17,25 @@
     return (n / 1000000).toFixed(1) + 'M';
   }
 
-  // Dark by default; only 'light' flips.
-  $: isLight = data.theme === 'light';
-  $: paletteStyle = isLight
-    ? `--accent: ${data.accent};
-       --bg: color-mix(in srgb, ${data.accent} 8%, #fff);
-       --surface: color-mix(in srgb, ${data.accent} 14%, #fafafa);
-       --border: color-mix(in srgb, ${data.accent} 30%, transparent);
-       --text-primary: color-mix(in srgb, #0a0a0b 92%, ${data.accent} 8%);
-       --text-muted: color-mix(in srgb, #0a0a0b 55%, ${data.accent} 45%);`
-    : `--accent: ${data.accent};
-       --bg: color-mix(in srgb, ${data.accent} 8%, #000);
-       --surface: color-mix(in srgb, ${data.accent} 16%, #0a0a0b);
-       --border: color-mix(in srgb, ${data.accent} 25%, transparent);
-       --text-primary: color-mix(in srgb, #ffffff 96%, ${data.accent} 4%);
-       --text-muted: color-mix(in srgb, #ffffff 60%, ${data.accent} 40%);`;
+  // `theme` column stores brightness as string "0".."100".
+  // Legacy: 'light' → 100, everything else → 20.
+  function brightnessOf(t) {
+    if (!t) return 20;
+    const n = parseInt(t, 10);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
+    if (t === 'light') return 100;
+    return 20;
+  }
+  $: b = brightnessOf(data.theme);
+  $: surfB = Math.max(0, Math.min(100, b + 6));
+  $: invB = 100 - b;
+  $: paletteStyle =
+    `--accent: ${data.accent};
+     --bg: color-mix(in srgb, ${data.accent} 8%, color-mix(in srgb, #fff ${b}%, #000));
+     --surface: color-mix(in srgb, ${data.accent} 14%, color-mix(in srgb, #fff ${surfB}%, #000));
+     --border: color-mix(in srgb, ${data.accent} 28%, transparent);
+     --text-primary: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 95%, ${data.accent} 5%);
+     --text-muted: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 55%, ${data.accent} 45%);`;
 </script>
 
 <svelte:head>

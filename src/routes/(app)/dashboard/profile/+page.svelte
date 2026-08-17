@@ -1,28 +1,37 @@
 <script lang="ts">
   export let data;
 
+  // Reuse `theme` column: numeric-in-string 0..100 (brightness). Legacy values map:
+  //   'light' → 100, everything else ('dark' | 'default' | 'mono' | undefined) → 20.
+  function themeToBrightness(t: string | null | undefined): number {
+    if (!t) return 20;
+    const n = parseInt(t, 10);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
+    if (t === 'light') return 100;
+    return 20;
+  }
+
   let displayName = data.profile?.displayName ?? '';
   let bio = data.profile?.bio ?? '';
   let avatarUrl = data.profile?.avatarUrl ?? '';
   let accent = data.profile?.accent ?? '#3B82F6';
-  // Reuse existing `theme` column: 'dark' | 'light'. Any legacy value → 'dark'.
-  let mode: 'dark' | 'light' = data.profile?.theme === 'light' ? 'light' : 'dark';
+  let brightness: number = themeToBrightness(data.profile?.theme);
 
   let saving = false;
   let saved = false;
   let dirty = false;
 
   $: {
-    const origMode: 'dark' | 'light' = data.profile?.theme === 'light' ? 'light' : 'dark';
+    const origBright = themeToBrightness(data.profile?.theme);
     const orig = {
       displayName: data.profile?.displayName ?? '',
       bio: data.profile?.bio ?? '',
       avatarUrl: data.profile?.avatarUrl ?? '',
       accent: data.profile?.accent ?? '#3B82F6',
-      mode: origMode
+      brightness: origBright
     };
     dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
-      || accent !== orig.accent || mode !== orig.mode;
+      || accent !== orig.accent || brightness !== orig.brightness;
   }
 
   async function saveProfile() {
@@ -31,7 +40,11 @@
     const res = await fetch('/dashboard/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'updateProfile', displayName, bio, avatarUrl, accent, theme: mode })
+      body: JSON.stringify({
+        action: 'updateProfile',
+        displayName, bio, avatarUrl, accent,
+        theme: String(Math.round(brightness))
+      })
     });
     saving = false;
     if (res.ok) {
@@ -43,20 +56,19 @@
     }
   }
 
-  // Palette derivation (must match /@handle logic exactly)
-  $: paletteStyle = mode === 'dark'
-    ? `--accent: ${accent};
-       --p-bg: color-mix(in srgb, ${accent} 8%, #000);
-       --p-surface: color-mix(in srgb, ${accent} 16%, #0a0a0b);
-       --p-border: color-mix(in srgb, ${accent} 25%, transparent);
-       --p-text: color-mix(in srgb, #ffffff 96%, ${accent} 4%);
-       --p-muted: color-mix(in srgb, #ffffff 60%, ${accent} 40%);`
-    : `--accent: ${accent};
-       --p-bg: color-mix(in srgb, ${accent} 8%, #fff);
-       --p-surface: color-mix(in srgb, ${accent} 14%, #fafafa);
-       --p-border: color-mix(in srgb, ${accent} 30%, transparent);
-       --p-text: color-mix(in srgb, #0a0a0b 92%, ${accent} 8%);
-       --p-muted: color-mix(in srgb, #0a0a0b 55%, ${accent} 45%);`;
+  // Palette derivation (must mirror /@handle logic exactly).
+  // brightness 0 = pure black base, 100 = pure white base.
+  $: paletteStyle = (() => {
+    const b = Math.max(0, Math.min(100, brightness));
+    const surfB = Math.max(0, Math.min(100, b + 6));
+    const invB = 100 - b;
+    return `--accent: ${accent};
+            --p-bg: color-mix(in srgb, ${accent} 8%, color-mix(in srgb, #fff ${b}%, #000));
+            --p-surface: color-mix(in srgb, ${accent} 14%, color-mix(in srgb, #fff ${surfB}%, #000));
+            --p-border: color-mix(in srgb, ${accent} 28%, transparent);
+            --p-text: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 95%, ${accent} 5%);
+            --p-muted: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 55%, ${accent} 45%);`;
+  })();
 
   $: previewName = displayName || data.user.twitterHandle || '@you';
   $: previewInitial = previewName.charAt(0).toUpperCase();
@@ -110,31 +122,39 @@
   <div class="space-y-4">
     <div>
       <h2 class="text-base font-medium" style="color: var(--text-primary);">Appearance</h2>
-      <p class="text-sm mt-1" style="color: var(--text-muted);">Pick a color and mode. Your public page's palette is derived from these.</p>
+      <p class="text-sm mt-1" style="color: var(--text-muted);">Pick a color and a brightness. The full palette is derived from both.</p>
     </div>
 
     <div class="rounded-xl p-6 space-y-6" style="background: var(--surface); border: 1px solid var(--border);">
-      <!-- Accent + mode -->
-      <div class="flex items-center gap-6 flex-wrap">
-        <div class="flex items-center gap-3">
-          <label class="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer shrink-0" style="background: {accent}; box-shadow: 0 0 0 4px color-mix(in srgb, {accent} 20%, transparent);">
-            <input type="color" bind:value={accent} class="absolute inset-0 opacity-0 cursor-pointer" />
-          </label>
-          <div class="flex flex-col">
-            <span class="text-sm font-medium tabular-nums" style="color: var(--text-primary);">{accent.toUpperCase()}</span>
-            <span class="text-xs" style="color: var(--text-muted);">Click swatch</span>
-          </div>
+      <!-- Accent -->
+      <div class="flex items-center gap-4">
+        <label class="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer shrink-0" style="background: {accent}; box-shadow: 0 0 0 4px color-mix(in srgb, {accent} 20%, transparent);">
+          <input type="color" bind:value={accent} class="absolute inset-0 opacity-0 cursor-pointer" />
+        </label>
+        <div class="flex flex-col">
+          <span class="text-sm font-medium tabular-nums" style="color: var(--text-primary);">{accent.toUpperCase()}</span>
+          <span class="text-xs" style="color: var(--text-muted);">Click swatch to change</span>
         </div>
+      </div>
 
-        <div class="flex items-center gap-2">
-          {#each [{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }] as m}
-            <button
-              type="button"
-              on:click={() => (mode = m.id)}
-              class="px-4 py-2 rounded-md text-sm transition-colors"
-              style="background: {mode === m.id ? 'var(--text-primary)' : 'var(--bg)'}; color: {mode === m.id ? 'var(--bg)' : 'var(--text-primary)'}; border: 1px solid {mode === m.id ? 'var(--text-primary)' : 'var(--border)'}; cursor: pointer;"
-            >{m.label}</button>
-          {/each}
+      <!-- Brightness slider -->
+      <div class="space-y-2">
+        <div class="flex items-baseline justify-between">
+          <span class="text-sm" style="color: var(--text-muted);">Brightness</span>
+          <span class="text-xs tabular-nums" style="color: var(--text-muted);">{Math.round(brightness)}</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          bind:value={brightness}
+          class="w-full brightness-slider"
+          aria-label="Palette brightness"
+        />
+        <div class="flex justify-between text-xs" style="color: var(--text-muted); opacity: 0.7;">
+          <span>Dark</span>
+          <span>Light</span>
         </div>
       </div>
 
@@ -142,7 +162,7 @@
       <div class="space-y-2">
         <span class="text-xs uppercase tracking-wide" style="color: var(--text-muted);">Preview</span>
         <div class="rounded-xl overflow-hidden" style="border: 1px solid var(--border);">
-          <div class="p-6 flex flex-col items-center gap-3 text-center" style="{paletteStyle} background: var(--p-bg); color: var(--p-text);">
+          <div class="p-6 flex flex-col items-center gap-3 text-center transition-colors" style="{paletteStyle} background: var(--p-bg); color: var(--p-text);">
             {#if avatarUrl}
               <img src={avatarUrl} alt="" class="w-14 h-14 rounded-full object-cover" style="border: 1px solid var(--p-border);" />
             {:else}
@@ -190,3 +210,33 @@
     {/if}
   </div>
 </section>
+
+<style>
+  .brightness-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    background: linear-gradient(to right, #0a0a0b, #fafafa);
+    border-radius: 999px;
+    outline: none;
+  }
+  .brightness-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  .brightness-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+</style>
