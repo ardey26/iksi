@@ -1,5 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { verifyUserSession } from '$lib/server/user-auth';
+import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 
 export const load: LayoutServerLoad = async ({ cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
@@ -19,7 +20,7 @@ export const load: LayoutServerLoad = async ({ cookies }) => {
       googleEmail: user.googleEmail ?? null,
       handle: user.handle?.handle ?? null,
       displayName: user.profile?.displayName ?? null,
-      avatarUrl: user.profile?.avatarUrl ?? null
+      avatarUrl: user.profile?.avatarUrl ? normalizeAvatarUrl(user.profile.avatarUrl) : null
     }
   };
 };

@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
 import { ImageResponse } from '@vercel/og';
+import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 
 export const GET: RequestHandler = async ({ params }) => {
   const raw = params.handle;
@@ -33,7 +34,7 @@ export const GET: RequestHandler = async ({ params }) => {
     children.push({
       type: 'img',
       props: {
-        src: p.avatarUrl,
+        src: normalizeAvatarUrl(p.avatarUrl),
         width: 120,
         height: 120,
         style: { borderRadius: 60, marginBottom: 24 }

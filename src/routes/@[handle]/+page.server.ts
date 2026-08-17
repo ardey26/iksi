@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { decodeURL } from '$lib/server/crypto.js';
+import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 
 export const load: PageServerLoad = async ({ params, request, platform }) => {
   const raw = params.handle;
@@ -47,7 +48,7 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
     handle,
     displayName: p.displayName ?? `@${handle}`,
     bio: p.bio,
-    avatarUrl: p.avatarUrl,
+    avatarUrl: p.avatarUrl ? normalizeAvatarUrl(p.avatarUrl) : null,
     theme: p.theme,
     accent: p.accent,
     publicClicks: p.publicClicks,

@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { verifyUserSession } from '$lib/server/user-auth';
+import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 
 const CLAIM_EXEMPT_ROUTES = new Set(['/(app)/dashboard/claim', '/(app)/logout']);
 
@@ -30,7 +31,7 @@ export const load: LayoutServerLoad = async ({ cookies, route }) => {
       handle: user.handle?.handle ?? null,
       profileId: user.profile?.id ?? null,
       displayName: user.profile?.displayName ?? null,
-      avatarUrl: user.profile?.avatarUrl ?? null
+      avatarUrl: user.profile?.avatarUrl ? normalizeAvatarUrl(user.profile.avatarUrl) : null
     }
   };
 };

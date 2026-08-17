@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 
 const PUBLIC_LIMIT_PER_HOUR = 100;
 
@@ -54,7 +55,7 @@ export const GET: RequestHandler = async ({ params, getClientAddress }) => {
     handle,
     displayName: p.displayName,
     bio: p.bio,
-    avatarUrl: p.avatarUrl,
+    avatarUrl: p.avatarUrl ? normalizeAvatarUrl(p.avatarUrl) : null,
     theme: p.theme,
     accent: p.accent,
     rows: p.rows.map((r) => ({
