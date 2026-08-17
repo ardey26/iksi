@@ -5,7 +5,8 @@
     return v.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
   }
 
-  let handle = sanitize(data.user.twitterHandle ?? '');
+  const suggested = data.user.twitterHandle ?? (data.user.googleEmail?.split('@')[0] ?? '');
+  let handle = sanitize(suggested);
   let error = '';
   let loading = false;
 

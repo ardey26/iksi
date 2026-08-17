@@ -10,8 +10,10 @@ datasource db {
 
 model User {
   id            Int       @id @default(autoincrement())
-  twitterId     String    @unique
-  twitterHandle String
+  twitterId     String?   @unique
+  twitterHandle String?
+  googleId      String?   @unique
+  googleEmail   String?
   createdAt     DateTime  @default(now())
   handle        Handle?
   profile       Profile?

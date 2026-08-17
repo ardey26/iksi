@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
 
   export let user: {
-    twitterHandle: string;
+    twitterHandle: string | null;
+    googleEmail?: string | null;
     handle: string | null;
     displayName: string | null;
     avatarUrl: string | null;
@@ -29,7 +30,10 @@
     };
   });
 
-  $: initial = (user.displayName || user.handle || user.twitterHandle || '?')
+  $: identityLabel = user.twitterHandle
+    ? `@${user.twitterHandle}`
+    : (user.googleEmail ?? '');
+  $: initial = (user.displayName || user.handle || user.twitterHandle || user.googleEmail || '?')
     .trim()
     .charAt(0)
     .toUpperCase();
@@ -69,8 +73,8 @@
           <p class="text-xs mt-0.5" style="color: var(--text-muted);">
             iksi.app/@{user.handle}
           </p>
-        {:else}
-          <span class="text-sm" style="color: var(--text-muted);">@{user.twitterHandle}</span>
+        {:else if identityLabel}
+          <span class="text-sm truncate block" style="color: var(--text-muted);">{identityLabel}</span>
         {/if}
       </div>
       <a

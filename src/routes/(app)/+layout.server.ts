@@ -25,7 +25,8 @@ export const load: LayoutServerLoad = async ({ cookies, route }) => {
   return {
     user: {
       id: user.id,
-      twitterHandle: user.twitterHandle,
+      twitterHandle: user.twitterHandle ?? null,
+      googleEmail: user.googleEmail ?? null,
       handle: user.handle?.handle ?? null,
       profileId: user.profile?.id ?? null,
       displayName: user.profile?.displayName ?? null,

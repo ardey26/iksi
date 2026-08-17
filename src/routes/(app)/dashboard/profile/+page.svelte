@@ -74,7 +74,7 @@
             --p-muted: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 55%, ${accent} 45%);`;
   })();
 
-  $: previewName = displayName || data.user.twitterHandle || '@you';
+  $: previewName = displayName || data.user.twitterHandle || data.user.googleEmail?.split('@')[0] || '@you';
   $: previewInitial = previewName.charAt(0).toUpperCase();
   const sampleRows = ['Website', 'Latest post', 'Newsletter'];
 </script>
@@ -98,7 +98,7 @@
     <div class="rounded-xl p-6 space-y-5" style="background: var(--surface); border: 1px solid var(--border);">
       <label class="block space-y-2">
         <span class="text-sm" style="color: var(--text-muted);">Display name</span>
-        <input type="text" bind:value={displayName} maxlength="80" placeholder={data.user.twitterHandle}
+        <input type="text" bind:value={displayName} maxlength="80" placeholder={data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name'}
                class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
                style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
       </label>
