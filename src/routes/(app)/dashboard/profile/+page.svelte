@@ -4,7 +4,6 @@
   let displayName = data.profile?.displayName ?? '';
   let bio = data.profile?.bio ?? '';
   let avatarUrl = data.profile?.avatarUrl ?? '';
-  let theme = data.profile?.theme ?? 'default';
   let accent = data.profile?.accent ?? '#3B82F6';
 
   let saving = false;
@@ -16,11 +15,10 @@
       displayName: data.profile?.displayName ?? '',
       bio: data.profile?.bio ?? '',
       avatarUrl: data.profile?.avatarUrl ?? '',
-      theme: data.profile?.theme ?? 'default',
       accent: data.profile?.accent ?? '#3B82F6'
     };
     dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
-      || theme !== orig.theme || accent !== orig.accent;
+      || accent !== orig.accent;
   }
 
   async function saveProfile() {
@@ -29,7 +27,7 @@
     const res = await fetch('/dashboard/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'updateProfile', displayName, bio, avatarUrl, theme, accent })
+      body: JSON.stringify({ action: 'updateProfile', displayName, bio, avatarUrl, accent })
     });
     saving = false;
     if (res.ok) {
@@ -40,12 +38,6 @@
       alert(body.error || 'Save failed');
     }
   }
-
-  const themes = [
-    { id: 'default', label: 'Dark' },
-    { id: 'light', label: 'Light' },
-    { id: 'mono', label: 'Mono' }
-  ];
 </script>
 
 <svelte:head><title>Profile — iksi</title></svelte:head>
@@ -97,29 +89,16 @@
       <h2 class="text-base font-medium" style="color: var(--text-primary);">Appearance</h2>
       <p class="text-sm mt-1" style="color: var(--text-muted);">Look and feel of your public page.</p>
     </div>
-    <div class="rounded-xl p-6 space-y-6" style="background: var(--surface); border: 1px solid var(--border);">
-      <div class="space-y-3">
-        <span class="text-sm" style="color: var(--text-muted);">Theme</span>
-        <div class="flex gap-2">
-          {#each themes as t}
-            <button
-              type="button"
-              on:click={() => theme = t.id}
-              class="flex-1 py-2.5 rounded-md text-sm transition-colors"
-              style="background: {theme === t.id ? 'var(--text-primary)' : 'var(--bg)'}; color: {theme === t.id ? 'var(--bg)' : 'var(--text-primary)'}; border: 1px solid {theme === t.id ? 'var(--text-primary)' : 'var(--border)'}; cursor: pointer;"
-            >{t.label}</button>
-          {/each}
-        </div>
-      </div>
-
+    <div class="rounded-xl p-6" style="background: var(--surface); border: 1px solid var(--border);">
       <div class="flex items-center gap-4">
-        <span class="text-sm" style="color: var(--text-muted);">Accent</span>
-        <label class="relative w-10 h-10 rounded-full overflow-hidden cursor-pointer" style="background: {accent}; border: 1px solid var(--border);">
+        <label class="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer shrink-0" style="background: {accent}; box-shadow: 0 0 0 4px color-mix(in srgb, {accent} 20%, transparent);">
           <input type="color" bind:value={accent} class="absolute inset-0 opacity-0 cursor-pointer" />
         </label>
-        <span class="text-sm tabular-nums" style="color: var(--text-muted);">{accent.toUpperCase()}</span>
+        <div class="flex flex-col">
+          <span class="text-sm font-medium tabular-nums" style="color: var(--text-primary);">{accent.toUpperCase()}</span>
+          <span class="text-xs" style="color: var(--text-muted);">Click the swatch to change. Your public page uses this color throughout.</span>
+        </div>
       </div>
-
     </div>
   </div>
 

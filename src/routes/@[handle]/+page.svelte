@@ -23,9 +23,20 @@
   <meta name="description" content={data.bio ?? `@${data.handle} on iksi`} />
 </svelte:head>
 
-<div class="min-h-screen flex flex-col items-center px-4 pt-20 pb-8"
-     style={`background: var(--bg); color: var(--text-primary); --accent: ${data.accent};`}
-     data-theme={data.theme}>
+<!--
+  The whole palette on the public page is derived from the user's chosen accent hex.
+  Backgrounds/surfaces are dark shades of the accent; borders + muted text carry a
+  subtle tint of the same hue. All via CSS color-mix — no per-hex classes needed.
+-->
+<div class="iksi-profile min-h-screen flex flex-col items-center px-4 pt-20 pb-8"
+     style="--accent: {data.accent};
+            --bg: color-mix(in srgb, {data.accent} 8%, #000);
+            --surface: color-mix(in srgb, {data.accent} 16%, #0a0a0b);
+            --border: color-mix(in srgb, {data.accent} 25%, transparent);
+            --text-primary: color-mix(in srgb, #ffffff 96%, {data.accent} 4%);
+            --text-muted: color-mix(in srgb, #ffffff 60%, {data.accent} 40%);
+            background: var(--bg);
+            color: var(--text-primary);">
 
   <!-- Share button top-right -->
   <button
@@ -35,11 +46,8 @@
     aria-label="Copy profile link"
   >
     {#if copied}
-      <span>copied</span>
+      <span>Copied</span>
     {:else}
-      <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342l6.632 3.316m0-9.316L8.684 10.658m8.632-3l-1.632-1.632a2 2 0 10-2.828 2.828L14.488 10.658m1.828 5.684l1.632 1.632a2 2 0 11-2.828 2.828l-1.632-1.632"/>
-      </svg>
       <span>Share</span>
     {/if}
   </button>
