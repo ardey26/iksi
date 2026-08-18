@@ -28,6 +28,12 @@ export const DELETE: RequestHandler = async ({ request, cookies }) => {
   const link = await prisma.longURL.findUnique({ where: { id } });
   if (!link || link.userId !== uid) return json({ error: 'Not found' }, { status: 404 });
 
-  await prisma.longURL.delete({ where: { id } });
+  // Cascade: kill any ProfileRow that referenced this link too. Schema uses
+  // SetNull, but the unified links UI treats a link and its public row as one
+  // entity — leaving orphaned rows labeled "deleted" would surprise the user.
+  await prisma.$transaction([
+    prisma.profileRow.deleteMany({ where: { linkId: id } }),
+    prisma.longURL.delete({ where: { id } })
+  ]);
   return json({ ok: true });
 };

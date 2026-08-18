@@ -74,6 +74,52 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       });
       return json({ ok: true, row: created });
     }
+    case 'upsertRow': {
+      // Unified endpoint used by the single-table links UI. Creates the
+      // ProfileRow if it doesn't exist, otherwise updates title/enabled.
+      const { linkId, title, enabled } = body;
+      if (!Number.isInteger(linkId)) return json({ error: 'Invalid linkId' }, { status: 400 });
+      if (typeof title !== 'string' || title.length === 0 || title.length > 80) {
+        return json({ error: 'Title required (≤80 chars)' }, { status: 400 });
+      }
+      if (typeof enabled !== 'boolean') return json({ error: 'enabled required' }, { status: 400 });
+
+      const link = await prisma.longURL.findUnique({ where: { id: linkId } });
+      if (!link || link.userId !== uid) return json({ error: 'Link not owned' }, { status: 403 });
+
+      // Safe-browsing gate applies only when going public.
+      if (enabled) {
+        const stale = !link.safeCheckedAt || (Date.now() - link.safeCheckedAt.getTime()) > 86400000;
+        if (stale) {
+          const raw = await decodeURL(link.originalURL);
+          const verdict = await checkURL(raw);
+          await prisma.longURL.update({
+            where: { id: link.id },
+            data: { safeVerdict: verdict, safeCheckedAt: new Date() }
+          });
+          if (verdict !== 'safe' && verdict !== 'pending') {
+            return json({ error: 'This link failed a safety check' }, { status: 422 });
+          }
+        }
+      }
+
+      const existing = await prisma.profileRow.findFirst({ where: { profileId: p.id, linkId } });
+      let row;
+      if (existing) {
+        row = await prisma.profileRow.update({
+          where: { id: existing.id },
+          data: { title, enabled },
+          include: { link: { select: { shortURL: true } } }
+        });
+      } else {
+        const last = await prisma.profileRow.aggregate({ where: { profileId: p.id }, _max: { position: true } });
+        row = await prisma.profileRow.create({
+          data: { profileId: p.id, linkId, title, enabled, position: (last._max.position ?? -1) + 1 },
+          include: { link: { select: { shortURL: true } } }
+        });
+      }
+      return json({ ok: true, row });
+    }
     case 'toggleRow': {
       const { rowId, enabled } = body;
       const row = await prisma.profileRow.findUnique({ where: { id: rowId } });

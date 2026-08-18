@@ -5,19 +5,30 @@ export const load: PageServerLoad = async ({ parent }) => {
   const { user } = await parent();
   const { prisma } = await import('$lib/prisma.js');
 
-  const [links, profile] = await Promise.all([
-    prisma.longURL.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, shortURL: true, originalURL: true, clickCount: true, createdAt: true, safeVerdict: true }
-    }),
-    prisma.profile.findUnique({
-      where: { userId: user.id },
-      include: {
-        rows: { orderBy: { position: 'asc' }, include: { link: { select: { shortURL: true } } } }
-      }
-    })
-  ]);
+  const profile = await prisma.profile.findUnique({
+    where: { userId: user.id },
+    select: { id: true }
+  });
+
+  const links = await prisma.longURL.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      shortURL: true,
+      originalURL: true,
+      clickCount: true,
+      createdAt: true,
+      safeVerdict: true,
+      profileRows: profile
+        ? {
+            where: { profileId: profile.id },
+            select: { id: true, title: true, enabled: true, position: true },
+            take: 1
+          }
+        : false
+    }
+  });
 
   const decoded = await Promise.all(
     links.map(async (l) => {
@@ -32,8 +43,20 @@ export const load: PageServerLoad = async ({ parent }) => {
         console.error(`[links] decodeURL threw for shortURL="${l.shortURL}"`, err);
         plain = '';
       }
-      return { ...l, originalURL: plain };
+      const row = (l as any).profileRows?.[0] ?? null;
+      const { profileRows: _drop, ...rest } = l as any;
+      return { ...rest, originalURL: plain, profileRow: row };
     })
   );
-  return { user, links: decoded, profile };
+
+  // Sort: public rows first (by their configured position), then everything
+  // else by recency. Matches the order of the public page for on-page items.
+  decoded.sort((a, b) => {
+    const aPos = a.profileRow?.position ?? Number.POSITIVE_INFINITY;
+    const bPos = b.profileRow?.position ?? Number.POSITIVE_INFINITY;
+    if (aPos !== bPos) return aPos - bPos;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  return { user, links: decoded };
 };
