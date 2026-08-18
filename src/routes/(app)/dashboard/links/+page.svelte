@@ -177,12 +177,15 @@
         : null;
 
       if (!addedLink && body.shortURL) {
-        // Dedupe path: server returned an existing shortURL without the full
-        // link object. Reload loader to pick it up.
+        // Dedupe path: user re-shortened a URL they'd already shortened.
+        // Server returned just the existing shortURL. Reload loader, then
+        // find the record in the fresh server data (NOT the local `links`
+        // copy — the reactive sync statement may not have fired yet).
         await invalidateAll();
-        addedLink = links.find((l) => l.shortURL === body.shortURL) ?? null;
+        const fresh = data.links.find((l: any) => l.shortURL === body.shortURL);
+        addedLink = fresh ?? null;
       } else if (addedLink) {
-        // Optimistic prepend.
+        // Optimistic prepend for a fresh creation.
         links = [addedLink, ...links];
       }
 
