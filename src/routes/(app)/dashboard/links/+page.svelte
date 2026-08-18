@@ -382,7 +382,7 @@
       {/if}
     </div>
 
-    <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
+    <div class="rounded-xl overflow-auto" style="background: var(--surface); border: 1px solid var(--border);">
       <table class="w-full text-sm">
         <thead>
           <tr style="border-bottom: 1px solid var(--border);">
