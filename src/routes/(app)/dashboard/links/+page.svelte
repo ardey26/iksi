@@ -420,8 +420,8 @@
             <button
               on:click={add}
               disabled={!canAdd}
-              class="text-xs font-medium hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
-              style="color: var(--accent); background: transparent; border: none; cursor: pointer; padding: 0;"
+              class="px-3 py-1.5 text-xs font-medium rounded-md transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
+              style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
             >{adding ? 'Adding…' : 'Add'}</button>
           </td>
         </tr>
