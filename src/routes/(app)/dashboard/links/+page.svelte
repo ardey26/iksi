@@ -13,9 +13,6 @@
     profileRow: { id: number; title: string; enabled: boolean; position: number } | null;
   };
 
-  // Local mutable copy for optimistic UI. Only re-sync when loader data
-  // reference actually changes — otherwise we'd clobber pending optimistic
-  // updates every reactive pass.
   let links: Link[] = [...data.links];
   let _linksRef = data.links;
   $: if (data.links !== _linksRef) {
@@ -23,12 +20,19 @@
     links = [...data.links];
   }
 
+  $: publicLinks = links.filter((l) => l.profileRow?.enabled);
+  $: privateLinks = links.filter((l) => !l.profileRow?.enabled);
+
   let copiedId: number | null = null;
-  let editingTitleId: number | null = null;
 
   function hostOf(u: string) {
     try { return new URL(u).hostname.replace(/^www\./, ''); }
     catch { return u; }
+  }
+  function faviconOf(u: string) {
+    const host = hostOf(u);
+    if (!host || !host.includes('.')) return null;
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
   }
   function relDate(d: string | Date) {
     const dt = new Date(d);
@@ -43,6 +47,12 @@
   function verdictLabel(v: string | null | undefined) {
     if (!v || v === 'safe' || v === 'pending') return null;
     return v;
+  }
+  function fmtClicks(n: number) {
+    if (n < 1000) return n.toString();
+    if (n < 10000) return (n / 1000).toFixed(1) + 'k';
+    if (n < 1000000) return Math.round(n / 1000) + 'k';
+    return (n / 1000000).toFixed(1) + 'M';
   }
   async function copy(id: number, short: string) {
     try {
@@ -73,7 +83,6 @@
     const currentTitle = link.profileRow?.title?.trim() || hostOf(link.originalURL) || link.shortURL;
     const nextEnabled = !(link.profileRow?.enabled ?? false);
 
-    // Optimistic
     links = links.map((l) =>
       l.id === link.id
         ? {
@@ -90,7 +99,6 @@
 
     const row = await apiUpsertRow(link, currentTitle, nextEnabled);
     if (!row) {
-      // Revert
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: link.profileRow } : l));
     } else {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: row } : l));
@@ -99,12 +107,8 @@
 
   async function saveTitle(link: Link, newTitle: string) {
     const title = newTitle.trim();
-    editingTitleId = null;
     if (!title) {
-      // Blank title on a row that has no ProfileRow yet = nothing to persist.
       if (!link.profileRow) return;
-      // Blank title on an existing row: we treat it as "remove from public",
-      // which requires deleting the ProfileRow entirely (title is NOT NULL).
       const res = await fetch('/dashboard/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +129,7 @@
   }
 
   async function del(link: Link) {
-    if (!confirm(`Delete iksi.app/${link.shortURL}? This also removes it from your public page.`)) return;
+    if (!confirm(`Delete iksi.app/${link.shortURL}?`)) return;
     const prev = links;
     links = links.filter((l) => l.id !== link.id);
     const res = await fetch('/dashboard/links', {
@@ -139,7 +143,7 @@
     }
   }
 
-  // --- Add-row ---
+  // --- Add link ---
   let newURL = '';
   let newTitle = '';
   let newPublish = true;
@@ -172,26 +176,19 @@
         return;
       }
 
-      let addedLink: Link | null = body.link
-        ? { ...body.link, profileRow: null }
-        : null;
+      let addedLink: Link | null = body.link ? { ...body.link, profileRow: null } : null;
 
       if (!addedLink && body.shortURL) {
-        // Dedupe path: user re-shortened a URL they'd already shortened.
-        // Server returned just the existing shortURL. Reload loader, then
-        // find the record in the fresh server data (NOT the local `links`
-        // copy — the reactive sync statement may not have fired yet).
         await invalidateAll();
         const fresh = data.links.find((l: any) => l.shortURL === body.shortURL);
         addedLink = fresh ?? null;
       } else if (addedLink) {
-        // Optimistic prepend for a fresh creation.
         links = [addedLink, ...links];
       }
 
       const wantsPublic = newPublish;
       const title = newTitle.trim() || hostOf(url) || addedLink?.shortURL || '';
-      if (addedLink && (title && (wantsPublic || newTitle.trim().length > 0))) {
+      if (addedLink && title && (wantsPublic || newTitle.trim().length > 0)) {
         const row = await apiUpsertRow(addedLink, title, wantsPublic);
         if (row) {
           links = links.map((l) => (l.id === addedLink!.id ? { ...l, profileRow: row } : l));
@@ -208,14 +205,11 @@
     }
   }
 
-  // --- Drag reorder (only among rows that are on the public page) ---
+  // --- Drag reorder (public links only) ---
   let dragId: number | null = null;
   let dragOverId: number | null = null;
 
-  function isPublic(l: Link) { return !!l.profileRow?.enabled; }
-
   function onDragStart(e: DragEvent, l: Link) {
-    if (!isPublic(l)) { e.preventDefault(); return; }
     dragId = l.id;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -223,7 +217,7 @@
     }
   }
   function onDragOver(e: DragEvent, l: Link) {
-    if (dragId === null || !isPublic(l)) return;
+    if (dragId === null) return;
     e.preventDefault();
     dragOverId = l.id;
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
@@ -233,9 +227,8 @@
     e.preventDefault();
     const from = dragId;
     dragId = null; dragOverId = null;
-    if (from === null || from === target.id || !isPublic(target)) return;
+    if (from === null || from === target.id) return;
 
-    const publicLinks = links.filter(isPublic);
     const fromIdx = publicLinks.findIndex((l) => l.id === from);
     const toIdx = publicLinks.findIndex((l) => l.id === target.id);
     if (fromIdx < 0 || toIdx < 0) return;
@@ -245,14 +238,7 @@
     reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moving);
 
-    // Splice the reordered publics back into the full list where the first
-    // public used to be (preserving private links' relative positions below).
-    const firstPubPos = links.findIndex(isPublic);
-    const withoutPubs = links.filter((l) => !isPublic(l));
-    const next = [...reordered, ...withoutPubs];
-    // Preserve any leading non-public links? Public-first is our sort rule, so
-    // we don't need to worry about it — sort emits publics first anyway.
-    links = next;
+    links = [...reordered, ...privateLinks];
 
     const orderedIds = reordered.map((l) => l.profileRow!.id);
     const res = await fetch('/dashboard/profile', {
@@ -266,189 +252,287 @@
 
 <svelte:head><title>Links — iksi</title></svelte:head>
 
-<section class="w-full max-w-2xl mx-auto space-y-8">
-  <header class="flex items-baseline justify-between gap-4">
-    <div>
-      <p class="text-sm mb-8" style="color: var(--text-muted);">
-        <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
-      </p>
-      <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Links</h1>
-      <p class="text-sm mt-2" style="color: var(--text-muted);">Every link you own. Toggle to show on your public page.</p>
+<section class="w-full max-w-2xl mx-auto space-y-10">
+  <header>
+    <p class="text-sm mb-8" style="color: var(--text-muted);">
+      <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
+    </p>
+    <div class="flex items-baseline justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Links</h1>
+        <p class="text-sm mt-2" style="color: var(--text-muted);">Everything you've shortened. Toggle to show on your public page.</p>
+      </div>
+      {#if data.user.handle}
+        <a href={`/@${data.user.handle}`} target="_blank" rel="noopener"
+           class="text-sm shrink-0 hover:opacity-70 transition-opacity flex items-center gap-1"
+           style="color: var(--text-muted);">
+          View public
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M9 7h8v8"/>
+          </svg>
+        </a>
+      {/if}
     </div>
-    {#if data.user.handle}
-      <a href={`/@${data.user.handle}`} target="_blank" rel="noopener" class="text-sm shrink-0 hover:opacity-70 transition-opacity" style="color: var(--text-muted);">View public →</a>
-    {/if}
   </header>
 
-  <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
-    <table class="w-full text-sm">
-      <thead>
-        <tr style="border-bottom: 1px solid var(--border);">
-          <th class="w-6 py-3"></th>
-          <th class="text-left py-3 pl-1 font-normal text-xs uppercase tracking-wide" style="color: var(--text-muted);">Link</th>
-          <th class="text-left py-3 pr-4 font-normal text-xs uppercase tracking-wide" style="color: var(--text-muted);">Title</th>
-          <th class="w-24 text-left py-3 font-normal text-xs uppercase tracking-wide" style="color: var(--text-muted);">On page</th>
-          <th class="w-16 text-right py-3 pr-2 font-normal text-xs uppercase tracking-wide" style="color: var(--text-muted);">Clicks</th>
-          <th class="w-10 py-3"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each links as l (l.id)}
-          <tr
-            draggable={isPublic(l)}
+  <!-- Add a link -->
+  <div class="rounded-xl p-5 space-y-4"
+       style="background: var(--surface); border: 1px solid var(--border);">
+    <div class="flex items-baseline justify-between gap-4">
+      <h2 class="text-sm font-medium" style="color: var(--text-primary);">Add a link</h2>
+      {#if addError}<span class="text-xs" style="color: var(--error);">{addError}</span>{/if}
+    </div>
+    <input
+      type="url"
+      bind:value={newURL}
+      placeholder="Paste any URL — https://example.com/…"
+      maxlength="2048"
+      on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
+      class="w-full px-3 py-2.5 text-base rounded-lg outline-none transition-colors"
+      style="background: var(--bg); border: 1px solid {newURL && !isValidUrl(newURL) ? 'var(--error)' : isValidUrl(newURL) ? 'var(--accent)' : 'var(--border)'}; color: var(--text-primary);"
+    />
+    <div class="flex items-center gap-3">
+      <input
+        type="text"
+        bind:value={newTitle}
+        placeholder="Title (optional — used on your public page)"
+        maxlength="80"
+        on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+        class="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg outline-none transition-colors"
+        style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);"
+      />
+      <label class="flex items-center gap-2 shrink-0 cursor-pointer select-none">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={newPublish}
+          on:click={() => (newPublish = !newPublish)}
+          class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
+          style="background: {newPublish ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
+        >
+          <span class="inline-block w-4 h-4 rounded-full transition-transform"
+                style="background: white; transform: translateX({newPublish ? '18px' : '2px'});"></span>
+        </button>
+        <span class="text-xs" style="color: var(--text-muted);">Publish now</span>
+      </label>
+      <button
+        on:click={add}
+        disabled={!canAdd}
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+        style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
+      >{adding ? 'Adding…' : 'Add'}</button>
+    </div>
+  </div>
+
+  <!-- On your page -->
+  {#if publicLinks.length > 0}
+    <div class="space-y-3">
+      <div class="flex items-baseline justify-between px-1">
+        <h2 class="text-xs uppercase tracking-wide font-medium" style="color: var(--text-muted);">
+          On your page
+          <span class="ml-1" style="color: var(--text-primary);">{publicLinks.length}</span>
+        </h2>
+        <span class="text-[10px]" style="color: var(--text-muted); opacity: 0.7;">Drag to reorder</span>
+      </div>
+      <ul class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
+        {#each publicLinks as l (l.id)}
+          <li
+            draggable="true"
             on:dragstart={(e) => onDragStart(e, l)}
             on:dragover={(e) => onDragOver(e, l)}
             on:dragend={onDragEnd}
             on:drop={(e) => onDrop(e, l)}
-            class="group"
-            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'}; transition: opacity 120ms ease, background 120ms ease;"
+            class="group relative flex items-center gap-3 px-4 py-3.5 transition-all"
+            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'}; cursor: grab;"
           >
-            <td class="pl-2 align-middle text-center" style="cursor: {isPublic(l) ? 'grab' : 'default'};" title={isPublic(l) ? 'Drag to reorder on public page' : ''}>
-              {#if isPublic(l)}
-                <svg class="w-3.5 h-3.5 mx-auto opacity-30 group-hover:opacity-70 transition-opacity" viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
-                  <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-                  <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-                  <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-                </svg>
-              {/if}
-            </td>
+            <!-- Drag handle -->
+            <svg class="w-3.5 h-3.5 opacity-25 group-hover:opacity-60 transition-opacity shrink-0"
+                 viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
+              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+              <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+              <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+            </svg>
 
-            <td class="py-2.5 pr-4 pl-1 align-middle min-w-0">
-              <button
-                on:click={() => copy(l.id, l.shortURL)}
-                class="flex items-baseline gap-1.5 hover:opacity-80 transition-opacity"
-                style="background: transparent; border: none; cursor: pointer; padding: 0;"
-                title="Copy short link"
-              >
-                <span class="text-xs font-mono" style="color: var(--text-muted);">iksi.app/</span>
-                <span class="text-xs font-mono font-medium" style="color: var(--text-primary);">{l.shortURL}</span>
-                {#if copiedId === l.id}
-                  <span class="text-[10px]" style="color: var(--accent);">copied</span>
-                {/if}
-              </button>
-              {#if l.originalURL}
-                <a href={l.originalURL} target="_blank" rel="noopener"
-                   class="block text-xs mt-0.5 truncate hover:opacity-70 transition-opacity max-w-[16rem]"
-                   style="color: var(--text-muted);"
-                   title={l.originalURL}>{hostOf(l.originalURL)}</a>
+            <!-- Favicon -->
+            <div class="w-8 h-8 rounded-md flex items-center justify-center shrink-0 overflow-hidden"
+                 style="background: var(--bg); border: 1px solid var(--border);">
+              {#if faviconOf(l.originalURL)}
+                <img src={faviconOf(l.originalURL)} alt="" class="w-4 h-4" loading="lazy"
+                     on:error={(e) => { e.currentTarget.style.display = 'none'; }} />
               {:else}
-                <span class="block text-xs mt-0.5 italic" style="color: var(--text-muted); opacity: 0.6;">destination unavailable</span>
+                <span class="text-xs" style="color: var(--text-muted);">·</span>
               {/if}
-              {#if verdictLabel(l.safeVerdict)}
-                <span class="text-[10px]" style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
-              {/if}
-            </td>
+            </div>
 
-            <td class="py-2.5 pr-4 align-middle">
-              {#if editingTitleId === l.id}
-                <input
-                  type="text"
-                  value={l.profileRow?.title ?? ''}
-                  maxlength="80"
-                  autofocus
-                  on:blur={(e) => saveTitle(l, e.currentTarget.value)}
-                  on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { editingTitleId = null; } }}
-                  class="w-full px-2 py-1 text-sm rounded outline-none"
-                  style="background: var(--bg); border: 1px solid var(--accent); color: var(--text-primary);"
-                />
-              {:else}
+            <!-- Title + meta -->
+            <div class="min-w-0 flex-1">
+              <input
+                type="text"
+                value={l.profileRow?.title ?? ''}
+                placeholder="Untitled"
+                maxlength="80"
+                on:blur={(e) => saveTitle(l, e.currentTarget.value)}
+                on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
+                style="color: var(--text-primary); border: none;"
+              />
+              <div class="flex items-center gap-1.5 mt-0.5 text-xs" style="color: var(--text-muted);">
                 <button
-                  on:click={() => (editingTitleId = l.id)}
-                  class="w-full text-left text-sm truncate px-2 py-1 -mx-2 rounded hover:bg-[color-mix(in_srgb,var(--text-primary)_4%,transparent)] transition-colors"
-                  style="background: transparent; border: none; cursor: text; color: {l.profileRow?.title ? 'var(--text-primary)' : 'var(--text-muted)'};"
-                >{l.profileRow?.title || 'Add a title…'}</button>
-              {/if}
-            </td>
+                  on:click|stopPropagation={() => copy(l.id, l.shortURL)}
+                  class="font-mono hover:opacity-70 transition-opacity"
+                  style="background: transparent; border: none; cursor: pointer; padding: 0; color: inherit;"
+                  title="Copy short link"
+                >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
+                {#if l.originalURL}
+                  <span style="opacity: 0.5;">·</span>
+                  <a href={l.originalURL} target="_blank" rel="noopener"
+                     class="truncate hover:opacity-70 transition-opacity" style="color: inherit;"
+                     title={l.originalURL}>{hostOf(l.originalURL)}</a>
+                {/if}
+                {#if verdictLabel(l.safeVerdict)}
+                  <span style="opacity: 0.5;">·</span>
+                  <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
+                {/if}
+              </div>
+            </div>
 
-            <td class="py-2.5 pr-4 align-middle">
-              <button
-                role="switch"
-                aria-checked={l.profileRow?.enabled ?? false}
-                aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
-                on:click={() => togglePublish(l)}
-                class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
-                style="background: {l.profileRow?.enabled ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
-              >
-                <span class="inline-block w-4 h-4 rounded-full transition-transform"
-                      style="background: white; transform: translateX({l.profileRow?.enabled ? '18px' : '2px'});"></span>
-              </button>
-            </td>
+            <!-- Clicks -->
+            <div class="text-right shrink-0 tabular-nums" style="color: var(--text-muted);">
+              <div class="text-sm" style="color: var(--text-primary);">{fmtClicks(l.clickCount)}</div>
+              <div class="text-[10px] mt-0.5">{relDate(l.createdAt)}</div>
+            </div>
 
-            <td class="py-2.5 pr-2 align-middle text-right">
-              <div class="text-sm tabular-nums" style="color: var(--text-primary);">{l.clickCount.toLocaleString()}</div>
-              <div class="text-[10px]" style="color: var(--text-muted);">{relDate(l.createdAt)}</div>
-            </td>
-
-            <td class="py-2.5 pr-2 align-middle text-right">
-              <button
-                on:click={() => del(l)}
-                aria-label="Delete link"
-                title="Delete link"
-                class="p-1 opacity-30 group-hover:opacity-100 transition-opacity"
-                style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
-              >
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
-                </svg>
-              </button>
-            </td>
-          </tr>
-        {/each}
-
-        <!-- Add-row: at the bottom, always. Paste URL, optional title, toggle to publish. -->
-        <tr style="border-top: 1px solid var(--border);">
-          <td class="pl-2 align-middle text-center">
-            <span class="text-sm leading-none" style="color: var(--text-muted); opacity: 0.5;">+</span>
-          </td>
-          <td class="py-2 pr-4 pl-1 align-middle">
-            <input
-              type="url"
-              bind:value={newURL}
-              placeholder="https://example.com/…"
-              maxlength="2048"
-              on:keydown={(e) => { if (e.key === 'Enter') add(); }}
-              class="w-full px-0 py-1.5 text-sm outline-none bg-transparent"
-              style="color: var(--text-primary); border: none;"
-            />
-          </td>
-          <td class="py-2 pr-4 align-middle">
-            <input
-              type="text"
-              bind:value={newTitle}
-              placeholder="Title (defaults to site name)"
-              maxlength="80"
-              on:keydown={(e) => { if (e.key === 'Enter') add(); }}
-              class="w-full px-0 py-1.5 text-sm outline-none bg-transparent"
-              style="color: var(--text-primary); border: none;"
-            />
-          </td>
-          <td class="py-2 pr-4 align-middle">
+            <!-- Toggle -->
             <button
               role="switch"
-              aria-checked={newPublish}
-              aria-label={newPublish ? 'Will publish' : 'Will not publish'}
-              on:click={() => (newPublish = !newPublish)}
-              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
-              style="background: {newPublish ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
+              aria-checked={true}
+              aria-label="Remove from public page"
+              on:click|stopPropagation={() => togglePublish(l)}
+              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors shrink-0"
+              style="background: var(--accent); border: none; cursor: pointer; padding: 0;"
             >
-              <span class="inline-block w-4 h-4 rounded-full transition-transform"
-                    style="background: white; transform: translateX({newPublish ? '18px' : '2px'});"></span>
+              <span class="inline-block w-4 h-4 rounded-full" style="background: white; transform: translateX(18px);"></span>
             </button>
-          </td>
-          <td class="py-2 pr-2 align-middle text-right" colspan="2">
-            <button
-              on:click={add}
-              disabled={!canAdd}
-              class="text-xs font-medium hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
-              style="color: var(--accent); background: transparent; border: none; cursor: pointer; padding: 0;"
-            >{adding ? 'Adding…' : 'Add'}</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
 
-  {#if addError}
-    <p class="text-xs" style="color: var(--error);">{addError}</p>
+            <!-- Delete -->
+            <button
+              on:click|stopPropagation={() => del(l)}
+              aria-label="Delete link"
+              title="Delete link"
+              class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
+              style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+              </svg>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
+  <!-- Not published -->
+  {#if privateLinks.length > 0}
+    <div class="space-y-3">
+      <h2 class="text-xs uppercase tracking-wide font-medium px-1" style="color: var(--text-muted);">
+        Not on your page
+        <span class="ml-1" style="color: var(--text-primary);">{privateLinks.length}</span>
+      </h2>
+      <ul class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
+        {#each privateLinks as l (l.id)}
+          <li class="group relative flex items-center gap-3 px-4 py-3.5"
+              style="border-top: 1px solid var(--border);">
+            <!-- Spacer where drag handle sits for public rows -->
+            <div class="w-3.5 shrink-0"></div>
+
+            <div class="w-8 h-8 rounded-md flex items-center justify-center shrink-0 overflow-hidden"
+                 style="background: var(--bg); border: 1px solid var(--border); opacity: 0.7;">
+              {#if faviconOf(l.originalURL)}
+                <img src={faviconOf(l.originalURL)} alt="" class="w-4 h-4" loading="lazy"
+                     on:error={(e) => { e.currentTarget.style.display = 'none'; }} />
+              {:else}
+                <span class="text-xs" style="color: var(--text-muted);">·</span>
+              {/if}
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <input
+                type="text"
+                value={l.profileRow?.title ?? ''}
+                placeholder="Add a title…"
+                maxlength="80"
+                on:blur={(e) => saveTitle(l, e.currentTarget.value)}
+                on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
+                style="color: {l.profileRow?.title ? 'var(--text-primary)' : 'var(--text-muted)'}; border: none;"
+              />
+              <div class="flex items-center gap-1.5 mt-0.5 text-xs" style="color: var(--text-muted);">
+                <button
+                  on:click={() => copy(l.id, l.shortURL)}
+                  class="font-mono hover:opacity-70 transition-opacity"
+                  style="background: transparent; border: none; cursor: pointer; padding: 0; color: inherit;"
+                  title="Copy short link"
+                >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
+                {#if l.originalURL}
+                  <span style="opacity: 0.5;">·</span>
+                  <a href={l.originalURL} target="_blank" rel="noopener"
+                     class="truncate hover:opacity-70 transition-opacity" style="color: inherit;"
+                     title={l.originalURL}>{hostOf(l.originalURL)}</a>
+                {/if}
+                {#if verdictLabel(l.safeVerdict)}
+                  <span style="opacity: 0.5;">·</span>
+                  <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="text-right shrink-0 tabular-nums" style="color: var(--text-muted);">
+              <div class="text-sm" style="color: var(--text-primary);">{fmtClicks(l.clickCount)}</div>
+              <div class="text-[10px] mt-0.5">{relDate(l.createdAt)}</div>
+            </div>
+
+            <button
+              role="switch"
+              aria-checked={false}
+              aria-label="Show on public page"
+              on:click={() => togglePublish(l)}
+              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors shrink-0"
+              style="background: var(--border); border: none; cursor: pointer; padding: 0;"
+            >
+              <span class="inline-block w-4 h-4 rounded-full" style="background: white; transform: translateX(2px);"></span>
+            </button>
+
+            <button
+              on:click={() => del(l)}
+              aria-label="Delete link"
+              title="Delete link"
+              class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
+              style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+              </svg>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
+  {#if links.length === 0}
+    <div class="rounded-xl py-16 text-center" style="background: var(--surface); border: 1px dashed var(--border);">
+      <p class="text-sm" style="color: var(--text-muted);">Nothing here yet. Paste a URL above to get started.</p>
+    </div>
   {/if}
 </section>
+
+<style>
+  .title-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+  .title-input:focus {
+    box-shadow: 0 1px 0 0 var(--accent);
+  }
+</style>
