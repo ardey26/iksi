@@ -273,6 +273,15 @@
 
   <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
     <table class="w-full text-sm">
+      <thead>
+        <tr style="background: color-mix(in srgb, var(--text-primary) 2%, transparent);">
+          <th class="w-6"></th>
+          <th class="text-left py-2.5 pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Link</th>
+          <th class="w-12 text-left font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">On page</th>
+          <th class="w-16 text-right pr-1 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Clicks</th>
+          <th class="w-8"></th>
+        </tr>
+      </thead>
       <tbody>
         {#each links as l (l.id)}
           <tr
