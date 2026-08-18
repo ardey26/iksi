@@ -20,20 +20,27 @@
     links = [...data.links];
   }
 
-  $: publicLinks = links.filter((l) => l.profileRow?.enabled);
-  $: privateLinks = links.filter((l) => !l.profileRow?.enabled);
-
   let copiedId: number | null = null;
 
   function hostOf(u: string) {
     try { return new URL(u).hostname.replace(/^www\./, ''); }
     catch { return u; }
   }
-  function faviconOf(u: string) {
+
+  // Favicon URLs are memoized per-hostname so re-renders don't recompute
+  // (and the browser's HTTP cache dedupes network requests for the same host).
+  // sz=32 = 2x for a 16px display, retina-crisp without wasting bytes.
+  const _faviconByHost = new Map<string, string | null>();
+  function faviconOf(u: string): string | null {
     const host = hostOf(u);
     if (!host || !host.includes('.')) return null;
-    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+    const cached = _faviconByHost.get(host);
+    if (cached !== undefined) return cached;
+    const url = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`;
+    _faviconByHost.set(host, url);
+    return url;
   }
+
   function relDate(d: string | Date) {
     const dt = new Date(d);
     const diff = Date.now() - dt.getTime();
@@ -82,21 +89,11 @@
   async function togglePublish(link: Link) {
     const currentTitle = link.profileRow?.title?.trim() || hostOf(link.originalURL) || link.shortURL;
     const nextEnabled = !(link.profileRow?.enabled ?? false);
-
     links = links.map((l) =>
       l.id === link.id
-        ? {
-            ...l,
-            profileRow: {
-              id: l.profileRow?.id ?? -1,
-              position: l.profileRow?.position ?? Number.MAX_SAFE_INTEGER,
-              title: currentTitle,
-              enabled: nextEnabled
-            }
-          }
+        ? { ...l, profileRow: { id: l.profileRow?.id ?? -1, position: l.profileRow?.position ?? Number.MAX_SAFE_INTEGER, title: currentTitle, enabled: nextEnabled } }
         : l
     );
-
     const row = await apiUpsertRow(link, currentTitle, nextEnabled);
     if (!row) {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: link.profileRow } : l));
@@ -120,7 +117,6 @@
       return;
     }
     if (link.profileRow && link.profileRow.title === title) return;
-
     const enabled = link.profileRow?.enabled ?? false;
     const row = await apiUpsertRow(link, title, enabled);
     if (row) {
@@ -171,13 +167,9 @@
         body: JSON.stringify({ longURL: url, customURL: '' })
       });
       const body = await res.json();
-      if (!res.ok) {
-        addError = body.error || 'Could not shorten.';
-        return;
-      }
+      if (!res.ok) { addError = body.error || 'Could not shorten.'; return; }
 
       let addedLink: Link | null = body.link ? { ...body.link, profileRow: null } : null;
-
       if (!addedLink && body.shortURL) {
         await invalidateAll();
         const fresh = data.links.find((l: any) => l.shortURL === body.shortURL);
@@ -205,11 +197,14 @@
     }
   }
 
-  // --- Drag reorder (public links only) ---
+  // --- Drag reorder (public rows only) ---
   let dragId: number | null = null;
   let dragOverId: number | null = null;
 
+  function isPublic(l: Link) { return !!l.profileRow?.enabled; }
+
   function onDragStart(e: DragEvent, l: Link) {
+    if (!isPublic(l)) { e.preventDefault(); return; }
     dragId = l.id;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -217,7 +212,7 @@
     }
   }
   function onDragOver(e: DragEvent, l: Link) {
-    if (dragId === null) return;
+    if (dragId === null || !isPublic(l)) return;
     e.preventDefault();
     dragOverId = l.id;
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
@@ -227,8 +222,10 @@
     e.preventDefault();
     const from = dragId;
     dragId = null; dragOverId = null;
-    if (from === null || from === target.id) return;
+    if (from === null || from === target.id || !isPublic(target)) return;
 
+    const publicLinks = links.filter(isPublic);
+    const privateLinks = links.filter((l) => !isPublic(l));
     const fromIdx = publicLinks.findIndex((l) => l.id === from);
     const toIdx = publicLinks.findIndex((l) => l.id === target.id);
     if (fromIdx < 0 || toIdx < 0) return;
@@ -237,7 +234,6 @@
     const reordered = publicLinks.slice();
     reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moving);
-
     links = [...reordered, ...privateLinks];
 
     const orderedIds = reordered.map((l) => l.profileRow!.id);
@@ -252,7 +248,7 @@
 
 <svelte:head><title>Links — iksi</title></svelte:head>
 
-<section class="w-full max-w-2xl mx-auto space-y-10">
+<section class="w-full max-w-2xl mx-auto space-y-8">
   <header>
     <p class="text-sm mb-8" style="color: var(--text-muted);">
       <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
@@ -275,255 +271,166 @@
     </div>
   </header>
 
-  <!-- Add a link -->
-  <div class="rounded-xl p-5 space-y-4"
-       style="background: var(--surface); border: 1px solid var(--border);">
-    <div class="flex items-baseline justify-between gap-4">
-      <h2 class="text-sm font-medium" style="color: var(--text-primary);">Add a link</h2>
-      {#if addError}<span class="text-xs" style="color: var(--error);">{addError}</span>{/if}
-    </div>
-    <input
-      type="url"
-      bind:value={newURL}
-      placeholder="Paste any URL — https://example.com/…"
-      maxlength="2048"
-      on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); add(); } }}
-      class="w-full px-3 py-2.5 text-base rounded-lg outline-none transition-colors"
-      style="background: var(--bg); border: 1px solid {newURL && !isValidUrl(newURL) ? 'var(--error)' : isValidUrl(newURL) ? 'var(--accent)' : 'var(--border)'}; color: var(--text-primary);"
-    />
-    <div class="flex items-center gap-3">
-      <input
-        type="text"
-        bind:value={newTitle}
-        placeholder="Title (optional — used on your public page)"
-        maxlength="80"
-        on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-        class="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg outline-none transition-colors"
-        style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);"
-      />
-      <label class="flex items-center gap-2 shrink-0 cursor-pointer select-none">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={newPublish}
-          on:click={() => (newPublish = !newPublish)}
-          class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
-          style="background: {newPublish ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
-        >
-          <span class="inline-block w-4 h-4 rounded-full transition-transform"
-                style="background: white; transform: translateX({newPublish ? '18px' : '2px'});"></span>
-        </button>
-        <span class="text-xs" style="color: var(--text-muted);">Publish now</span>
-      </label>
-      <button
-        on:click={add}
-        disabled={!canAdd}
-        class="px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
-        style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
-      >{adding ? 'Adding…' : 'Add'}</button>
-    </div>
-  </div>
-
-  <!-- On your page -->
-  {#if publicLinks.length > 0}
-    <div class="space-y-3">
-      <div class="flex items-baseline justify-between px-1">
-        <h2 class="text-xs uppercase tracking-wide font-medium" style="color: var(--text-muted);">
-          On your page
-          <span class="ml-1" style="color: var(--text-primary);">{publicLinks.length}</span>
-        </h2>
-        <span class="text-[10px]" style="color: var(--text-muted); opacity: 0.7;">Drag to reorder</span>
-      </div>
-      <ul class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
-        {#each publicLinks as l (l.id)}
-          <li
-            draggable="true"
+  <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
+    <table class="w-full text-sm">
+      <tbody>
+        {#each links as l (l.id)}
+          <tr
+            draggable={isPublic(l)}
             on:dragstart={(e) => onDragStart(e, l)}
             on:dragover={(e) => onDragOver(e, l)}
             on:dragend={onDragEnd}
             on:drop={(e) => onDrop(e, l)}
-            class="group relative flex items-center gap-3 px-4 py-3.5 transition-all"
-            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'}; cursor: grab;"
+            class="group"
+            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'};"
           >
-            <!-- Drag handle -->
-            <svg class="w-3.5 h-3.5 opacity-25 group-hover:opacity-60 transition-opacity shrink-0"
-                 viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
-              <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-              <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-              <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-            </svg>
-
-            <!-- Favicon -->
-            <div class="w-8 h-8 rounded-md flex items-center justify-center shrink-0 overflow-hidden"
-                 style="background: var(--bg); border: 1px solid var(--border);">
-              {#if faviconOf(l.originalURL)}
-                <img src={faviconOf(l.originalURL)} alt="" class="w-4 h-4" loading="lazy"
-                     on:error={(e) => { e.currentTarget.style.display = 'none'; }} />
-              {:else}
-                <span class="text-xs" style="color: var(--text-muted);">·</span>
+            <!-- Drag handle (public only) -->
+            <td class="w-6 pl-2 align-middle" style="cursor: {isPublic(l) ? 'grab' : 'default'};">
+              {#if isPublic(l)}
+                <svg class="w-3 h-3 opacity-25 group-hover:opacity-60 transition-opacity"
+                     viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
+                  <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                  <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                  <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+                </svg>
               {/if}
-            </div>
+            </td>
 
-            <!-- Title + meta -->
-            <div class="min-w-0 flex-1">
-              <input
-                type="text"
-                value={l.profileRow?.title ?? ''}
-                placeholder="Untitled"
-                maxlength="80"
-                on:blur={(e) => saveTitle(l, e.currentTarget.value)}
-                on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
-                style="color: var(--text-primary); border: none;"
-              />
-              <div class="flex items-center gap-1.5 mt-0.5 text-xs" style="color: var(--text-muted);">
-                <button
-                  on:click|stopPropagation={() => copy(l.id, l.shortURL)}
-                  class="font-mono hover:opacity-70 transition-opacity"
-                  style="background: transparent; border: none; cursor: pointer; padding: 0; color: inherit;"
-                  title="Copy short link"
-                >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
-                {#if l.originalURL}
-                  <span style="opacity: 0.5;">·</span>
-                  <a href={l.originalURL} target="_blank" rel="noopener"
-                     class="truncate hover:opacity-70 transition-opacity" style="color: inherit;"
-                     title={l.originalURL}>{hostOf(l.originalURL)}</a>
+            <!-- Favicon + title + meta -->
+            <td class="py-3 pr-3 align-middle min-w-0">
+              <div class="flex items-center gap-3 min-w-0">
+                {#if faviconOf(l.originalURL)}
+                  <img src={faviconOf(l.originalURL)} alt="" width="16" height="16"
+                       class="shrink-0 rounded-sm" loading="lazy" decoding="async"
+                       on:error={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                {:else}
+                  <div class="w-4 h-4 shrink-0"></div>
                 {/if}
-                {#if verdictLabel(l.safeVerdict)}
-                  <span style="opacity: 0.5;">·</span>
-                  <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
-                {/if}
+                <div class="min-w-0 flex-1">
+                  <input
+                    type="text"
+                    value={l.profileRow?.title ?? ''}
+                    placeholder={isPublic(l) ? 'Untitled' : 'Add a title…'}
+                    maxlength="80"
+                    on:blur={(e) => saveTitle(l, e.currentTarget.value)}
+                    on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
+                    style="color: {l.profileRow?.title ? 'var(--text-primary)' : 'var(--text-muted)'}; border: none;"
+                  />
+                  <div class="flex items-center gap-1.5 mt-0.5 text-xs truncate" style="color: var(--text-muted);">
+                    <button on:click={() => copy(l.id, l.shortURL)}
+                            class="font-mono hover:opacity-70 transition-opacity shrink-0"
+                            style="background: transparent; border: none; cursor: pointer; padding: 0; color: inherit;"
+                            title="Copy short link"
+                    >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
+                    {#if l.originalURL}
+                      <span style="opacity: 0.4;">·</span>
+                      <span class="truncate" title={l.originalURL}>{hostOf(l.originalURL)}</span>
+                    {/if}
+                    {#if verdictLabel(l.safeVerdict)}
+                      <span style="opacity: 0.4;">·</span>
+                      <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
+                    {/if}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <!-- Clicks -->
-            <div class="text-right shrink-0 tabular-nums" style="color: var(--text-muted);">
-              <div class="text-sm" style="color: var(--text-primary);">{fmtClicks(l.clickCount)}</div>
-              <div class="text-[10px] mt-0.5">{relDate(l.createdAt)}</div>
-            </div>
+            </td>
 
             <!-- Toggle -->
-            <button
-              role="switch"
-              aria-checked={true}
-              aria-label="Remove from public page"
-              on:click|stopPropagation={() => togglePublish(l)}
-              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors shrink-0"
-              style="background: var(--accent); border: none; cursor: pointer; padding: 0;"
-            >
-              <span class="inline-block w-4 h-4 rounded-full" style="background: white; transform: translateX(18px);"></span>
-            </button>
+            <td class="w-12 align-middle">
+              <button
+                role="switch"
+                aria-checked={l.profileRow?.enabled ?? false}
+                aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
+                on:click={() => togglePublish(l)}
+                class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
+                style="background: {l.profileRow?.enabled ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
+              >
+                <span class="inline-block w-4 h-4 rounded-full transition-transform"
+                      style="background: white; transform: translateX({l.profileRow?.enabled ? '18px' : '2px'});"></span>
+              </button>
+            </td>
+
+            <!-- Clicks -->
+            <td class="w-16 text-right align-middle tabular-nums pr-1">
+              <div class="text-sm" style="color: var(--text-primary);" title={relDate(l.createdAt)}>{fmtClicks(l.clickCount)}</div>
+            </td>
 
             <!-- Delete -->
-            <button
-              on:click|stopPropagation={() => del(l)}
-              aria-label="Delete link"
-              title="Delete link"
-              class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
-              style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
-            >
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
-              </svg>
-            </button>
-          </li>
+            <td class="w-8 pr-2 text-right align-middle">
+              <button
+                on:click={() => del(l)}
+                aria-label="Delete link"
+                title="Delete link"
+                class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity"
+                style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+                </svg>
+              </button>
+            </td>
+          </tr>
         {/each}
-      </ul>
-    </div>
-  {/if}
 
-  <!-- Not published -->
-  {#if privateLinks.length > 0}
-    <div class="space-y-3">
-      <h2 class="text-xs uppercase tracking-wide font-medium px-1" style="color: var(--text-muted);">
-        Not on your page
-        <span class="ml-1" style="color: var(--text-primary);">{privateLinks.length}</span>
-      </h2>
-      <ul class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
-        {#each privateLinks as l (l.id)}
-          <li class="group relative flex items-center gap-3 px-4 py-3.5"
-              style="border-top: 1px solid var(--border);">
-            <!-- Spacer where drag handle sits for public rows -->
-            <div class="w-3.5 shrink-0"></div>
-
-            <div class="w-8 h-8 rounded-md flex items-center justify-center shrink-0 overflow-hidden"
-                 style="background: var(--bg); border: 1px solid var(--border); opacity: 0.7;">
-              {#if faviconOf(l.originalURL)}
-                <img src={faviconOf(l.originalURL)} alt="" class="w-4 h-4" loading="lazy"
-                     on:error={(e) => { e.currentTarget.style.display = 'none'; }} />
-              {:else}
-                <span class="text-xs" style="color: var(--text-muted);">·</span>
-              {/if}
-            </div>
-
-            <div class="min-w-0 flex-1">
-              <input
-                type="text"
-                value={l.profileRow?.title ?? ''}
-                placeholder="Add a title…"
-                maxlength="80"
-                on:blur={(e) => saveTitle(l, e.currentTarget.value)}
-                on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
-                style="color: {l.profileRow?.title ? 'var(--text-primary)' : 'var(--text-muted)'}; border: none;"
-              />
-              <div class="flex items-center gap-1.5 mt-0.5 text-xs" style="color: var(--text-muted);">
-                <button
-                  on:click={() => copy(l.id, l.shortURL)}
-                  class="font-mono hover:opacity-70 transition-opacity"
-                  style="background: transparent; border: none; cursor: pointer; padding: 0; color: inherit;"
-                  title="Copy short link"
-                >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
-                {#if l.originalURL}
-                  <span style="opacity: 0.5;">·</span>
-                  <a href={l.originalURL} target="_blank" rel="noopener"
-                     class="truncate hover:opacity-70 transition-opacity" style="color: inherit;"
-                     title={l.originalURL}>{hostOf(l.originalURL)}</a>
-                {/if}
-                {#if verdictLabel(l.safeVerdict)}
-                  <span style="opacity: 0.5;">·</span>
-                  <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
-                {/if}
+        <!-- Add-row -->
+        <tr style="border-top: 1px solid var(--border); background: color-mix(in srgb, var(--text-primary) 2%, transparent);">
+          <td class="w-6 pl-2 align-middle text-center">
+            <span class="text-sm" style="color: var(--text-muted); opacity: 0.5;">+</span>
+          </td>
+          <td class="py-3 pr-3 align-middle">
+            <div class="flex items-center gap-3">
+              <div class="w-4 h-4 shrink-0 rounded-sm" style="background: var(--border); opacity: 0.5;"></div>
+              <div class="min-w-0 flex-1 space-y-1">
+                <input
+                  type="url"
+                  bind:value={newURL}
+                  placeholder="Paste a URL…"
+                  maxlength="2048"
+                  on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+                  class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
+                  style="color: var(--text-primary); border: none;"
+                />
+                <input
+                  type="text"
+                  bind:value={newTitle}
+                  placeholder="Title (optional)"
+                  maxlength="80"
+                  on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+                  class="w-full text-xs bg-transparent outline-none px-0 py-0 truncate title-input"
+                  style="color: var(--text-muted); border: none;"
+                />
               </div>
             </div>
-
-            <div class="text-right shrink-0 tabular-nums" style="color: var(--text-muted);">
-              <div class="text-sm" style="color: var(--text-primary);">{fmtClicks(l.clickCount)}</div>
-              <div class="text-[10px] mt-0.5">{relDate(l.createdAt)}</div>
-            </div>
-
+          </td>
+          <td class="w-12 align-middle">
             <button
               role="switch"
-              aria-checked={false}
-              aria-label="Show on public page"
-              on:click={() => togglePublish(l)}
-              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors shrink-0"
-              style="background: var(--border); border: none; cursor: pointer; padding: 0;"
+              aria-checked={newPublish}
+              aria-label={newPublish ? 'Will publish' : 'Will not publish'}
+              on:click={() => (newPublish = !newPublish)}
+              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
+              style="background: {newPublish ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
             >
-              <span class="inline-block w-4 h-4 rounded-full" style="background: white; transform: translateX(2px);"></span>
+              <span class="inline-block w-4 h-4 rounded-full transition-transform"
+                    style="background: white; transform: translateX({newPublish ? '18px' : '2px'});"></span>
             </button>
-
+          </td>
+          <td class="align-middle text-right pr-2" colspan="2">
             <button
-              on:click={() => del(l)}
-              aria-label="Delete link"
-              title="Delete link"
-              class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity shrink-0"
-              style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
-            >
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
-              </svg>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </div>
-  {/if}
+              on:click={add}
+              disabled={!canAdd}
+              class="text-xs font-medium hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+              style="color: var(--accent); background: transparent; border: none; cursor: pointer; padding: 0;"
+            >{adding ? 'Adding…' : 'Add'}</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-  {#if links.length === 0}
-    <div class="rounded-xl py-16 text-center" style="background: var(--surface); border: 1px dashed var(--border);">
-      <p class="text-sm" style="color: var(--text-muted);">Nothing here yet. Paste a URL above to get started.</p>
-    </div>
+  {#if addError}
+    <p class="text-xs" style="color: var(--error);">{addError}</p>
   {/if}
 </section>
 
