@@ -216,7 +216,9 @@
 
       newURL = '';
       newTitle = '';
-      newPublish = true;
+      // Intentionally don't reset newPublish — user's toggle preference
+      // sticks across adds. If they set it OFF for one link, we assume
+      // they want OFF for the next unless they change it.
       toast(wasDedupe ? 'Already had this — updated' : 'Link added');
     } catch {
       addError = 'Network error.';
