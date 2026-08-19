@@ -9,9 +9,21 @@ describe('normalizeAvatarUrl', () => {
       .toBe('https://drive.google.com/uc?export=view&id=ABC123');
   });
 
-  it('leaves already-direct URLs alone', () => {
-    expect(normalizeAvatarUrl('https://lh3.googleusercontent.com/a/x=s96-c'))
-      .toBe('https://lh3.googleusercontent.com/a/x=s96-c');
+  it('bumps low-res Google OAuth avatars to 400px', () => {
+    expect(normalizeAvatarUrl('https://lh3.googleusercontent.com/a/AGN...=s96-c'))
+      .toBe('https://lh3.googleusercontent.com/a/AGN...=s400-c');
+    expect(normalizeAvatarUrl('https://lh3.googleusercontent.com/a/x=s48'))
+      .toBe('https://lh3.googleusercontent.com/a/x=s400');
+  });
+
+  it('bumps low-res Twitter profile images to 400x400', () => {
+    expect(normalizeAvatarUrl('https://pbs.twimg.com/profile_images/123/abc_normal.jpg'))
+      .toBe('https://pbs.twimg.com/profile_images/123/abc_400x400.jpg');
+    expect(normalizeAvatarUrl('https://pbs.twimg.com/profile_images/123/abc_bigger.png'))
+      .toBe('https://pbs.twimg.com/profile_images/123/abc_400x400.png');
+  });
+
+  it('leaves non-provider URLs alone', () => {
     expect(normalizeAvatarUrl('  https://cdn.example.com/me.png  '))
       .toBe('https://cdn.example.com/me.png');
   });

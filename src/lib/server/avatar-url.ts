@@ -3,11 +3,32 @@
 // (`/file/d/<ID>/view`) which serves HTML, not the image.
 
 const GDRIVE_SHARE_RE = /^https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^?#]*)?/;
+// Google user content avatars (e.g. sign-in avatar) use a size suffix like
+// `=s96-c`. Providers return 96px by default, which is blurry on retina at 96
+// display px. Bump to 400 so we have headroom for 2x rendering.
+const GOOGLE_UC_SIZE_RE = /(=s)\d+(-c)?$/i;
+// Twitter profile images end with `_normal.jpg` (48px), `_bigger.jpg` (73px),
+// `_mini.jpg` (24px). Swap to `_400x400.jpg` for a crisp render.
+const TWITTER_SIZE_RE = /_(?:normal|bigger|mini)(\.\w+)$/i;
 
 export function normalizeAvatarUrl(input: string): string {
-  const m = input.trim().match(GDRIVE_SHARE_RE);
-  if (m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
-  return input.trim();
+  const trimmed = input.trim();
+
+  // Google Drive "share page" → direct-image URL
+  const gd = trimmed.match(GDRIVE_SHARE_RE);
+  if (gd) return `https://drive.google.com/uc?export=view&id=${gd[1]}`;
+
+  // Bump low-res OAuth avatars up to a size that looks crisp on retina.
+  // Only rewrite when we recognize the size suffix — appending one blindly
+  // can break URLs that use a different convention.
+  if (/googleusercontent\.com\//i.test(trimmed) && GOOGLE_UC_SIZE_RE.test(trimmed)) {
+    return trimmed.replace(GOOGLE_UC_SIZE_RE, '$1400$2');
+  }
+  if (/pbs\.twimg\.com\/profile_images\//i.test(trimmed) && TWITTER_SIZE_RE.test(trimmed)) {
+    return trimmed.replace(TWITTER_SIZE_RE, '_400x400$1');
+  }
+
+  return trimmed;
 }
 
 export type AvatarCheck = { ok: true; url: string } | { ok: false; error: string };
