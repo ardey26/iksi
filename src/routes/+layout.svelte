@@ -83,14 +83,21 @@
   });
 </script>
 
-<SEO
-  title={seo.title}
-  description={seo.description}
-  canonical={seo.canonical}
-  ogImage={seo.ogImage}
-  structuredData={seo.structuredData}
-  noindex={seo.noindex}
-/>
+<!--
+  Profile pages emit their own full <svelte:head>. Skipping the layout-level
+  <SEO> avoids duplicated tags AND avoids the seoForRoute default that marks
+  everything-except-homepage as noindex (which would kill profile SEO).
+-->
+{#if !isProfilePage}
+  <SEO
+    title={seo.title}
+    description={seo.description}
+    canonical={seo.canonical}
+    ogImage={seo.ogImage}
+    structuredData={seo.structuredData}
+    noindex={seo.noindex}
+  />
+{/if}
 
 <!-- Top-of-page navigation progress bar; only visible during a route change -->
 {#if $navigating}
