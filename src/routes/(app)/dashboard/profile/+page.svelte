@@ -66,23 +66,37 @@
   }
 
   // Palette derivation (must mirror /@handle logic exactly).
-  // brightness 0..100 drives bg lightness. Text flips to black once bg brightness >= 30.
+  // OKLCH-based: perceptually uniform lightness across all hues.
   $: paletteStyle = (() => {
-    const b = Math.max(0, Math.min(100, brightness));
-    const surfB = Math.max(0, Math.min(100, b + 6));
-    const textLight = b < 30; // true → white text, false → black text
-    const invB = textLight ? 100 : 0;
+    const bL = Math.max(0.04, Math.min(0.99, brightness / 100));
+    const isLight = bL > 0.5;
+    const sL = Math.min(1, bL + (isLight ? 0.025 : 0.03));
+    const tL = isLight ? Math.max(0.14, 0.94 - bL) : Math.min(0.94, bL + 0.75);
+    const mL = isLight ? Math.max(0.38, bL - 0.30) : Math.min(0.72, bL + 0.38);
+    const brL = isLight ? Math.max(0.80, bL - 0.10) : Math.min(0.32, bL + 0.14);
+    const accentReadableL = isLight ? 0.48 : 0.72;
     return `--accent: ${accent};
-            --p-bg: color-mix(in srgb, ${accent} 8%, color-mix(in srgb, #fff ${b}%, #000));
-            --p-surface: color-mix(in srgb, ${accent} 14%, color-mix(in srgb, #fff ${surfB}%, #000));
-            --p-border: color-mix(in srgb, ${accent} 28%, transparent);
-            --p-text: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 95%, ${accent} 5%);
-            --p-muted: color-mix(in srgb, color-mix(in srgb, #fff ${invB}%, #000) 55%, ${accent} 45%);`;
+            --p-accent-text: oklch(from ${accent} ${accentReadableL} max(c, 0.09) h);
+            --p-bg: oklch(from ${accent} ${bL} 0.020 h);
+            --p-surface: oklch(from ${accent} ${sL} 0.014 h);
+            --p-border: oklch(from ${accent} ${brL} 0.050 h);
+            --p-text: oklch(from ${accent} ${tL} 0.008 h);
+            --p-muted: oklch(from ${accent} ${mL} 0.018 h);`;
   })();
 
   $: previewName = displayName || data.user.twitterHandle || data.user.googleEmail?.split('@')[0] || '@you';
-  $: previewInitial = previewName.charAt(0).toUpperCase();
-  const sampleRows = ['Website', 'Latest post', 'Newsletter'];
+  $: previewHandle = data.user.handle || data.user.twitterHandle || 'you';
+  function initials(name: string) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '·';
+    if (parts.length === 1) return parts[0].slice(0, 2).toLowerCase();
+    return (parts[0][0] + parts[1][0]).toLowerCase();
+  }
+  const sampleRows = [
+    { title: 'Website', short: 'me', dest: 'yoursite.com' },
+    { title: 'Latest post', short: 'post', dest: 'blog.io' },
+    { title: 'Newsletter', short: 'sub', dest: 'buttondown.email' }
+  ];
 </script>
 
 <svelte:head><title>Profile — iksi</title></svelte:head>
@@ -168,36 +182,58 @@
         </div>
       </div>
 
-      <!-- Live preview -->
+      <!-- Live preview — mirrors the /@handle card layout -->
       <div class="space-y-2">
         <span class="text-xs uppercase tracking-wide" style="color: var(--text-muted);">Preview</span>
-        <div class="rounded-xl overflow-hidden" style="border: 1px solid var(--border);">
-          <div class="p-6 flex flex-col items-center gap-3 text-center transition-colors" style="{paletteStyle} background: var(--p-bg); color: var(--p-text);">
-            {#if avatarUrl}
-              <img src={avatarUrl} alt="" class="w-14 h-14 rounded-full object-cover" style="border: 1px solid var(--p-border);" />
-            {:else}
-              <div class="w-14 h-14 rounded-full flex items-center justify-center text-base font-medium" style="background: var(--p-surface); border: 1px solid var(--p-border); color: var(--p-muted);">
-                {previewInitial}
+        <div class="rounded-2xl p-6 transition-colors"
+             style="{paletteStyle} background: var(--p-bg);">
+          <div class="w-full rounded-2xl overflow-hidden preview-card"
+               style="background: var(--p-surface); border: 1px solid var(--p-border); color: var(--p-text);">
+
+            <!-- Header: avatar + identity + copy pill -->
+            <div class="p-4 flex items-start gap-3">
+              {#if avatarUrl}
+                <img src={avatarUrl} alt="" class="w-10 h-10 rounded-full object-cover shrink-0"
+                     style="border: 1px solid var(--p-border);" />
+              {:else}
+                <div class="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold"
+                     style="background: oklch(from {accent} 0.90 max(c, 0.08) h); color: var(--p-accent-text);">
+                  {initials(previewName)}
+                </div>
+              {/if}
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold tracking-tight leading-tight truncate" style="color: var(--p-text);">{previewName}</div>
+                <div class="text-xs mt-0.5 truncate" style="color: var(--p-accent-text);">iksi.app/@{previewHandle}</div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
+                    style="background: var(--p-text); color: var(--p-bg);">Copy</span>
+            </div>
+
+            <!-- Bio -->
+            {#if bio}
+              <div class="px-4 pb-4">
+                <p class="text-sm leading-tight font-medium" style="color: var(--p-text);">{bio}</p>
               </div>
             {/if}
 
-            <div class="space-y-0.5">
-              <div class="text-base font-semibold tracking-tight leading-none">{previewName}</div>
-              {#if data.user.handle}
-                <div class="text-xs" style="color: var(--p-muted);">@{data.user.handle}</div>
-              {/if}
-            </div>
-
-            {#if bio}
-              <p class="text-xs leading-relaxed max-w-xs" style="color: var(--p-muted);">{bio}</p>
-            {/if}
-
-            <div class="w-full max-w-xs space-y-1.5 pt-2">
-              {#each sampleRows as r}
-                <div class="w-full px-3 py-2 rounded-lg text-xs font-medium" style="background: var(--p-surface); border: 1px solid var(--p-border);">
-                  {r}
+            <!-- Sample rows (kebab shown as visual cue) -->
+            <div>
+              {#each sampleRows as row, i}
+                <div class="px-4 py-3 flex items-center gap-3" style="border-top: 1px solid var(--p-border);">
+                  <span class="text-xs tabular-nums" style="color: var(--p-muted); opacity: 0.6;">{i + 1}.</span>
+                  <div class="flex-1 min-w-0 text-sm font-semibold tracking-tight truncate" style="color: var(--p-text);">{row.title}</div>
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" style="color: var(--p-muted);" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                  </svg>
                 </div>
               {/each}
+            </div>
+
+            <!-- Footer -->
+            <div class="px-4 pb-3 pt-2 text-center">
+              <span class="text-xs" style="color: var(--p-muted);">
+                {previewHandle} shortens links with <span class="underline decoration-1 underline-offset-2" style="color: var(--p-text);">iksi</span>
+              </span>
             </div>
           </div>
         </div>
@@ -248,5 +284,11 @@
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .preview-card {
+    box-shadow:
+      0 16px 40px -14px oklch(from var(--accent) 0.15 0.08 h / 0.35),
+      0 4px 14px -4px oklch(from var(--accent) 0.15 0.04 h / 0.18);
   }
 </style>
