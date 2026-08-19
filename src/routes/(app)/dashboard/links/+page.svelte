@@ -277,9 +277,9 @@
         <tr style="background: color-mix(in srgb, var(--text-primary) 2%, transparent);">
           <th class="w-6"></th>
           <th class="text-left py-2.5 pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Link</th>
-          <th class="w-12 text-left font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">On page</th>
-          <th class="w-16 text-right pr-1 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Clicks</th>
-          <th class="w-8"></th>
+          <th class="w-20 text-center whitespace-nowrap font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">On page</th>
+          <th class="w-16 text-right pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Clicks</th>
+          <th class="w-10 pr-2"></th>
         </tr>
       </thead>
       <tbody>
@@ -346,13 +346,13 @@
             </td>
 
             <!-- Toggle -->
-            <td class="w-12 align-middle">
+            <td class="w-20 text-center align-middle">
               <button
                 role="switch"
                 aria-checked={l.profileRow?.enabled ?? false}
                 aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
                 on:click={() => togglePublish(l)}
-                class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
+                class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors align-middle"
                 style="background: {l.profileRow?.enabled ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
               >
                 <span class="inline-block w-4 h-4 rounded-full transition-transform"
@@ -361,17 +361,17 @@
             </td>
 
             <!-- Clicks -->
-            <td class="w-16 text-right align-middle tabular-nums pr-1">
+            <td class="w-16 text-right align-middle tabular-nums pr-3">
               <div class="text-sm" style="color: var(--text-primary);" title={relDate(l.createdAt)}>{fmtClicks(l.clickCount)}</div>
             </td>
 
             <!-- Delete -->
-            <td class="w-8 pr-2 text-right align-middle">
+            <td class="w-10 pr-2 text-center align-middle">
               <button
                 on:click={() => del(l)}
                 aria-label="Delete link"
                 title="Delete link"
-                class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity"
+                class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity align-middle"
                 style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
               >
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
@@ -389,7 +389,8 @@
           </td>
           <td class="py-3 pr-3 align-middle">
             <div class="flex items-center gap-3">
-              <div class="w-4 h-4 shrink-0 rounded-sm" style="background: var(--border); opacity: 0.5;"></div>
+              <!-- Spacer to align inputs with body-row favicons -->
+              <div class="w-4 h-4 shrink-0" aria-hidden="true"></div>
               <div class="min-w-0 flex-1 space-y-1">
                 <input
                   type="url"
@@ -412,13 +413,13 @@
               </div>
             </div>
           </td>
-          <td class="w-12 align-middle">
+          <td class="w-20 text-center align-middle">
             <button
               role="switch"
               aria-checked={newPublish}
               aria-label={newPublish ? 'Will publish' : 'Will not publish'}
               on:click={() => (newPublish = !newPublish)}
-              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors"
+              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors align-middle"
               style="background: {newPublish ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
             >
               <span class="inline-block w-4 h-4 rounded-full transition-transform"
