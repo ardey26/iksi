@@ -11,7 +11,14 @@
     createdAt: string | Date;
     safeVerdict: string | null;
     profileRow: { id: number; title: string; enabled: boolean; position: number } | null;
+    // Set true on optimistic rows while the server call is in flight; used to
+    // dim the row visually. Never persisted by the loader.
+    pending?: boolean;
   };
+
+  // Negative counter so temp IDs never collide with real DB IDs.
+  let _tempIdCounter = -1;
+  const nextTempId = () => _tempIdCounter--;
 
   let links: Link[] = [...data.links];
   let _linksRef = data.links;
@@ -164,7 +171,6 @@
   let newURL = '';
   let newTitle = '';
   let newPublish = true;
-  let adding = false;
   let addError = '';
 
   function isValidUrl(s: string) {
@@ -174,24 +180,42 @@
       return !!u.hostname && u.hostname.includes('.');
     } catch { return false; }
   }
-  $: canAdd = isValidUrl(newURL) && !adding;
+  // Form stays enabled during in-flight adds — the optimistic prepend
+  // makes the operation feel instant, and the user can queue another add
+  // right away.
+  $: canAdd = isValidUrl(newURL);
 
   async function add() {
     if (!canAdd) return;
 
-    // Snapshot form values, then clear the inputs immediately. This way, the
-    // form always resets — even if the async work later throws or a
-    // downstream call (upsertRow) fails after the link is already created.
-    // Note: newPublish is intentionally NOT reset so the user's toggle
-    // preference sticks across successive adds.
+    // Snapshot form values, clear the form immediately so the user can
+    // keep adding.
     const url = newURL.trim();
     const typedTitle = newTitle.trim();
     const wantsPublic = newPublish;
     newURL = '';
     newTitle = '';
-
-    adding = true;
     addError = '';
+
+    // Prepend an optimistic row so it appears in the list instantly.
+    // Muted (pending) until the server confirms.
+    const tempId = nextTempId();
+    const optimisticTitle = typedTitle || hostOf(url) || '';
+    const shouldPublish = wantsPublic || typedTitle.length > 0;
+    const optimistic: Link = {
+      id: tempId,
+      shortURL: '···',
+      originalURL: url,
+      clickCount: 0,
+      createdAt: new Date().toISOString(),
+      safeVerdict: null,
+      profileRow: shouldPublish && optimisticTitle
+        ? { id: tempId, title: optimisticTitle, enabled: wantsPublic, position: -1 }
+        : null,
+      pending: true
+    };
+    links = [optimistic, ...links];
+
     try {
       const res = await fetch('/api/shorten', {
         method: 'POST',
@@ -200,7 +224,8 @@
       });
       const body = await res.json();
       if (!res.ok) {
-        // Restore input so the user can fix and retry.
+        // Roll back the optimistic entry, restore the form so user can retry.
+        links = links.filter((l) => l.id !== tempId);
         newURL = url;
         newTitle = typedTitle;
         addError = body.error || 'Could not shorten.';
@@ -215,24 +240,40 @@
         const fresh = data.links.find((l: any) => l.shortURL === body.shortURL);
         addedLink = fresh ?? null;
         wasDedupe = true;
-      } else if (addedLink) {
-        links = [addedLink, ...links];
       }
 
-      const title = typedTitle || hostOf(url) || addedLink?.shortURL || '';
-      if (addedLink && title && (wantsPublic || typedTitle.length > 0)) {
-        const row = await apiUpsertRow(addedLink, title, wantsPublic);
-        if (row) {
-          links = links.map((l) => (l.id === addedLink!.id ? { ...l, profileRow: row } : l));
-        }
+      if (!addedLink) {
+        links = links.filter((l) => l.id !== tempId);
+        toast('Something went wrong', 'error');
+        return;
+      }
+
+      // Replace the optimistic entry with the real link data — keep pending
+      // true if we still have an upsert to do.
+      const needsUpsert = optimisticTitle && (wantsPublic || typedTitle.length > 0);
+      links = links.map((l) =>
+        l.id === tempId
+          ? { ...addedLink!, profileRow: l.profileRow, pending: needsUpsert }
+          : l
+      );
+
+      if (needsUpsert) {
+        const row = await apiUpsertRow(addedLink, optimisticTitle, wantsPublic);
+        links = links.map((l) =>
+          l.id === addedLink!.id
+            ? { ...l, profileRow: row ?? l.profileRow, pending: false }
+            : l
+        );
       }
 
       toast(wasDedupe ? 'Already had this — updated' : 'Link added');
     } catch {
+      // Roll back the optimistic entry on network error.
+      links = links.filter((l) => l.id !== tempId);
+      newURL = url;
+      newTitle = typedTitle;
       addError = 'Network error.';
       toast('Network error', 'error');
-    } finally {
-      adding = false;
     }
   }
 
@@ -281,7 +322,12 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reorderRows', orderedIds })
     });
-    if (!res.ok) invalidateAll();
+    if (!res.ok) {
+      invalidateAll();
+      toast('Could not save order', 'error');
+    } else {
+      toast('Order updated');
+    }
   }
 </script>
 
@@ -354,13 +400,13 @@
       <tbody>
         {#each links as l (l.id)}
           <tr
-            draggable={isPublic(l)}
+            draggable={isPublic(l) && !l.pending}
             on:dragstart={(e) => onDragStart(e, l)}
             on:dragover={(e) => onDragOver(e, l)}
             on:dragend={onDragEnd}
             on:drop={(e) => onDrop(e, l)}
             class="group"
-            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'};"
+            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : l.pending ? '0.5' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'}; transition: opacity 180ms ease;"
           >
             <!-- Drag handle (public only) -->
             <td class="w-6 pl-2 align-middle" style="cursor: {isPublic(l) ? 'grab' : 'default'};">
@@ -501,7 +547,7 @@
               disabled={!canAdd}
               class="px-3 py-1.5 text-xs font-medium rounded-md transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
               style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
-            >{adding ? 'Adding…' : 'Add'}</button>
+            >Add</button>
           </td>
         </tr>
       </tbody>
