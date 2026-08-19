@@ -178,10 +178,21 @@
 
   async function add() {
     if (!canAdd) return;
+
+    // Snapshot form values, then clear the inputs immediately. This way, the
+    // form always resets — even if the async work later throws or a
+    // downstream call (upsertRow) fails after the link is already created.
+    // Note: newPublish is intentionally NOT reset so the user's toggle
+    // preference sticks across successive adds.
+    const url = newURL.trim();
+    const typedTitle = newTitle.trim();
+    const wantsPublic = newPublish;
+    newURL = '';
+    newTitle = '';
+
     adding = true;
     addError = '';
     try {
-      const url = newURL.trim();
       const res = await fetch('/api/shorten', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -189,6 +200,9 @@
       });
       const body = await res.json();
       if (!res.ok) {
+        // Restore input so the user can fix and retry.
+        newURL = url;
+        newTitle = typedTitle;
         addError = body.error || 'Could not shorten.';
         toast(body.error || 'Could not shorten', 'error');
         return;
@@ -205,20 +219,14 @@
         links = [addedLink, ...links];
       }
 
-      const wantsPublic = newPublish;
-      const title = newTitle.trim() || hostOf(url) || addedLink?.shortURL || '';
-      if (addedLink && title && (wantsPublic || newTitle.trim().length > 0)) {
+      const title = typedTitle || hostOf(url) || addedLink?.shortURL || '';
+      if (addedLink && title && (wantsPublic || typedTitle.length > 0)) {
         const row = await apiUpsertRow(addedLink, title, wantsPublic);
         if (row) {
           links = links.map((l) => (l.id === addedLink!.id ? { ...l, profileRow: row } : l));
         }
       }
 
-      newURL = '';
-      newTitle = '';
-      // Intentionally don't reset newPublish — user's toggle preference
-      // sticks across adds. If they set it OFF for one link, we assume
-      // they want OFF for the next unless they change it.
       toast(wasDedupe ? 'Already had this — updated' : 'Link added');
     } catch {
       addError = 'Network error.';
@@ -281,12 +289,30 @@
 
 {#if toastMessage}
   <div
-    class="toast"
     role="status"
     aria-live="polite"
-    style="border-color: {toastKind === 'error' ? 'var(--error)' : 'var(--border)'};"
+    class="toast-anim"
+    style="
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.8125rem;
+      color: var(--text-primary);
+      background: var(--surface);
+      border: 1px solid {toastKind === 'error' ? 'var(--error)' : 'var(--border)'};
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      width: auto;
+      max-width: min(90vw, 26rem);
+      pointer-events: none;
+    "
   >
-    <span class="toast-dot" style="background: {toastKind === 'error' ? 'var(--error)' : 'var(--accent)'};"></span>
+    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: {toastKind === 'error' ? 'var(--error)' : 'var(--accent)'};"></span>
     <span>{toastMessage}</span>
   </div>
 {/if}
@@ -499,29 +525,10 @@
     background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   }
 
-  /* Toast: floating status pill in the top-right of the viewport */
-  .toast {
-    position: fixed;
-    top: 1.25rem;
-    right: 1.25rem;
-    z-index: 100;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.625rem;
-    padding: 0.625rem 1rem;
-    border-radius: 9999px;
-    font-size: 0.8125rem;
-    color: var(--text-primary);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  /* Toast entry animation (positioning is inlined on the element itself
+     to sidestep any scoped-CSS or flex-parent quirks). */
+  .toast-anim {
     animation: toast-in 180ms cubic-bezier(0.34, 1.4, 0.64, 1);
-  }
-  .toast-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
   }
   @keyframes toast-in {
     from { opacity: 0; transform: translateY(-6px); }
