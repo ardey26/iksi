@@ -323,7 +323,7 @@
                     maxlength="80"
                     on:blur={(e) => saveTitle(l, e.currentTarget.value)}
                     on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
+                    class="block w-full text-sm font-medium bg-transparent outline-none py-1.5 px-2 -mx-2 rounded-md truncate title-input"
                     style="color: {l.profileRow?.title ? 'var(--text-primary)' : 'var(--text-muted)'}; border: none;"
                   />
                   <div class="flex items-center gap-1.5 mt-0.5 text-xs truncate" style="color: var(--text-muted);">
@@ -398,7 +398,7 @@
                   placeholder="Paste a URL…"
                   maxlength="2048"
                   on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                  class="w-full text-sm font-medium bg-transparent outline-none px-0 py-0 truncate title-input"
+                  class="block w-full text-sm font-medium bg-transparent outline-none py-1.5 px-2 -mx-2 rounded-md truncate title-input"
                   style="color: var(--text-primary); border: none;"
                 />
                 <input
@@ -407,7 +407,7 @@
                   placeholder="Title (optional)"
                   maxlength="80"
                   on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                  class="w-full text-xs bg-transparent outline-none px-0 py-0 truncate title-input"
+                  class="block w-full text-xs bg-transparent outline-none py-1.5 px-2 -mx-2 rounded-md truncate title-input"
                   style="color: var(--text-muted); border: none;"
                 />
               </div>
@@ -449,7 +449,10 @@
     color: var(--text-muted);
     opacity: 0.6;
   }
+  .title-input:hover:not(:focus) {
+    background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  }
   .title-input:focus {
-    box-shadow: 0 1px 0 0 var(--accent);
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   }
 </style>
