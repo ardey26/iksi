@@ -104,6 +104,7 @@
 
   // Canonical URL and derived SEO strings for the head.
   $: profileUrl = `https://www.iksi.app/@${data.handle}`;
+  $: ogImageUrl = `https://www.iksi.app/api/@${data.handle}/og`;
   $: seoTitle = `${data.displayName} (@${data.handle}) — iksi`;
   $: seoDescription = data.bio
     ? data.bio.replace(/\s+/g, ' ').trim().slice(0, 160)
@@ -133,23 +134,24 @@
   <meta name="language" content="English" />
   <link rel="canonical" href={profileUrl} />
 
-  <!-- Open Graph (uses the shared static image; keeps social unfurls working) -->
+  <!-- Open Graph — dynamic per-user card (avatar + bio + @handle + iksi mark) -->
   <meta property="og:type" content="profile" />
   <meta property="og:site_name" content="iksi" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:title" content={seoTitle} />
   <meta property="og:description" content={seoDescription} />
   <meta property="og:url" content={profileUrl} />
-  <meta property="og:image" content="https://www.iksi.app/og-image.png" />
+  <meta property="og:image" content={ogImageUrl} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content={`${data.displayName} on iksi`} />
   <meta property="profile:username" content={data.handle} />
 
   <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={seoTitle} />
   <meta name="twitter:description" content={seoDescription} />
-  <meta name="twitter:image" content="https://www.iksi.app/og-image.png" />
+  <meta name="twitter:image" content={ogImageUrl} />
 
   <!-- Schema.org Person structured data (rich results in Google search) -->
   {@html `<script type="application/ld+json">${personLdJson}</script>`}
