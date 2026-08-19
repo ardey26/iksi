@@ -22,6 +22,17 @@
 
   let copiedId: number | null = null;
 
+  // --- Lightweight toast (single message, auto-dismiss) ---
+  let toastMessage: string | null = null;
+  let toastKind: 'success' | 'error' = 'success';
+  let _toastTimer: ReturnType<typeof setTimeout> | null = null;
+  function toast(message: string, kind: 'success' | 'error' = 'success') {
+    toastMessage = message;
+    toastKind = kind;
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { toastMessage = null; }, 2200);
+  }
+
   function hostOf(u: string) {
     try { return new URL(u).hostname.replace(/^www\./, ''); }
     catch { return u; }
@@ -66,7 +77,10 @@
       await navigator.clipboard.writeText(`https://iksi.app/${short}`);
       copiedId = id;
       setTimeout(() => { if (copiedId === id) copiedId = null; }, 1400);
-    } catch {}
+      toast('Copied to clipboard');
+    } catch {
+      toast('Could not copy', 'error');
+    }
   }
 
   // --- Mutations ---
@@ -79,7 +93,7 @@
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      alert(body.error || 'Failed');
+      toast(body.error || 'Something went wrong', 'error');
       return null;
     }
     const body = await res.json();
@@ -99,6 +113,7 @@
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: link.profileRow } : l));
     } else {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: row } : l));
+      toast(nextEnabled ? 'Published to your page' : 'Removed from your page');
     }
   }
 
@@ -113,6 +128,9 @@
       });
       if (res.ok) {
         links = links.map((l) => (l.id === link.id ? { ...l, profileRow: null } : l));
+        toast('Removed from your page');
+      } else {
+        toast('Could not update', 'error');
       }
       return;
     }
@@ -121,6 +139,7 @@
     const row = await apiUpsertRow(link, title, enabled);
     if (row) {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: row } : l));
+      toast('Title saved');
     }
   }
 
@@ -135,7 +154,9 @@
     });
     if (!res.ok) {
       links = prev;
-      alert('Failed to delete.');
+      toast('Could not delete link', 'error');
+    } else {
+      toast('Link deleted');
     }
   }
 
@@ -167,13 +188,19 @@
         body: JSON.stringify({ longURL: url, customURL: '' })
       });
       const body = await res.json();
-      if (!res.ok) { addError = body.error || 'Could not shorten.'; return; }
+      if (!res.ok) {
+        addError = body.error || 'Could not shorten.';
+        toast(body.error || 'Could not shorten', 'error');
+        return;
+      }
 
       let addedLink: Link | null = body.link ? { ...body.link, profileRow: null } : null;
+      let wasDedupe = false;
       if (!addedLink && body.shortURL) {
         await invalidateAll();
         const fresh = data.links.find((l: any) => l.shortURL === body.shortURL);
         addedLink = fresh ?? null;
+        wasDedupe = true;
       } else if (addedLink) {
         links = [addedLink, ...links];
       }
@@ -190,8 +217,10 @@
       newURL = '';
       newTitle = '';
       newPublish = true;
+      toast(wasDedupe ? 'Already had this — updated' : 'Link added');
     } catch {
       addError = 'Network error.';
+      toast('Network error', 'error');
     } finally {
       adding = false;
     }
@@ -247,6 +276,18 @@
 </script>
 
 <svelte:head><title>Links — iksi</title></svelte:head>
+
+{#if toastMessage}
+  <div
+    class="toast"
+    role="status"
+    aria-live="polite"
+    style="border-color: {toastKind === 'error' ? 'var(--error)' : 'var(--border)'};"
+  >
+    <span class="toast-dot" style="background: {toastKind === 'error' ? 'var(--error)' : 'var(--accent)'};"></span>
+    <span>{toastMessage}</span>
+  </div>
+{/if}
 
 <section class="w-full max-w-2xl mx-auto space-y-8">
   <header>
@@ -454,5 +495,34 @@
   }
   .title-input:focus {
     background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  }
+
+  /* Toast: floating status pill in the top-right of the viewport */
+  .toast {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 100;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    animation: toast-in 180ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .toast-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 </style>

@@ -204,7 +204,7 @@
     {:else}
       <ul>
         {#each data.rows as row, i}
-          <li class="relative flex items-stretch" style="border-top: 1px solid var(--border);">
+          <li class="row-item relative flex items-stretch" style="border-top: 1px solid var(--border);">
             {#if row.href}
               <a href={row.href}
                  class="row group flex items-center gap-4 flex-1 min-w-0 pl-7 sm:pl-8 pr-3 py-5 transition-colors"
@@ -290,12 +290,13 @@
       0 8px 24px -6px oklch(from var(--accent) 0.15 0.04 h / 0.18);
   }
 
-  .row:hover {
+  /* Tint the whole li (including the kebab sibling) when hovered. */
+  .row-item:hover {
     background: color-mix(in srgb, var(--accent) 5%, transparent);
   }
   .kebab-btn:hover {
     color: var(--text-primary);
-    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
   .menu-item:hover {
     background: color-mix(in srgb, var(--accent) 8%, transparent);
