@@ -1,12 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$lib/prisma.js', () => {
-  const txn = vi.fn(async (ops: unknown[]) => ops.length);
   return {
     prisma: {
-      $transaction: txn,
-      click: { create: vi.fn((args) => args) },
-      longURL: { update: vi.fn((args) => args) },
+      click: { create: vi.fn(async (args) => args) },
+      longURL: { update: vi.fn(async (args) => args) },
       profileView: { create: vi.fn() }
     }
   };
@@ -76,8 +74,10 @@ describe('normalizeReferrer', () => {
 });
 
 describe('recordClick', () => {
-  it('calls prisma.$transaction with a click insert + counter increment', async () => {
+  it('inserts a Click row and increments the counter', async () => {
     const { prisma } = await import('$lib/prisma.js');
+    (prisma.click.create as any).mockClear();
+    (prisma.longURL.update as any).mockClear();
 
     const event = {
       request: {
@@ -91,11 +91,8 @@ describe('recordClick', () => {
 
     await recordClick(42, event);
 
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    const ops = (prisma.$transaction as any).mock.calls[0][0];
-    expect(ops).toHaveLength(2);
-    // First op: click create
-    expect(ops[0]).toMatchObject({
+    expect(prisma.click.create).toHaveBeenCalledTimes(1);
+    expect((prisma.click.create as any).mock.calls[0][0]).toMatchObject({
       data: {
         urlId: 42,
         referrer: 'x.com',
@@ -104,8 +101,9 @@ describe('recordClick', () => {
         device: 'desktop'
       }
     });
-    // Second op: counter increment
-    expect(ops[1]).toMatchObject({
+
+    expect(prisma.longURL.update).toHaveBeenCalledTimes(1);
+    expect((prisma.longURL.update as any).mock.calls[0][0]).toMatchObject({
       where: { id: 42 },
       data: { clickCount: { increment: 1 } }
     });
@@ -113,7 +111,7 @@ describe('recordClick', () => {
 
   it('swallows DB errors (never throws)', async () => {
     const { prisma } = await import('$lib/prisma.js');
-    (prisma.$transaction as any).mockRejectedValueOnce(new Error('DB down'));
+    (prisma.click.create as any).mockRejectedValueOnce(new Error('DB down'));
 
     const event = { request: { headers: new Headers() } } as any;
     await expect(recordClick(1, event)).resolves.toBeUndefined();
@@ -123,12 +121,11 @@ describe('recordClick', () => {
 describe('recordClick with opts', () => {
   it('writes surface/profileId/rowId when provided', async () => {
     const { prisma } = await import('$lib/prisma.js');
-    (prisma.$transaction as any).mockClear();
+    (prisma.click.create as any).mockClear();
     const event = { request: { headers: new Headers({ 'user-agent': 'Mozilla/5.0 Chrome/120.0' }) } } as any;
     await recordClick(7, event, { surface: 'profile', profileId: 3, rowId: 11 });
 
-    const ops = (prisma.$transaction as any).mock.calls[0][0];
-    expect(ops[0]).toMatchObject({
+    expect((prisma.click.create as any).mock.calls[0][0]).toMatchObject({
       data: expect.objectContaining({
         urlId: 7,
         surface: 'profile',
@@ -140,12 +137,12 @@ describe('recordClick with opts', () => {
 
   it('leaves surface/profileId/rowId as undefined when opts omitted', async () => {
     const { prisma } = await import('$lib/prisma.js');
-    (prisma.$transaction as any).mockClear();
+    (prisma.click.create as any).mockClear();
     const event = { request: { headers: new Headers() } } as any;
     await recordClick(1, event);
-    const ops = (prisma.$transaction as any).mock.calls[0][0];
-    expect(ops[0].data.surface).toBeUndefined();
-    expect(ops[0].data.profileId).toBeUndefined();
+    const args = (prisma.click.create as any).mock.calls[0][0];
+    expect(args.data.surface).toBeUndefined();
+    expect(args.data.profileId).toBeUndefined();
   });
 });
 

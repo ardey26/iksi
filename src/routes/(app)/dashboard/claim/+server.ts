@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { validateHandle } from '$lib/server/handles';
 import { verifyUserSession } from '$lib/server/user-auth';
+import { invalidateUserCache } from '$lib/server/user-cache';
 
 const CLAIM_LIMIT_PER_HOUR_IP = 3;
 const CLAIM_LIMIT_PER_HOUR_USER = 1;
@@ -42,6 +43,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
   const { prisma } = await import('$lib/prisma.js');
   try {
     await prisma.handle.create({ data: { handle: v.handle, userId: uid } });
+    invalidateUserCache(uid);
     return json({ ok: true, handle: v.handle });
   } catch (err: any) {
     if (err?.code === 'P2002') return json({ error: 'That handle is taken' }, { status: 409 });

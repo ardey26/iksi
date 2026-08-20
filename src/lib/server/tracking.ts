@@ -51,7 +51,12 @@ export async function recordClick(
     const referrer = normalizeReferrer(h.get('referer'));
     const country = h.get('x-vercel-ip-country') || null;
 
-    await prisma.$transaction([
+    // Two independent writes, no transaction wrapper. Losing a click row
+    // or a count increment on an isolated failure is fine — these are
+    // analytics, not billing. Skipping the transaction halves the round
+    // trips to Postgres and removes lock contention between the Click
+    // insert and the LongURL row update on hot links.
+    await Promise.all([
       prisma.click.create({
         data: {
           urlId,

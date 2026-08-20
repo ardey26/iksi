@@ -94,7 +94,6 @@ model LongURL {
   profileRows   ProfileRow[]
 
   @@index([createdAt(sort: Desc)])
-  @@index([originalURL])
   @@index([clickCount(sort: Desc)])
   @@index([userId])
   @@index([safeCheckedAt])
@@ -117,12 +116,8 @@ model Click {
 
   @@index([urlId, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
-  @@index([country])
-  @@index([referrer])
-  @@index([device])
   @@index([profileId, createdAt(sort: Desc)])
   @@index([rowId, createdAt(sort: Desc)])
-  @@index([surface])
 }
 
 model RateLimit {

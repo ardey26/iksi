@@ -27,15 +27,33 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
   const { prisma } = await import('$lib/prisma.js');
   const record = await prisma.handle.findUnique({
     where: { handle },
-    include: {
+    select: {
       user: {
-        include: {
+        select: {
           profile: {
-            include: {
+            select: {
+              id: true,
+              displayName: true,
+              bio: true,
+              avatarUrl: true,
+              theme: true,
+              accent: true,
+              publicClicks: true,
               rows: {
                 where: { enabled: true, quarantined: false },
                 orderBy: { position: 'asc' },
-                include: { link: true }
+                select: {
+                  id: true,
+                  title: true,
+                  link: {
+                    select: {
+                      id: true,
+                      shortURL: true,
+                      originalURL: true,
+                      clickCount: true
+                    }
+                  }
+                }
               }
             }
           }
@@ -47,16 +65,24 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
   if (!record?.user?.profile) throw error(404, 'not found');
   const p = record.user.profile;
 
-  const rows = await Promise.all(p.rows.map(async (r) => ({
+  // Decode originalURL once per row so we can (a) compute the social sameAs
+  // list for JSON-LD and (b) not send the encrypted ciphertext to the client.
+  // The decoded destination is deliberately NOT returned to the client — the
+  // profile page renders titles + short URLs only. Keeping the destination
+  // server-side avoids leaking anything the redirect endpoint doesn't already.
+  const decoded = await Promise.all(
+    p.rows.map((r) => (r.link ? decodeURL(r.link.originalURL) : Promise.resolve(null)))
+  );
+
+  const rows = p.rows.map((r, i) => ({
     id: r.id,
     title: r.title,
     shortURL: r.link?.shortURL ?? null,
     href: r.link ? `/${r.link.shortURL}?s=profile&p=${p.id}&r=${r.id}` : null,
-    destination: r.link ? await decodeURL(r.link.originalURL) : null,
     clicks: p.publicClicks && r.link ? r.link.clickCount : null
-  })));
+  }));
 
-  const sameAs = extractSameAs(rows.map((r) => r.destination));
+  const sameAs = extractSameAs(decoded);
 
   // Fire-and-forget profile view (do not block)
   const { recordProfileView } = await import('$lib/server/tracking');

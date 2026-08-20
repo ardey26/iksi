@@ -4,6 +4,7 @@ import { verifyUserSession } from '$lib/server/user-auth';
 import { checkURL } from '$lib/server/safe-browsing';
 import { decodeURL } from '$lib/server/crypto.js';
 import { verifyAvatarUrl } from '$lib/server/avatar-url';
+import { invalidateUserCache } from '$lib/server/user-cache';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 
@@ -47,6 +48,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       if (validTheme(theme)) data.theme = theme;
       if (typeof publicClicks === 'boolean') data.publicClicks = publicClicks;
       await prisma.profile.update({ where: { id: p.id }, data });
+      invalidateUserCache(uid);
       return json({ ok: true, avatarUrl: finalAvatarUrl });
     }
     case 'addRow': {
