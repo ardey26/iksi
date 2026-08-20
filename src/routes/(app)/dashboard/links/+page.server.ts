@@ -1,34 +1,50 @@
 import type { PageServerLoad } from './$types';
 import { decodeURL } from '$lib/server/crypto.js';
 
-export const load: PageServerLoad = async ({ parent }) => {
+// Cap the initial dashboard load. Fetching + decoding every link a user has
+// ever created scales linearly with account age; on top of that, any
+// legacy-format URLs get scrypt-decoded here, which is intentionally slow
+// (~100-500ms each). Show the most recent N and expose a total count so
+// the UI can offer "load more" cursor pagination if needed.
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
+
+export const load: PageServerLoad = async ({ parent, url }) => {
   const { user } = await parent();
   const { prisma } = await import('$lib/prisma.js');
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-    select: { id: true }
-  });
+  const limitParam = Number(url.searchParams.get('limit'));
+  const limit = Number.isInteger(limitParam) && limitParam > 0 && limitParam <= MAX_LIMIT
+    ? limitParam
+    : DEFAULT_LIMIT;
 
-  const links = await prisma.longURL.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      shortURL: true,
-      originalURL: true,
-      clickCount: true,
-      createdAt: true,
-      safeVerdict: true,
-      profileRows: profile
-        ? {
-            where: { profileId: profile.id },
-            select: { id: true, title: true, enabled: true, position: true },
-            take: 1
-          }
-        : false
-    }
-  });
+  // profileId is provided by the cached root layout payload — no extra
+  // query needed. Then fire the link list and total count in parallel.
+  const profileId = user.profileId;
+
+  const [links, totalCount] = await Promise.all([
+    prisma.longURL.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        shortURL: true,
+        originalURL: true,
+        clickCount: true,
+        createdAt: true,
+        safeVerdict: true,
+        profileRows: profileId
+          ? {
+              where: { profileId },
+              select: { id: true, title: true, enabled: true, position: true },
+              take: 1
+            }
+          : false
+      }
+    }),
+    prisma.longURL.count({ where: { userId: user.id } })
+  ]);
 
   const decoded = await Promise.all(
     links.map(async (l) => {
@@ -58,5 +74,11 @@ export const load: PageServerLoad = async ({ parent }) => {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  return { user, links: decoded };
+  return {
+    user,
+    links: decoded,
+    totalCount,
+    limit,
+    hasMore: totalCount > limit
+  };
 };

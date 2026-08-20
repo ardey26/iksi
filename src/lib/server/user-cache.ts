@@ -12,6 +12,7 @@ export type CachedUserPayload = {
   twitterHandle: string | null;
   googleEmail: string | null;
   handle: string | null;
+  profileId: number | null;
   displayName: string | null;
   avatarUrl: string | null;
 };

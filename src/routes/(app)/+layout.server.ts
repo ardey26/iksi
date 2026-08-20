@@ -1,19 +1,15 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
-import { verifyUserSession } from '$lib/server/user-auth';
-import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 
 const CLAIM_EXEMPT_ROUTES = new Set(['/(app)/dashboard/claim', '/(app)/logout']);
 
-export const load: LayoutServerLoad = async ({ cookies, route }) => {
-  const uid = verifyUserSession(cookies.get('user_session'));
-  if (uid === null) throw redirect(302, '/login');
+export const load: LayoutServerLoad = async ({ parent, route, cookies }) => {
+  // Reuse the root layout's cached user lookup instead of hitting the DB
+  // again. This layout used to run its own `findUnique` with a handle +
+  // profile include on every dashboard navigation, adding an extra round
+  // trip that showed up as visible latency.
+  const { user } = await parent();
 
-  const { prisma } = await import('$lib/prisma.js');
-  const user = await prisma.user.findUnique({
-    where: { id: uid },
-    include: { handle: true, profile: true }
-  });
   if (!user) {
     cookies.delete('user_session', { path: '/' });
     throw redirect(302, '/login');
@@ -23,15 +19,5 @@ export const load: LayoutServerLoad = async ({ cookies, route }) => {
     throw redirect(302, '/dashboard/claim');
   }
 
-  return {
-    user: {
-      id: user.id,
-      twitterHandle: user.twitterHandle ?? null,
-      googleEmail: user.googleEmail ?? null,
-      handle: user.handle?.handle ?? null,
-      profileId: user.profile?.id ?? null,
-      displayName: user.profile?.displayName ?? null,
-      avatarUrl: user.profile?.avatarUrl ? normalizeAvatarUrl(user.profile.avatarUrl) : null
-    }
-  };
+  return { user };
 };

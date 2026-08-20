@@ -18,7 +18,7 @@ export const load: LayoutServerLoad = async ({ cookies }) => {
       twitterHandle: true,
       googleEmail: true,
       handle: { select: { handle: true } },
-      profile: { select: { displayName: true, avatarUrl: true } }
+      profile: { select: { id: true, displayName: true, avatarUrl: true } }
     }
   });
 
@@ -28,6 +28,7 @@ export const load: LayoutServerLoad = async ({ cookies }) => {
         twitterHandle: row.twitterHandle ?? null,
         googleEmail: row.googleEmail ?? null,
         handle: row.handle?.handle ?? null,
+        profileId: row.profile?.id ?? null,
         displayName: row.profile?.displayName ?? null,
         avatarUrl: row.profile?.avatarUrl ? normalizeAvatarUrl(row.profile.avatarUrl) : null
       }
