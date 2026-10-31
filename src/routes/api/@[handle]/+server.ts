@@ -1,11 +1,11 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { normalizeAvatarUrl } from '$lib/server/avatar-url';
+import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 
 const PUBLIC_LIMIT_PER_HOUR = 100;
 
 async function checkAndBump(key: string, max: number): Promise<boolean> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const now = new Date();
   const existing = await prisma.rateLimit.findUnique({ where: { id: key } });
   if (existing && existing.resetAt > now) {
@@ -29,7 +29,7 @@ export const GET: RequestHandler = async ({ params, getClientAddress }) => {
   const raw = params.handle;
   const handle = (raw.startsWith('@') ? raw.slice(1) : raw).toLowerCase();
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const record = await prisma.handle.findUnique({
     where: { handle },
     include: {

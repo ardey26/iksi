@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { verifyUserSession } from '$lib/server/user-auth';
-import { encodeURL } from '$lib/server/crypto.js';
+import { verifyUserSession } from '#lib/server/user-auth.js';
+import { encodeURL } from '#lib/server/crypto.js';
 
 export const PATCH: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
@@ -9,7 +9,7 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
   const { id, originalURL } = await request.json();
   if (!Number.isInteger(id) || typeof originalURL !== 'string') return json({ error: 'Invalid input' }, { status: 400 });
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const link = await prisma.longURL.findUnique({ where: { id } });
   if (!link || link.userId !== uid) return json({ error: 'Not found' }, { status: 404 });
 
@@ -24,7 +24,7 @@ export const DELETE: RequestHandler = async ({ request, cookies }) => {
   const { id } = await request.json();
   if (!Number.isInteger(id)) return json({ error: 'Invalid input' }, { status: 400 });
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const link = await prisma.longURL.findUnique({ where: { id } });
   if (!link || link.userId !== uid) return json({ error: 'Not found' }, { status: 404 });
 

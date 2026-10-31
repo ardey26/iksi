@@ -12,11 +12,11 @@ export const load: LayoutServerLoad = async ({ parent, route, cookies }) => {
 
   if (!user) {
     cookies.delete('user_session', { path: '/' });
-    throw redirect(302, '/login');
+    redirect(302, '/login');
   }
 
   if (!user.handle && !CLAIM_EXEMPT_ROUTES.has(route.id ?? '')) {
-    throw redirect(302, '/dashboard/claim');
+    redirect(302, '/dashboard/claim');
   }
 
   return { user };

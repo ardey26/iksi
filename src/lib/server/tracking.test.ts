@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('$lib/prisma.js', () => {
+vi.mock('#lib/prisma.js', () => {
   return {
     prisma: {
       click: { create: vi.fn(async (args) => args) },
@@ -75,7 +75,7 @@ describe('normalizeReferrer', () => {
 
 describe('recordClick', () => {
   it('inserts a Click row and increments the counter', async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     (prisma.click.create as any).mockClear();
     (prisma.longURL.update as any).mockClear();
 
@@ -110,7 +110,7 @@ describe('recordClick', () => {
   });
 
   it('swallows DB errors (never throws)', async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     (prisma.click.create as any).mockRejectedValueOnce(new Error('DB down'));
 
     const event = { request: { headers: new Headers() } } as any;
@@ -120,7 +120,7 @@ describe('recordClick', () => {
 
 describe('recordClick with opts', () => {
   it('writes surface/profileId/rowId when provided', async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     (prisma.click.create as any).mockClear();
     const event = { request: { headers: new Headers({ 'user-agent': 'Mozilla/5.0 Chrome/120.0' }) } } as any;
     await recordClick(7, event, { surface: 'profile', profileId: 3, rowId: 11 });
@@ -136,7 +136,7 @@ describe('recordClick with opts', () => {
   });
 
   it('leaves surface/profileId/rowId as undefined when opts omitted', async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     (prisma.click.create as any).mockClear();
     const event = { request: { headers: new Headers() } } as any;
     await recordClick(1, event);
@@ -148,7 +148,7 @@ describe('recordClick with opts', () => {
 
 describe('recordProfileView', () => {
   it('creates a ProfileView row with referrer + country', async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     (prisma.profileView.create as any).mockClear();
     const event = {
       request: { headers: new Headers({ referer: 'https://x.com/', 'x-vercel-ip-country': 'US' }) }
@@ -160,7 +160,7 @@ describe('recordProfileView', () => {
   });
 
   it('swallows errors', async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     (prisma.profileView.create as any).mockRejectedValueOnce(new Error('boom'));
     const event = { request: { headers: new Headers() } } as any;
     await expect(recordProfileView(1, event)).resolves.toBeUndefined();

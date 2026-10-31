@@ -45,7 +45,7 @@ export async function recordClick(
   try {
     // Dynamic import: vi.mock hoisting is not reliable through SvelteKit's $lib alias,
     // and dynamic import lets the test-time mock replace the module registry entry.
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     const h = event.request.headers;
     const { browser, device } = parseUA(h.get('user-agent'));
     const referrer = normalizeReferrer(h.get('referer'));
@@ -81,7 +81,7 @@ export async function recordClick(
 
 export async function recordProfileView(profileId: number, event: RequestEvent): Promise<void> {
   try {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     const h = event.request.headers;
     const referrer = normalizeReferrer(h.get('referer'));
     const country = h.get('x-vercel-ip-country') || null;

@@ -1,4 +1,4 @@
-import { prisma } from '$lib/prisma.js';
+import { prisma } from '#lib/prisma.js';
 
 // Cache the sitemap in-memory for a bit so we're not hitting the DB on every crawl.
 let cache = null;

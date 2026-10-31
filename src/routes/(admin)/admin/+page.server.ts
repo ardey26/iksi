@@ -2,8 +2,8 @@ import type { PageServerLoad } from './$types';
 import {
   getKPIs, getTimeSeries, getTopLinks,
   getCountryBreakdown, getReferrerBreakdown, getUABreakdown
-} from '$lib/server/stats';
-import { decodeURL } from '$lib/server/crypto.js';
+} from '#lib/server/stats.js';
+import { decodeURL } from '#lib/server/crypto.js';
 
 export const load: PageServerLoad = async ({ url }) => {
   const rawRange = Number(url.searchParams.get('range'));

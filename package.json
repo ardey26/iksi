@@ -3,7 +3,7 @@
 	"version": "0.0.1",
 	"private": true,
 	"engines": {
-		"node": ">=20"
+		"node": ">=22.17"
 	},
 	"scripts": {
 		"dev": "vite dev",
@@ -12,43 +12,51 @@
 		"test": "vitest",
 		"test:ui": "vitest --ui",
 		"test:coverage": "vitest --coverage",
-		"lint": "prettier --plugin-search-dir . --check . && eslint .",
-		"format": "prettier --plugin-search-dir . --write .",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
 		"postinstall": "prisma generate"
 	},
 	"devDependencies": {
+		"@eslint/js": "^9.39.5",
 		"@fontsource-variable/geist": "^5.3.0",
-		"@sveltejs/adapter-auto": "^1.0.0",
-		"@sveltejs/adapter-vercel": "^3.1.0",
-		"@sveltejs/kit": "^1.0.0",
-		"@tailwindcss/forms": "^0.5.3",
-		"@testing-library/jest-dom": "^5.16.5",
-		"@testing-library/svelte": "^3.2.2",
-		"@vitest/ui": "^0.28.5",
-		"autoprefixer": "^10.4.13",
-		"c8": "^7.12.0",
-		"eslint": "^8.28.0",
-		"eslint-config-prettier": "^8.5.0",
-		"eslint-plugin-svelte3": "^4.0.0",
-		"jsdom": "^21.1.0",
-		"postcss": "^8.4.21",
-		"prettier": "^2.8.0",
-		"prettier-plugin-svelte": "^2.8.1",
+		"@sveltejs/adapter-vercel": "^7.0.2",
+		"@sveltejs/kit": "^3.1.1",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"@tailwindcss/forms": "^0.5.11",
+		"@testing-library/jest-dom": "^6.10.0",
+		"@testing-library/svelte": "^5.4.2",
+		"@vitest/coverage-v8": "^4.1.12",
+		"@vitest/ui": "^4.1.12",
+		"autoprefixer": "^10.6.2",
+		"eslint": "^9.39.5",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-svelte": "^3.23.1",
+		"globals": "^17.13.0",
+		"jsdom": "^29.1.1",
+		"postcss": "^8.5.32",
+		"prettier": "^3.9.10",
+		"prettier-plugin-svelte": "^4.1.1",
 		"prisma": "^4.9.0",
-		"svelte": "^3.54.0",
-		"svelte-icons": "^2.1.0",
-		"tailwindcss": "^3.2.4",
-		"vite": "^4.0.0",
-		"vitest": "^0.28.5"
+		"svelte": "^5.57.3",
+		"tailwindcss": "^3.4.17",
+		"vite": "^8.3.5",
+		"vitest": "^4.1.12"
 	},
 	"type": "module",
 	"dependencies": {
 		"@prisma/client": "^4.9.0",
-		"@remix-run/vercel": "^1.19.3",
-		"@vercel/og": "^1.0.1",
-		"bcrypt": "^5.1.0",
+		"@vercel/og": "1.0.1",
+		"bcrypt": "^6.0.0",
 		"chart.js": "^4.5.0",
 		"dotenv": "^17.4.1",
 		"qrcode": "^1.5.4"
+	},
+	"overrides": {
+		"satori": {
+			"fflate": "^0.7.5"
+		}
+	},
+	"imports": {
+		"#lib/*": "./src/lib/*"
 	}
 }

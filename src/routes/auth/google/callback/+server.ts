@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { dev } from '$app/environment';
-import { verifyState, exchangeCode, fetchMe } from '$lib/server/google-oauth';
-import { createUserSession } from '$lib/server/user-auth';
+import { dev } from '$app/env';
+import { verifyState, exchangeCode, fetchMe } from '#lib/server/google-oauth.js';
+import { createUserSession } from '#lib/server/user-auth.js';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
   const code = url.searchParams.get('code');
@@ -33,7 +33,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     return new Response('OAuth exchange failed', { status: 502 });
   }
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const user = await prisma.user.upsert({
     where: { googleId: googleUser.id },
     create: {
@@ -60,5 +60,5 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     maxAge: 60 * 60 * 24 * 30
   });
 
-  throw redirect(302, user.handle ? '/dashboard' : '/dashboard/claim');
+  redirect(302, user.handle ? '/dashboard' : '/dashboard/claim');
 };

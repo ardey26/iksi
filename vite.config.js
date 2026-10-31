@@ -1,19 +1,22 @@
+import adapter from '@sveltejs/adapter-vercel';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
-import path from 'path';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		sveltekit({
+			preprocess: vitePreprocess(),
+			// Pin the serverless function next to the Supabase database (ap-southeast-1).
+			// Every DB round trip was crossing the Pacific from Vercel's default iad1.
+			adapter: adapter({ runtime: 'nodejs22.x', regions: ['sin1'] })
+		}),
+		svelteTesting()
+	],
 	build: {
 		target: 'es2020',
-		cssCodeSplit: true,
-		minify: 'esbuild',
-		esbuild: {
-			minifyIdentifiers: true,
-			minifySyntax: true,
-			minifyWhitespace: true,
-			drop: ['console', 'debugger']
-		}
+		cssCodeSplit: true
 	},
 	css: {
 		devSourcemap: false
@@ -28,10 +31,5 @@ export default defineConfig({
 		environment: 'jsdom',
 		globals: true,
 		setupFiles: ['./src/test/setup.js']
-	},
-	resolve: {
-		alias: {
-			$lib: path.resolve('./src/lib')
-		}
 	}
 });

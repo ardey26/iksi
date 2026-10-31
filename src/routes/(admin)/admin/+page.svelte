@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  export let data;
+  let { data } = $props();
 
-  $: qs = new URLSearchParams($page.url.search);
+  const qs = $derived(new URLSearchParams(page.url.search));
   function setParam(key: string, val: string | null) {
     const next = new URLSearchParams(qs);
     if (val === null) next.delete(key); else next.set(key, val);
-    goto(`?${next.toString()}`, { keepFocus: true, noScroll: true });
+    goto(`?${next.toString()}`, { reset: false });
   }
 </script>
 
@@ -32,7 +32,7 @@
       <div class="flex gap-1 text-xs">
         {#each [7, 30, 90] as d}
           <button
-            on:click={() => setParam('range', String(d))}
+            onclick={() => setParam('range', String(d))}
             class="px-2 py-1 rounded"
             style="color: {data.days === d ? 'var(--text-primary)' : 'var(--text-muted)'}; background: {data.days === d ? 'var(--surface)' : 'transparent'}; border: 1px solid var(--border);"
           >{d}d</button>
@@ -42,8 +42,8 @@
     {#await data.streamed.timeSeries}
       <div class="h-64 rounded-md" style="background: var(--surface); border: 1px solid var(--border);"></div>
     {:then ts}
-      {#await import('$lib/components/admin/TimeSeriesChart.svelte') then Mod}
-        <svelte:component this={Mod.default} labels={ts.labels} urls={ts.urls} clicks={ts.clicks} />
+      {#await import('#lib/components/admin/TimeSeriesChart.svelte') then Mod}
+        <Mod.default labels={ts.labels} urls={ts.urls} clicks={ts.clicks} />
       {/await}
     {/await}
   </section>
@@ -54,7 +54,7 @@
       <div class="flex gap-1 text-xs">
         {#each [{ k: 'clicks', l: 'By clicks' }, { k: 'created', l: 'By newest' }] as opt}
           <button
-            on:click={() => setParam('sort', opt.k)}
+            onclick={() => setParam('sort', opt.k)}
             class="px-2 py-1 rounded"
             style="color: {data.sort === opt.k ? 'var(--text-primary)' : 'var(--text-muted)'}; background: {data.sort === opt.k ? 'var(--surface)' : 'transparent'}; border: 1px solid var(--border);"
           >{opt.l}</button>
@@ -94,14 +94,16 @@
     {#await data.streamed.countries}
       <div class="h-40 rounded-md" style="background: var(--surface); border: 1px solid var(--border);"></div>
     {:then rows}
-      {#await import('$lib/components/admin/HorizontalBars.svelte') then Mod}
+      {#await import('#lib/components/admin/HorizontalBars.svelte') then Mod}
         {@const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })}
         {@const display = rows.map((r) => ({
-          label: r.isOther ? 'Other' : (r.country ? (regionNames.of(r.country) ?? r.country) : 'Unknown'),
+          label: r.isOther
+            ? 'Other'
+            : r.country ? regionNames.of(r.country) ?? r.country : 'Unknown',
           count: r.count,
           muted: !!r.isOther
         }))}
-        <svelte:component this={Mod.default} rows={display} />
+        <Mod.default rows={display} />
       {/await}
     {/await}
   </section>
@@ -111,13 +113,13 @@
     {#await data.streamed.referrers}
       <div class="h-40 rounded-md" style="background: var(--surface); border: 1px solid var(--border);"></div>
     {:then rows}
-      {#await import('$lib/components/admin/HorizontalBars.svelte') then Mod}
+      {#await import('#lib/components/admin/HorizontalBars.svelte') then Mod}
         {@const display = rows.map((r) => ({
-          label: r.isDirect ? 'Direct' : (r.referrer ?? '—'),
+          label: r.isDirect ? 'Direct' : r.referrer ?? '—',
           count: r.count,
           muted: !!r.isDirect
         }))}
-        <svelte:component this={Mod.default} rows={display} />
+        <Mod.default rows={display} />
       {/await}
     {/await}
   </section>
@@ -127,14 +129,14 @@
       <div class="h-40 rounded-md" style="background: var(--surface); border: 1px solid var(--border);"></div>
       <div class="h-40 rounded-md" style="background: var(--surface); border: 1px solid var(--border);"></div>
     {:then ua}
-      {#await import('$lib/components/admin/HorizontalBars.svelte') then Mod}
+      {#await import('#lib/components/admin/HorizontalBars.svelte') then Mod}
         <div class="space-y-3">
           <h2 class="text-sm uppercase tracking-wide" style="color: var(--text-muted);">Browsers</h2>
-          <svelte:component this={Mod.default} rows={ua.browsers.map((b) => ({ label: b.browser ?? 'Unknown', count: b.count }))} />
+          <Mod.default rows={ua.browsers.map((b) => ({ label: b.browser ?? 'Unknown', count: b.count }))} />
         </div>
         <div class="space-y-3">
           <h2 class="text-sm uppercase tracking-wide" style="color: var(--text-muted);">Devices</h2>
-          <svelte:component this={Mod.default} rows={ua.devices.map((d) => ({
+          <Mod.default rows={ua.devices.map((d) => ({
             label: d.device ?? 'Unknown',
             count: d.count,
             muted: d.device === 'bot'

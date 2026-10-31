@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createSession, verifyPassword } from '$lib/server/auth.js';
-import { dev } from '$app/environment';
+import { createSession, verifyPassword } from '#lib/server/auth.js';
+import { dev } from '$app/env';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
   try {

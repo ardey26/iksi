@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { ImageResponse } from '@vercel/og';
-import { normalizeAvatarUrl } from '$lib/server/avatar-url';
+import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 
 // --- Color helpers: derive a soft palette from the user's accent + brightness ---
 
@@ -105,7 +105,7 @@ export const GET: RequestHandler = async ({ params }) => {
   const raw = params.handle;
   const handle = (raw.startsWith('@') ? raw.slice(1) : raw).toLowerCase();
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const record = await prisma.handle.findUnique({
     where: { handle },
     include: { user: { include: { profile: true } } }

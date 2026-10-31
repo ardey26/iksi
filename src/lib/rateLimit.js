@@ -1,5 +1,5 @@
 // Database-backed rate limiter for horizontal scaling
-import { prisma } from '$lib/prisma.js';
+import { prisma } from '#lib/prisma.js';
 
 export async function rateLimit(identifier, maxRequests = 10, windowMs = 60000) {
 	const now = new Date();
