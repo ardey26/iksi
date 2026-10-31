@@ -5,34 +5,49 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
         <meta name="generator" content="SvelteKit" />
 
-        <!-- DNS Prefetch for better performance -->
-        <link rel="dns-prefetch" href="//fonts.googleapis.com">
-        <link rel="dns-prefetch" href="//fonts.gstatic.com">
+        <!-- Resolve theme before first paint so light-mode users never see a dark flash.
+             Mirrors getInitialTheme() in $lib/stores/theme.js. -->
+        <script>
+            try {
+                var t = localStorage.getItem('theme');
+                if (t !== 'light' && t !== 'dark') {
+                    t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        </script>
 
-        <!-- Preload critical resources -->
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-        <!-- Preload critical API endpoints -->
-        <link rel="prefetch" href="/api/shorten" />
+        <!-- Self-hosted Geist (variable). Latin subset is preloaded; latin-ext loads on demand. -->
+        <link rel="preload" href="%sveltekit.assets%/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
 
         <!-- Security headers (X-Frame-Options set via HTTP header in vercel.json) -->
         <meta http-equiv="X-Content-Type-Options" content="nosniff">
-        <meta http-equiv="X-XSS-Protection" content="1; mode=block">
         <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 
         <meta name="google-adsense-account" content="ca-pub-2753774406694455">
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2753774406694455"
-                crossorigin="anonymous"></script>
 
         <link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon.svg" />
         <link rel="icon" type="image/png" href="%sveltekit.assets%/favicon.png" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-              rel="stylesheet" media="print" onload="this.media='all'" />
-        <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" /></noscript>
+        <link rel="apple-touch-icon" href="%sveltekit.assets%/favicon.png" />
+        <link rel="manifest" href="%sveltekit.assets%/manifest.json" />
         %sveltekit.head%
     </head>
     <body data-sveltekit-preload-data="hover" class="sveltekit-body">
         <div class="sveltekit-container">%sveltekit.body%</div>
+
+        <!-- AdSense: loaded after the page is idle so it never competes with hydration. -->
+        <script>
+            window.addEventListener('load', function () {
+                setTimeout(function () {
+                    var s = document.createElement('script');
+                    s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2753774406694455';
+                    s.async = true;
+                    s.crossOrigin = 'anonymous';
+                    document.head.appendChild(s);
+                }, 2000);
+            });
+        </script>
     </body>
 </html>

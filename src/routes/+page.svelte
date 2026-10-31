@@ -77,6 +77,7 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <div class="w-full max-w-[500px]">
+  <h1 class="sr-only">iksi — free URL shortener</h1>
   {#if shortURL}
     <ShortenedURL {shortURL} on:reset={reset} />
   {:else}

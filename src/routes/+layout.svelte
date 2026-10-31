@@ -2,9 +2,7 @@
   import '../app.css';
   import { ThemeToggle, SEO } from '../lib/components';
   import UserMenu from '$lib/components/UserMenu.svelte';
-  import { onMount } from 'svelte';
   import { page, navigating } from '$app/stores';
-  import { theme } from '$lib/stores/theme.js';
 
   export let data;
 
@@ -74,13 +72,8 @@
   // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
   $: centerContent = $page.url.pathname === '/' || onLoginPage;
 
-  onMount(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      theme.set(savedTheme);
-    }
-  });
+  // Theme is resolved by the inline script in app.html before first paint and
+  // kept in sync by $lib/stores/theme.js. Nothing to do on mount.
 </script>
 
 <!--

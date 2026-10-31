@@ -22,15 +22,23 @@ function getInitialTheme() {
 export const theme = writable(getInitialTheme());
 
 // Theme toggle function
+let switchTimer;
 export function toggleTheme() {
 	theme.update(currentTheme => {
 		const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-		
+
 		if (browser) {
+			const root = document.documentElement;
+			// Enable the 300ms colour transition only for the duration of the switch
+			// (see app.css). Keeps every other style change instant.
+			root.setAttribute('data-theme-switching', '');
+			clearTimeout(switchTimer);
+			switchTimer = setTimeout(() => root.removeAttribute('data-theme-switching'), 350);
+
 			localStorage.setItem('theme', newTheme);
-			document.documentElement.setAttribute('data-theme', newTheme);
+			root.setAttribute('data-theme', newTheme);
 		}
-		
+
 		return newTheme;
 	});
 }
