@@ -3,9 +3,14 @@
 
   export let kind: 'avatar' | 'background';
   export let value: string | null = null;
+  // The image currently stored on the server for this kind. Remove only calls
+  // the server when the shown value is that image; any other value is an
+  // unsaved local one (e.g. a typed URL) and is cleared locally.
+  // undefined means "value is always the stored image".
+  export let savedUrl: string | null | undefined = undefined;
 
   const MAX_BYTES = 4 * 1024 * 1024;
-  const dispatch = createEventDispatcher<{ change: { url: string | null } }>();
+  const dispatch = createEventDispatcher<{ change: { url: string | null; persisted: boolean } }>();
 
   let input: HTMLInputElement;
   let busy = false;
@@ -35,7 +40,7 @@
         return;
       }
       value = data.url;
-      dispatch('change', { url: data.url });
+      dispatch('change', { url: data.url, persisted: true });
     } catch {
       error = 'Upload failed.';
     } finally {
@@ -46,6 +51,11 @@
   async function remove() {
     if (busy) return;
     error = '';
+    if (savedUrl !== undefined && value !== savedUrl) {
+      value = null;
+      dispatch('change', { url: null, persisted: false });
+      return;
+    }
     busy = true;
     try {
       const res = await fetch(`/api/media?kind=${kind}`, { method: 'DELETE' });
@@ -55,7 +65,7 @@
         return;
       }
       value = null;
-      dispatch('change', { url: null });
+      dispatch('change', { url: null, persisted: true });
     } catch {
       error = 'Could not remove image.';
     } finally {

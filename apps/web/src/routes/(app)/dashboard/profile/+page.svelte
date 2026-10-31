@@ -17,6 +17,9 @@
   let displayName = data.profile?.displayName ?? '';
   let bio = data.profile?.bio ?? '';
   let avatarUrl = data.profile?.avatarUrl ?? '';
+  // Avatar value the server has stored. Moves together with avatarUrl on
+  // upload/remove/save so those never count as unsaved changes.
+  let savedAvatarUrl = data.profile?.avatarUrl ?? '';
   let backgroundUrl: string | null = data.profile?.backgroundUrl ?? null;
   let showUrlInput = false;
   let accent = data.profile?.accent ?? '#3B82F6';
@@ -31,7 +34,7 @@
     const orig = {
       displayName: data.profile?.displayName ?? '',
       bio: data.profile?.bio ?? '',
-      avatarUrl: data.profile?.avatarUrl ?? '',
+      avatarUrl: savedAvatarUrl,
       accent: data.profile?.accent ?? '#3B82F6',
       brightness: origBright
     };
@@ -41,13 +44,24 @@
 
   // Uploads are persisted by /api/media immediately; refresh load data so the
   // form is not considered dirty because of them.
-  async function onAvatarChange(e: CustomEvent<{ url: string | null }>) {
-    avatarUrl = e.detail.url ?? '';
-    await invalidateAll();
+  async function refresh() {
+    try {
+      await invalidateAll();
+    } catch {
+      // The change already succeeded on the server; a failed refresh must not
+      // leave the form looking dirty.
+    }
   }
-  async function onBackgroundChange(e: CustomEvent<{ url: string | null }>) {
+  async function onAvatarChange(e: CustomEvent<{ url: string | null; persisted: boolean }>) {
+    const url = e.detail.url ?? '';
+    avatarUrl = url;
+    if (!e.detail.persisted) return; // unsaved typed URL cleared locally
+    savedAvatarUrl = url;
+    await refresh();
+  }
+  async function onBackgroundChange(e: CustomEvent<{ url: string | null; persisted: boolean }>) {
     backgroundUrl = e.detail.url;
-    await invalidateAll();
+    await refresh();
   }
 
   async function saveProfile() {
@@ -70,6 +84,7 @@
       if (typeof body.avatarUrl === 'string' || body.avatarUrl === null) {
         avatarUrl = body.avatarUrl ?? '';
       }
+      savedAvatarUrl = avatarUrl;
       saved = true;
       await invalidateAll();
       setTimeout(() => { saved = false; }, 1400);
@@ -149,7 +164,7 @@
 
       <div class="space-y-2">
         <span class="text-sm" style="color: var(--text-muted);">Avatar</span>
-        <ImageUpload kind="avatar" value={avatarUrl || null} on:change={onAvatarChange} />
+        <ImageUpload kind="avatar" value={avatarUrl || null} savedUrl={savedAvatarUrl || null} on:change={onAvatarChange} />
         <button type="button" on:click={() => (showUrlInput = !showUrlInput)}
                 class="text-xs transition-opacity hover:opacity-70"
                 style="background: none; border: none; padding: 0; color: var(--text-muted); cursor: pointer;"

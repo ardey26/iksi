@@ -42,7 +42,7 @@ describe('ImageUpload', () => {
     expect(init.body.get('kind')).toBe('avatar');
     expect(init.body.get('file')).toBeInstanceOf(File);
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange.mock.calls[0][0].detail).toEqual({ url: 'https://cdn.test/new.png' });
+    expect(onChange.mock.calls[0][0].detail).toEqual({ url: 'https://cdn.test/new.png', persisted: true });
   });
 
   it('shows the server error and keeps the old preview on 400', async () => {
@@ -60,7 +60,32 @@ describe('ImageUpload', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledWith('/api/media?kind=avatar', { method: 'DELETE' });
-    expect(onChange.mock.calls[0][0].detail).toEqual({ url: null });
+    expect(onChange.mock.calls[0][0].detail).toEqual({ url: null, persisted: true });
     expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('Remove on an unsaved typed URL clears locally without calling the server', async () => {
+    const onChange = vi.fn();
+    const { container } = render(ImageUpload, {
+      props: { kind: 'avatar', value: 'https://typed.test/x.png', savedUrl: 'https://cdn.test/saved.png' },
+      events: { change: onChange }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onChange.mock.calls[0][0].detail).toEqual({ url: null, persisted: false });
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('Remove on the saved image calls the server', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 204 });
+    const onChange = vi.fn();
+    render(ImageUpload, {
+      props: { kind: 'avatar', value: 'https://cdn.test/saved.png', savedUrl: 'https://cdn.test/saved.png' },
+      events: { change: onChange }
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledWith('/api/media?kind=avatar', { method: 'DELETE' });
+    expect(onChange.mock.calls[0][0].detail).toEqual({ url: null, persisted: true });
   });
 });
