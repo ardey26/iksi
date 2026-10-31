@@ -1,0 +1,66 @@
+name: Deploy
+
+# Runs after CI passes on main: database migrations, then the web app, then
+# the edge Worker. Order matters: new app code may read new columns, and the
+# Worker may read new fields the app serves.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Supabase session pooler (IPv4, port 5432). The direct host is IPv6-only.
+      - name: Database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_SESSION_URL }}
+          DIRECT_URL: ${{ secrets.DATABASE_SESSION_URL }}
+        run: pnpm --filter @iksi/web exec prisma migrate deploy
+
+      - name: Web app (Vercel production)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npx --yes vercel@65.9.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@65.9.0 build --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@65.9.0 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: Edge Worker
+        uses: cloudflare/wrangler-action@v3
+        env:
+          EDGE_SECRET: ${{ secrets.EDGE_SECRET }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/redirect
+          wranglerVersion: '4.156.0'
+          packageManager: pnpm
+          secrets: |
+            EDGE_SECRET
+          command: deploy --var VERSION:${{ github.event.workflow_run.head_sha || github.sha }}
