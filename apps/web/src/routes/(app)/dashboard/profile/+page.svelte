@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
+  import ImageUpload from '#lib/components/ImageUpload.svelte';
 
   export let data;
 
@@ -16,6 +17,8 @@
   let displayName = data.profile?.displayName ?? '';
   let bio = data.profile?.bio ?? '';
   let avatarUrl = data.profile?.avatarUrl ?? '';
+  let backgroundUrl: string | null = data.profile?.backgroundUrl ?? null;
+  let showUrlInput = false;
   let accent = data.profile?.accent ?? '#3B82F6';
   let brightness: number = themeToBrightness(data.profile?.theme);
 
@@ -34,6 +37,17 @@
     };
     dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
       || accent !== orig.accent || brightness !== orig.brightness;
+  }
+
+  // Uploads are persisted by /api/media immediately; refresh load data so the
+  // form is not considered dirty because of them.
+  async function onAvatarChange(e: CustomEvent<{ url: string | null }>) {
+    avatarUrl = e.detail.url ?? '';
+    await invalidateAll();
+  }
+  async function onBackgroundChange(e: CustomEvent<{ url: string | null }>) {
+    backgroundUrl = e.detail.url;
+    await invalidateAll();
   }
 
   async function saveProfile() {
@@ -133,12 +147,21 @@
                   style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);"></textarea>
       </label>
 
-      <label class="block space-y-2">
-        <span class="text-sm" style="color: var(--text-muted);">Avatar URL</span>
-        <input type="url" bind:value={avatarUrl} placeholder="https://..."
-               class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
-               style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
-      </label>
+      <div class="space-y-2">
+        <span class="text-sm" style="color: var(--text-muted);">Avatar</span>
+        <ImageUpload kind="avatar" value={avatarUrl || null} on:change={onAvatarChange} />
+        <button type="button" on:click={() => (showUrlInput = !showUrlInput)}
+                class="text-xs transition-opacity hover:opacity-70"
+                style="background: none; border: none; padding: 0; color: var(--text-muted); cursor: pointer;"
+                aria-expanded={showUrlInput}>
+          Paste a URL instead
+        </button>
+        {#if showUrlInput}
+          <input type="url" bind:value={avatarUrl} placeholder="https://..." aria-label="Avatar URL"
+                 class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
+                 style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
+        {/if}
+      </div>
     </div>
   </div>
 
@@ -182,11 +205,17 @@
         </div>
       </div>
 
+      <!-- Background -->
+      <div class="space-y-2">
+        <span class="text-sm" style="color: var(--text-muted);">Background</span>
+        <ImageUpload kind="background" value={backgroundUrl} on:change={onBackgroundChange} />
+      </div>
+
       <!-- Live preview — mirrors the /@handle card layout -->
       <div class="space-y-2">
         <span class="text-xs uppercase tracking-wide" style="color: var(--text-muted);">Preview</span>
         <div class="rounded-2xl p-6 transition-colors"
-             style="{paletteStyle} background: var(--p-bg);">
+             style="{paletteStyle} background: var(--p-bg);{backgroundUrl ? ` background-image: url('${backgroundUrl}'); background-size: cover; background-position: center;` : ''}">
           <div class="w-full rounded-2xl overflow-hidden preview-card"
                style="background: var(--p-surface); border: 1px solid var(--p-border); color: var(--p-text);">
 
