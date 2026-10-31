@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "LongURL" ADD COLUMN "rules" JSONB,
+ADD COLUMN "expiresAt" TIMESTAMP(3),
+ADD COLUMN "maxClicks" INTEGER,
+ADD COLUMN "expiredAt" TIMESTAMP(3),
+ADD COLUMN "passwordHash" TEXT,
+ADD COLUMN "permanent" BOOLEAN NOT NULL DEFAULT false;

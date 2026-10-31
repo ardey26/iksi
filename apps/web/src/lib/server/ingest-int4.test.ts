@@ -32,7 +32,8 @@ describe('ingestClicks INT4 guard', () => {
       existingLinkIds: lookup,
       existingProfileIds: lookup,
       existingRowIds: lookup,
-      writeBatch: vi.fn(async (_r: ClickRow[], _c: Map<number, number>) => {})
+      writeBatch: vi.fn(async (_r: ClickRow[], _c: Map<number, number>) => {}),
+      exhaust: vi.fn(async (_ids: number[]) => [] as string[])
     };
     const res = await ingestClicks(
       [ev(3), ev(2147483648), ev(3, 2147483648, 1), ev(3, 1, 2147483648), ev(2147483647, 1, 2)],

@@ -4,6 +4,8 @@ export {
 	normalizeHost,
 	linkKey,
 	parseLinkRecord,
+	decideLink,
+	type LinkDecision,
 	type LinkRecord,
 	type StoredLink
 } from './links/record';

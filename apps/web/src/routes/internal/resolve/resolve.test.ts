@@ -12,6 +12,17 @@ function call(slug: string | null, headers: Record<string, string> = {}) {
   return GET({ url, request: new Request(url, { headers }) } as never);
 }
 
+const ROW = {
+  id: 9,
+  originalURL: 'https://example.com',
+  safeVerdict: null,
+  rules: null,
+  expiresAt: null,
+  expiredAt: null,
+  passwordHash: null,
+  permanent: false
+};
+
 beforeEach(() => {
   process.env.EDGE_SECRET = 'edge';
   findUnique.mockReset();
@@ -37,7 +48,7 @@ describe('GET /internal/resolve', () => {
   });
 
   it('200s for a matching x-iksi-internal', async () => {
-    findUnique.mockResolvedValue({ id: 9, originalURL: 'https://example.com', safeVerdict: null });
+    findUnique.mockResolvedValue({ ...ROW });
     const res = await call('AbC', { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(200);
   });
@@ -50,13 +61,23 @@ describe('GET /internal/resolve', () => {
   });
 
   it('returns the record for a known slug, case preserved', async () => {
-    findUnique.mockResolvedValue({ id: 9, originalURL: 'https://example.com', safeVerdict: null });
+    findUnique.mockResolvedValue({ ...ROW });
     const res = await call('AbC', { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(await res.json()).toEqual({
       found: true,
-      record: { v: 1, id: 9, destination: 'https://example.com', flagged: false, permanent: false }
+      record: {
+        v: 1,
+        id: 9,
+        destination: 'https://example.com',
+        flagged: false,
+        permanent: false,
+        rules: [],
+        expiresAt: null,
+        expired: false,
+        protected: false
+      }
     });
     expect(findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { shortURL: 'AbC' } })

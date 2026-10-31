@@ -1,5 +1,6 @@
 import { isDbId, parseClickEvent, type ClickEvent } from '@iksi/core';
 import type { PrismaClient } from '@prisma/client';
+import { purgeEdge } from '#lib/server/edge-purge.js';
 import { parseUA, normalizeReferrer } from '#lib/server/tracking.js';
 
 export interface IngestResult {
@@ -25,6 +26,8 @@ export interface IngestDb {
   existingRowIds(ids: number[]): Promise<Set<number>>;
   /** Must insert the rows and apply the counts atomically. */
   writeBatch(rows: ClickRow[], counts: Map<number, number>): Promise<void>;
+  /** Marks links that reached maxClicks as expired and returns their slugs. */
+  exhaust(linkIds: number[]): Promise<string[]>;
 }
 
 /**
@@ -73,6 +76,13 @@ export async function ingestClicks(raw: unknown[], db: IngestDb): Promise<Ingest
   for (const r of rows) counts.set(r.urlId, (counts.get(r.urlId) ?? 0) + 1);
 
   await db.writeBatch(rows, counts);
+  // The clicks are stored; a failure here must not fail the response (the batch would be retried and double count).
+  try {
+    const slugs = await db.exhaust([...counts.keys()]);
+    if (slugs.length) await purgeEdge(slugs);
+  } catch (err) {
+    console.error('click limit expiry failed', err);
+  }
   return { accepted: rows.length, dropped: raw.length - rows.length };
 }
 
@@ -107,6 +117,16 @@ export function prismaIngestDb(prisma: PrismaClient): IngestDb {
           prisma.longURL.updateMany({ where: { id }, data: { clickCount: { increment: n } } })
         )
       ]);
+    },
+    async exhaust(linkIds) {
+      const rows = await prisma.$queryRaw<{ shortURL: string }[]>`
+        UPDATE "LongURL" SET "expiredAt" = now()
+        WHERE id = ANY(${linkIds}::int[])
+          AND "maxClicks" IS NOT NULL
+          AND "clickCount" >= "maxClicks"
+          AND "expiredAt" IS NULL
+        RETURNING "shortURL"`;
+      return rows.map((r) => r.shortURL);
     }
   };
 }

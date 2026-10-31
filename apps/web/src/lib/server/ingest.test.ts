@@ -1,5 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ingestClicks, type IngestDb, type ClickRow } from './ingest';
+import { purgeEdge } from './edge-purge';
+
+vi.mock('./edge-purge', () => ({ purgeEdge: vi.fn(async () => true) }));
+beforeEach(() => vi.mocked(purgeEdge).mockClear());
 
 function ev(linkId: number, over: Record<string, unknown> = {}) {
   return {
@@ -16,12 +20,18 @@ function ev(linkId: number, over: Record<string, unknown> = {}) {
   };
 }
 
-function fakeDb(existing: number[], profiles: number[] = [], rowsIds: number[] = []) {
+function fakeDb(
+  existing: number[],
+  profiles: number[] = [],
+  rowsIds: number[] = [],
+  limits: Record<number, string> = {}
+) {
   const db = {
     existingLinkIds: vi.fn(async (ids: number[]) => new Set(ids.filter((i) => existing.includes(i)))),
     existingProfileIds: vi.fn(async (ids: number[]) => new Set(ids.filter((i) => profiles.includes(i)))),
     existingRowIds: vi.fn(async (ids: number[]) => new Set(ids.filter((i) => rowsIds.includes(i)))),
-    writeBatch: vi.fn(async (_rows: ClickRow[], _c: Map<number, number>) => {})
+    writeBatch: vi.fn(async (_rows: ClickRow[], _c: Map<number, number>) => {}),
+    exhaust: vi.fn(async (ids: number[]) => ids.filter((i) => i in limits).map((i) => limits[i]))
   };
   return db satisfies IngestDb;
 }
@@ -119,5 +129,46 @@ describe('ingestClicks', () => {
     const db = fakeDb([3]);
     db.writeBatch.mockRejectedValue(new Error('db down'));
     await expect(ingestClicks([ev(3)], db)).rejects.toThrow('db down');
+  });
+
+  describe('click limits', () => {
+    it('exhausts the batch links and purges the returned slugs', async () => {
+      const db = fakeDb([3, 4], [], [], { 3: 'abc' });
+      await ingestClicks([ev(3), ev(4)], db);
+      expect(db.exhaust).toHaveBeenCalledWith([3, 4]);
+      expect(purgeEdge).toHaveBeenCalledWith(['abc']);
+    });
+
+    it('does not purge when no link reached its limit', async () => {
+      const db = fakeDb([4]);
+      await ingestClicks([ev(4)], db);
+      expect(purgeEdge).not.toHaveBeenCalled();
+    });
+
+    it('exhausts only after writeBatch succeeds', async () => {
+      const db = fakeDb([3], [], [], { 3: 'abc' });
+      db.writeBatch.mockRejectedValueOnce(new Error('db down'));
+      await expect(ingestClicks([ev(3)], db)).rejects.toThrow('db down');
+      expect(db.exhaust).not.toHaveBeenCalled();
+      expect(purgeEdge).not.toHaveBeenCalled();
+    });
+
+    it('an exhaust failure does not fail the ingest', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const db = fakeDb([3]);
+      db.exhaust.mockRejectedValueOnce(new Error('boom'));
+      await expect(ingestClicks([ev(3)], db)).resolves.toEqual({ accepted: 1, dropped: 0 });
+      expect(err).toHaveBeenCalled();
+      err.mockRestore();
+    });
+
+    it('a purge failure does not fail the ingest', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(purgeEdge).mockRejectedValueOnce(new Error('boom'));
+      const db = fakeDb([3], [], [], { 3: 'abc' });
+      await expect(ingestClicks([ev(3)], db)).resolves.toEqual({ accepted: 1, dropped: 0 });
+      expect(err).toHaveBeenCalled();
+      err.mockRestore();
+    });
   });
 });

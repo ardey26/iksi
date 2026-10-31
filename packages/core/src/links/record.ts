@@ -1,5 +1,6 @@
 import { isDbId } from '../ids';
 import { isHttpUrl } from './url';
+import { parseRules, type Rule } from '../routing/rules';
 
 export const CANONICAL_HOST = 'iksi.app';
 
@@ -20,6 +21,20 @@ export interface LinkRecord {
 	destination: string;
 	flagged: boolean;
 	permanent: boolean;
+	rules?: Rule[];
+	expiresAt?: number | null;
+	expired?: boolean;
+	protected?: boolean;
+}
+
+export type LinkDecision = 'redirect' | 'protected' | 'expired' | 'flagged';
+
+/** Order matters: flagged, then expired, then protected, else redirect. */
+export function decideLink(record: LinkRecord, now: number): LinkDecision {
+	if (record.flagged) return 'flagged';
+	if (record.expired || (record.expiresAt != null && record.expiresAt <= now)) return 'expired';
+	if (record.protected) return 'protected';
+	return 'redirect';
 }
 
 /** A record as held in the store, with the time (ms epoch) it was written. */
@@ -41,5 +56,30 @@ export function parseLinkRecord(input: unknown): LinkRecord | null {
 	) {
 		return null;
 	}
-	return { v: 1, id: r.id, destination: r.destination, flagged: r.flagged, permanent: r.permanent };
+	const optBool = (x: unknown) => x === undefined || typeof x === 'boolean';
+	if (
+		!optBool(r.expired) ||
+		!optBool(r.protected) ||
+		(r.expiresAt !== undefined &&
+			r.expiresAt !== null &&
+			(typeof r.expiresAt !== 'number' || !Number.isFinite(r.expiresAt)))
+	) {
+		return null;
+	}
+	const record: LinkRecord = {
+		v: 1,
+		id: r.id,
+		destination: r.destination,
+		flagged: r.flagged,
+		permanent: r.permanent
+	};
+	// Stored rules are untrusted; a bad set must not break redirects, so fall back to none.
+	if (r.rules !== undefined) {
+		const parsed = parseRules(r.rules);
+		record.rules = parsed.ok ? parsed.rules : [];
+	}
+	if (r.expiresAt !== undefined) record.expiresAt = r.expiresAt as number | null;
+	if (r.expired !== undefined) record.expired = r.expired as boolean;
+	if (r.protected !== undefined) record.protected = r.protected as boolean;
+	return record;
 }

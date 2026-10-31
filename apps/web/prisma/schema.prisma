@@ -89,6 +89,12 @@ model LongURL {
   userId        Int?
   safeVerdict   String?
   safeCheckedAt DateTime?
+  rules         Json?
+  expiresAt     DateTime?
+  maxClicks     Int?
+  expiredAt     DateTime?
+  passwordHash  String?
+  permanent     Boolean      @default(false)
   user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   clicks        Click[]
   profileRows   ProfileRow[]

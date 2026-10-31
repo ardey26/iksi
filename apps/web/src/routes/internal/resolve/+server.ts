@@ -26,7 +26,16 @@ export const GET: RequestHandler = async ({ url, request }) => {
   const { prisma } = await import('#lib/prisma.js');
   const row = await prisma.longURL.findUnique({
     where: { shortURL: slug },
-    select: { id: true, originalURL: true, safeVerdict: true }
+    select: {
+      id: true,
+      originalURL: true,
+      safeVerdict: true,
+      rules: true,
+      expiresAt: true,
+      expiredAt: true,
+      passwordHash: true,
+      permanent: true
+    }
   });
   if (!row) return json({ found: false }, 404);
 
