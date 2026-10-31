@@ -67,3 +67,50 @@ describe('dashboard links purge', () => {
     expect(r.status).toBe(200);
   });
 });
+
+describe('dashboard links PATCH destination validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    purgeEdge.mockResolvedValue(true);
+    findUnique.mockResolvedValue({ id: 5, userId: 7, shortURL: 'Xy' });
+  });
+
+  it.each([
+    ['a javascript: URL', 'javascript:alert(1)'],
+    ['a host without a dot', 'https://intranet'],
+    ['an iksi link (redirect loop)', 'https://iksi.app/abc'],
+    ['localhost', 'http://localhost.test:3000'],
+    ['an empty string', '   ']
+  ])('rejects %s with 400 and writes nothing', async (_name, originalURL) => {
+    const r = await call(PATCH, { id: 5, originalURL });
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toMatch(/valid URL/i);
+    expect(update).not.toHaveBeenCalled();
+    expect(purgeEdge).not.toHaveBeenCalled();
+  });
+
+  it('rejects a destination over 2048 characters after prefixing', async () => {
+    // 2048 raw characters become 2056 once https:// is added.
+    const originalURL = 'e.com/' + 'a'.repeat(2042);
+    expect(originalURL).toHaveLength(2048);
+    const r = await call(PATCH, { id: 5, originalURL });
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toMatch(/2048/);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('accepts exactly 2048 characters', async () => {
+    const originalURL = 'https://e.com/' + 'a'.repeat(2048 - 'https://e.com/'.length);
+    const r = await call(PATCH, { id: 5, originalURL });
+    expect(r.status).toBe(200);
+  });
+
+  it('stores the prefixed, trimmed destination', async () => {
+    const r = await call(PATCH, { id: 5, originalURL: '  example.com/path  ' });
+    expect(r.status).toBe(200);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 5 },
+      data: { originalURL: 'enc:https://example.com/path' }
+    });
+  });
+});
