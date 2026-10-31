@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseRules, type Rule } from '@iksi/core';
-import { toForm, fromForm, newRuleId, type RuleForm } from './rules-form';
+import { toForm, fromForm, newRuleId, type ConditionForm, type RuleForm } from './rules-form';
 
 const EXAMPLES: Rule[] = [
   { id: 'aaaaaaa1', when: { countries: ['SG', 'MY'] }, destination: 'https://sg.example.com' },
@@ -50,19 +50,32 @@ describe('rules-form', () => {
     });
   });
 
-  it('drops conditions with no values', () => {
-    const r = fromForm([
-      single({
-        conditions: [
-          { kind: 'country', values: ' , ' },
-          { kind: 'continent', values: [] },
-          { kind: 'device', values: [] },
-          { kind: 'os', values: [] },
-          { kind: 'referrer', values: '' }
-        ]
-      })
-    ]);
+  it.each([
+    ['blank country', { kind: 'country', values: ' , ' }, 'Rule 1: choose at least one country'],
+    ['no continent', { kind: 'continent', values: [] }, 'Rule 1: choose at least one continent'],
+    ['all device chips unchecked', { kind: 'device', values: [] }, 'Rule 1: choose at least one device'],
+    ['no operating system', { kind: 'os', values: [] }, 'Rule 1: choose at least one operating system'],
+    ['blank referrer', { kind: 'referrer', values: '' }, 'Rule 1: choose at least one referrer']
+  ] as [string, ConditionForm, string][])('a condition left empty (%s) is an error, not a catch-all', (_n, condition, error) => {
+    expect(fromForm([single({ conditions: [condition] })])).toEqual({ ok: false, error });
+  });
+
+  it('names the rule an empty condition is in', () => {
+    const r = fromForm([single(), single({ id: 'bbbbbbb2', conditions: [{ kind: 'device', values: [] }] })]);
+    expect(r).toEqual({ ok: false, error: 'Rule 2: choose at least one device' });
+  });
+
+  it('drops a removed condition: a rule with none left has no conditions', () => {
+    const r = fromForm([single({ conditions: [] })]);
     expect(r).toEqual({ ok: true, rules: [{ id: 'bbbbbbb1', when: {}, destination: 'https://a.example.com' }] });
+  });
+
+  it('keeps the conditions that remain after one is removed', () => {
+    const r = fromForm([single({ conditions: [{ kind: 'device', values: ['mobile'] }] })]);
+    expect(r).toEqual({
+      ok: true,
+      rules: [{ id: 'bbbbbbb1', when: { devices: ['mobile'] }, destination: 'https://a.example.com' }]
+    });
   });
 
   it('omits days when none are chosen', () => {

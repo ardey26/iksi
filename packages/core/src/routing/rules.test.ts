@@ -230,6 +230,10 @@ describe('parseRules', () => {
 		expect(err([{ ...good, when: { os: ['beos'] } }])).toMatch(/^Rule 1: os/);
 		expect(err([{ ...good, when: { referrerHosts: [''] } }])).toMatch(/^Rule 1: referrerHosts/);
 	});
+	it.each(['countries', 'continents', 'devices', 'os', 'referrerHosts'])(
+		'rejects an empty %s list instead of matching everyone',
+		(key) => expect(err([{ ...good, when: { [key]: [] } }])).toMatch(new RegExp(`^Rule 1: ${key}`))
+	);
 	it('rejects bad time conditions', () => {
 		const t = { start: '09:00', end: '17:00', tz: 'Asia/Manila' };
 		const bad = (time: unknown) => err([{ ...good, when: { time } }]);

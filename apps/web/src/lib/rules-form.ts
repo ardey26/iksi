@@ -66,26 +66,35 @@ export function newRuleId(): string {
 
 const list = (s: string) => s.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean);
 
-function buildWhen(conditions: ConditionForm[]): Conditions {
+/** What an empty condition of each kind is missing, as the error names it. */
+const NOUNS: Record<Exclude<ConditionForm['kind'], 'time'>, string> = {
+  country: 'country',
+  continent: 'continent',
+  device: 'device',
+  os: 'operating system',
+  referrer: 'referrer'
+};
+
+/**
+ * A condition the user added but left empty is an error: dropping it would
+ * widen the rule to every visitor. Only conditions the user removed are absent.
+ */
+function buildWhen(conditions: ConditionForm[]): { ok: true; when: Conditions } | { ok: false; noun: string } {
   const when: Conditions = {};
   for (const c of conditions) {
-    if (c.kind === 'country') {
-      const v = list(c.values).map((s) => s.toUpperCase());
-      if (v.length) when.countries = v;
-    } else if (c.kind === 'continent') {
-      if (c.values.length) when.continents = c.values;
-    } else if (c.kind === 'device') {
-      if (c.values.length) when.devices = c.values;
-    } else if (c.kind === 'os') {
-      if (c.values.length) when.os = c.values;
-    } else if (c.kind === 'referrer') {
-      const v = list(c.values);
-      if (v.length) when.referrerHosts = v;
-    } else {
+    if (c.kind === 'time') {
       when.time = { start: c.start, end: c.end, tz: c.tz, ...(c.days.length ? { days: c.days } : {}) };
+      continue;
     }
+    const values = typeof c.values === 'string' ? list(c.values) : c.values;
+    if (values.length === 0) return { ok: false, noun: NOUNS[c.kind] };
+    if (c.kind === 'country') when.countries = (values as string[]).map((s) => s.toUpperCase());
+    else if (c.kind === 'continent') when.continents = c.values;
+    else if (c.kind === 'device') when.devices = c.values;
+    else if (c.kind === 'os') when.os = c.values;
+    else when.referrerHosts = values as string[];
   }
-  return when;
+  return { ok: true, when };
 }
 
 /** Builds rules from the editor state. The result always passes parseRules; its errors name the rule. */
@@ -93,7 +102,9 @@ export function fromForm(forms: RuleForm[]): { ok: true; rules: Rule[] } | { ok:
   const raw: unknown[] = [];
   for (let i = 0; i < forms.length; i++) {
     const f = forms[i];
-    const when = buildWhen(f.conditions);
+    const built = buildWhen(f.conditions);
+    if (!built.ok) return { ok: false, error: `Rule ${i + 1}: choose at least one ${built.noun}` };
+    const when = built.when;
     if (f.mode === 'split') {
       if (f.split.some((s) => !s.destination.trim())) {
         return { ok: false, error: `Rule ${i + 1}: add a destination to every split row` };
