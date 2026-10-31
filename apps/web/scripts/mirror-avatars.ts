@@ -3,7 +3,7 @@
 // Needs DATABASE_URL and the R2_* env vars. --dry-run writes nothing.
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '#lib/prisma.js';
 import { fetchImage, mirrorAvatars } from '../src/lib/server/mirror';
 import { prismaProfileMediaDb } from '../src/lib/server/profile-media';
 import { r2MediaStore } from '../src/lib/server/media-store';
@@ -11,7 +11,6 @@ import { r2MediaStore } from '../src/lib/server/media-store';
 const dryRun = process.argv.includes('--dry-run');
 const cdn = process.env.MEDIA_BASE_URL || 'https://cdn.iksi.app';
 
-const prisma = new PrismaClient();
 try {
 	const rows = await prisma.profile.findMany({
 		where: { avatarUrl: { not: null }, NOT: { avatarUrl: { startsWith: cdn } } },

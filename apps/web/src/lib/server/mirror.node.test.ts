@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import sharp from 'sharp';
-import { mirrorAvatars } from './mirror';
+import { fetchImage, mirrorAvatars } from './mirror';
+import { MAX_UPLOAD_BYTES, MediaError } from './media';
 import type { ProfileMediaDb } from './profile-media';
 import type { MediaStore } from './media-store';
 
@@ -90,5 +91,69 @@ describe('mirrorAvatars', () => {
 		const { deps } = setup(async () => png());
 		await mirrorAvatars([p(1, 'https://lh3.googleusercontent.com/a/abc=s96-c')], deps);
 		expect(deps.fetchImage).toHaveBeenCalledWith('https://lh3.googleusercontent.com/a/abc=s400-c');
+	});
+});
+
+function streamOf(chunks: Uint8Array[], onCancel?: () => void) {
+	let i = 0;
+	return new ReadableStream<Uint8Array>({
+		pull(c) {
+			if (i < chunks.length) c.enqueue(chunks[i++]);
+			else c.close();
+		},
+		cancel() {
+			onCancel?.();
+		}
+	});
+}
+
+describe('fetchImage', () => {
+	it('rejects an oversized content-length and cancels the body', async () => {
+		const cancel = vi.fn();
+		const res = new Response(streamOf([new Uint8Array(10)], cancel), {
+			headers: { 'content-length': String(MAX_UPLOAD_BYTES + 1) }
+		});
+		const err = await fetchImage('https://x.test/a', (async () => res) as typeof fetch).catch(
+			(e) => e
+		);
+		expect(err).toBeInstanceOf(MediaError);
+		expect(err.code).toBe('too_large');
+		expect(cancel).toHaveBeenCalled();
+	});
+
+	it('caps a chunked stream with no content-length and cancels the reader', async () => {
+		const cancel = vi.fn();
+		const chunk = new Uint8Array(MAX_UPLOAD_BYTES / 2 + 1);
+		const res = new Response(streamOf([chunk, chunk, chunk], cancel));
+		res.headers.delete('content-length');
+		const err = await fetchImage('https://x.test/a', (async () => res) as typeof fetch).catch(
+			(e) => e
+		);
+		expect(err.code).toBe('too_large');
+		expect(cancel).toHaveBeenCalled();
+	});
+
+	it('throws on a non-OK status', async () => {
+		const f = (async () => new Response('no', { status: 404 })) as typeof fetch;
+		await expect(fetchImage('https://x.test/a', f)).rejects.toThrow('HTTP 404');
+	});
+
+	it('rejects on a timeout and mirrorAvatars records it as failed', async () => {
+		const f = (async () => {
+			throw new DOMException('timed out', 'TimeoutError');
+		}) as typeof fetch;
+		await expect(fetchImage('https://x.test/a', f)).rejects.toThrow('timed out');
+		const { deps } = setup((url) => fetchImage(url, f));
+		const r = await mirrorAvatars([p(7, 'https://example.com/a.png')], deps);
+		expect(r.failed).toEqual([{ profileId: 7, reason: 'timed out' }]);
+	});
+
+	it('reassembles a multi-chunk stream byte for byte and passes an AbortSignal', async () => {
+		const parts = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5]), new Uint8Array([6])];
+		const f = vi.fn(async () => new Response(streamOf(parts)));
+		const out = await fetchImage('https://x.test/a', f as unknown as typeof fetch);
+		expect(Array.from(out)).toEqual([1, 2, 3, 4, 5, 6]);
+		const init = f.mock.calls[0][1] as RequestInit;
+		expect(init.signal).toBeInstanceOf(AbortSignal);
 	});
 });
