@@ -8,6 +8,40 @@ import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
 import { clientOf } from '#lib/server/client.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
+import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
+
+/** What anonymous dedupe needs to know about the row already holding a urlHash. */
+const DEDUPE_SELECT = {
+	shortURL: true,
+	userId: true,
+	rules: true,
+	passwordHash: true,
+	expiresAt: true,
+	maxClicks: true,
+	expiredAt: true,
+	permanent: true,
+	safeVerdict: true
+};
+
+/**
+ * Anonymous dedupe may only hand out a plain anonymous link. Rows created by
+ * signed-in users before urlHash stopped being stored for them still carry
+ * one, and an owner can add a password, rules or expiry (or change the
+ * destination) after the hash was written.
+ */
+function reusable(row) {
+	const rules = Array.isArray(row.rules) ? row.rules.length > 0 : row.rules != null;
+	return (
+		row.userId === null &&
+		!rules &&
+		row.passwordHash === null &&
+		row.expiresAt === null &&
+		row.maxClicks === null &&
+		row.expiredAt === null &&
+		!row.permanent &&
+		!(row.safeVerdict !== null && FLAGGED_VERDICTS.includes(row.safeVerdict))
+	);
+}
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -163,28 +197,28 @@ export const POST = async (event) => {
 				shortURL = await generateShortURL();
 				urlHashForStore = null;
 			} else {
-				// Anonymous: keep the global-dedupe behaviour.
+				// Anonymous: global dedupe, but only onto a plain anonymous link.
 				const isShortened = await prisma.longURL.findFirst({
 					where: { urlHash: urlHash },
-					select: { shortURL: true }
+					select: DEDUPE_SELECT
 				});
-				if (isShortened) {
+				if (isShortened && reusable(isShortened)) {
 					return new Response(JSON.stringify({ shortURL: isShortened.shortURL }), {
 						headers: { 'Content-Type': 'application/json' }
 					});
 				}
 				shortURL = await generateShortURL();
-				urlHashForStore = urlHash;
+				// urlHash is unique: a row that cannot be reused keeps it, so this one stores none.
+				urlHashForStore = isShortened ? null : urlHash;
 			}
 		}
 
 		const encodedURL = encodeURL(prefixedURL);
-
-		try {
-			const url = await prisma.longURL.create({
+		const insert = (urlHash) =>
+			prisma.longURL.create({
 				data: {
 					originalURL: encodedURL,
-					urlHash: urlHashForStore,
+					urlHash,
 					shortURL: shortURL,
 					userId: uid
 				},
@@ -197,39 +231,42 @@ export const POST = async (event) => {
 				}
 			});
 
-			// Fire safe-browsing async; failures never block shorten response
-			settleVerdictInBackground(url.shortURL, [prefixedURL]);
-
-
-			return new Response(JSON.stringify({
-				shortURL: url.shortURL,
-				link: {
-					id: url.id,
-					shortURL: url.shortURL,
-					originalURL: prefixedURL,
-					clickCount: url.clickCount,
-					createdAt: url.createdAt,
-					safeVerdict: url.safeVerdict
-				}
-			}), {
-				headers: { 'Content-Type': 'application/json' }
-			});
+		let url;
+		try {
+			url = await insert(urlHashForStore);
 		} catch (err) {
 			// Concurrent insert race: another request claimed this urlHash a moment ago.
-			// Look up what they got and return that instead of failing.
-			if (err.code === 'P2002' && urlHashForStore && err.meta?.target?.includes?.('urlHash')) {
-				const existing = await prisma.longURL.findFirst({
-					where: { urlHash: urlHashForStore },
-					select: { shortURL: true }
+			// Reuse what they got when it is plain; otherwise store this link without the hash.
+			if (err.code !== 'P2002' || !urlHashForStore || !err.meta?.target?.includes?.('urlHash')) throw err;
+			const existing = await prisma.longURL.findFirst({
+				where: { urlHash: urlHashForStore },
+				select: DEDUPE_SELECT
+			});
+			if (existing && reusable(existing)) {
+				return new Response(JSON.stringify({ shortURL: existing.shortURL }), {
+					headers: { 'Content-Type': 'application/json' }
 				});
-				if (existing) {
-					return new Response(JSON.stringify({ shortURL: existing.shortURL }), {
-						headers: { 'Content-Type': 'application/json' }
-					});
-				}
 			}
-			throw err;
+			url = await insert(null);
 		}
+
+		// Fire safe-browsing async; failures never block shorten response
+		settleVerdictInBackground(url.shortURL, [prefixedURL]);
+
+
+		return new Response(JSON.stringify({
+			shortURL: url.shortURL,
+			link: {
+				id: url.id,
+				shortURL: url.shortURL,
+				originalURL: prefixedURL,
+				clickCount: url.clickCount,
+				createdAt: url.createdAt,
+				safeVerdict: url.safeVerdict
+			}
+		}), {
+			headers: { 'Content-Type': 'application/json' }
+		});
 		
 		} catch (error) {
 		console.error('Error in shorten API:', error);
