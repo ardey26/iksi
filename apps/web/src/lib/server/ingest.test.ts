@@ -16,11 +16,12 @@ function ev(linkId: number, over: Record<string, unknown> = {}) {
   };
 }
 
-function fakeDb(existing: number[]) {
+function fakeDb(existing: number[], profiles: number[] = [], rowsIds: number[] = []) {
   const db = {
     existingLinkIds: vi.fn(async (ids: number[]) => new Set(ids.filter((i) => existing.includes(i)))),
-    insertClicks: vi.fn(async (_rows: ClickRow[]) => {}),
-    incrementClickCounts: vi.fn(async (_c: Map<number, number>) => {})
+    existingProfileIds: vi.fn(async (ids: number[]) => new Set(ids.filter((i) => profiles.includes(i)))),
+    existingRowIds: vi.fn(async (ids: number[]) => new Set(ids.filter((i) => rowsIds.includes(i)))),
+    writeBatch: vi.fn(async (_rows: ClickRow[], _c: Map<number, number>) => {})
   };
   return db satisfies IngestDb;
 }
@@ -30,7 +31,7 @@ describe('ingestClicks', () => {
     const db = fakeDb([3, 4]);
     const res = await ingestClicks([ev(3), ev(3), ev(4)], db);
     expect(res).toEqual({ accepted: 3, dropped: 0 });
-    const rows = db.insertClicks.mock.calls[0][0];
+    const rows = db.writeBatch.mock.calls[0][0];
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({
       urlId: 3,
@@ -43,7 +44,7 @@ describe('ingestClicks', () => {
       rowId: null
     });
     expect(rows[0].createdAt).toEqual(new Date(1_700_000_000_000));
-    expect(db.incrementClickCounts).toHaveBeenCalledWith(
+    expect(db.writeBatch.mock.calls[0][1]).toEqual(
       new Map([
         [3, 2],
         [4, 1]
@@ -55,8 +56,8 @@ describe('ingestClicks', () => {
     const db = fakeDb([3]);
     const res = await ingestClicks([ev(99), ev(3)], db);
     expect(res).toEqual({ accepted: 1, dropped: 1 });
-    expect(db.insertClicks.mock.calls[0][0]).toHaveLength(1);
-    expect(db.incrementClickCounts).toHaveBeenCalledWith(new Map([[3, 1]]));
+    expect(db.writeBatch.mock.calls[0][0]).toHaveLength(1);
+    expect(db.writeBatch.mock.calls[0][1]).toEqual(new Map([[3, 1]]));
   });
 
   it('drops malformed events without throwing', async () => {
@@ -70,7 +71,26 @@ describe('ingestClicks', () => {
     expect(await ingestClicks([], db)).toEqual({ accepted: 0, dropped: 0 });
     expect(await ingestClicks([null], db)).toEqual({ accepted: 0, dropped: 1 });
     expect(db.existingLinkIds).not.toHaveBeenCalled();
-    expect(db.insertClicks).not.toHaveBeenCalled();
-    expect(db.incrementClickCounts).not.toHaveBeenCalled();
+    expect(db.writeBatch).not.toHaveBeenCalled();
+  });
+
+  it('nulls deleted profile and row refs but still counts the click', async () => {
+    const db = fakeDb([3], [], []);
+    const res = await ingestClicks([ev(3, { surface: 'profile', profileId: 7, rowId: 9 })], db);
+    expect(res).toEqual({ accepted: 1, dropped: 0 });
+    expect(db.writeBatch.mock.calls[0][0][0]).toMatchObject({ profileId: null, rowId: null });
+    expect(db.writeBatch.mock.calls[0][1]).toEqual(new Map([[3, 1]]));
+  });
+
+  it('keeps profile and row refs that still exist', async () => {
+    const db = fakeDb([3], [7], [9]);
+    await ingestClicks([ev(3, { surface: 'profile', profileId: 7, rowId: 9 })], db);
+    expect(db.writeBatch.mock.calls[0][0][0]).toMatchObject({ profileId: 7, rowId: 9 });
+  });
+
+  it('rejects when writeBatch rejects so the batch is retried', async () => {
+    const db = fakeDb([3]);
+    db.writeBatch.mockRejectedValue(new Error('db down'));
+    await expect(ingestClicks([ev(3)], db)).rejects.toThrow('db down');
   });
 });

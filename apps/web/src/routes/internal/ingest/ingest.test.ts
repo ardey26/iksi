@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findMany = vi.hoisted(() => vi.fn());
 const createMany = vi.hoisted(() => vi.fn());
-const update = vi.hoisted(() => vi.fn());
+const updateMany = vi.hoisted(() => vi.fn());
+const profileFindMany = vi.hoisted(() => vi.fn());
+const rowFindMany = vi.hoisted(() => vi.fn());
 const $transaction = vi.hoisted(() => vi.fn());
 vi.mock('#lib/prisma.js', () => ({
-  prisma: { longURL: { findMany, update }, click: { createMany }, $transaction }
+  prisma: { longURL: { findMany, updateMany },
+    click: { createMany },
+    profile: { findMany: profileFindMany },
+    profileRow: { findMany: rowFindMany },
+    $transaction }
 }));
 
 import { POST } from './+server';
@@ -36,7 +42,9 @@ beforeEach(() => {
   process.env.EDGE_SECRET = 'edge';
   findMany.mockReset();
   createMany.mockReset();
-  update.mockReset();
+  updateMany.mockReset();
+  profileFindMany.mockReset().mockResolvedValue([]);
+  rowFindMany.mockReset().mockResolvedValue([]);
   $transaction.mockReset();
 });
 
@@ -72,5 +80,27 @@ describe('POST /internal/ingest', () => {
     expect(await res.json()).toEqual({ accepted: 1, dropped: 1 });
     expect(createMany).toHaveBeenCalledTimes(1);
     expect($transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('5xxs when the transaction rejects so the queue retries', async () => {
+    findMany.mockResolvedValue([{ id: 3 }]);
+    $transaction.mockRejectedValue(new Error('db down'));
+    const res = await call({ events: [good] }, { 'x-iksi-edge': 'edge' });
+    expect(res.status).toBeGreaterThanOrEqual(500);
+  });
+
+  it('accepts a click whose profile was deleted', async () => {
+    findMany.mockResolvedValue([{ id: 3 }]);
+    profileFindMany.mockResolvedValue([]);
+    $transaction.mockResolvedValue([]);
+    const res = await call(
+      { events: [{ ...good, surface: 'profile', profileId: 7, rowId: 9 }] },
+      { 'x-iksi-edge': 'edge' }
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ accepted: 1, dropped: 0 });
+    expect(createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ profileId: null, rowId: null })]
+    });
   });
 });

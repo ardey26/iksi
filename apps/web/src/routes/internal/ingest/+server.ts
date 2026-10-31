@@ -22,7 +22,13 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const { prisma } = await import('#lib/prisma.js');
-  const result = await ingestClicks(events, prismaIngestDb(prisma));
+  let result;
+  try {
+    result = await ingestClicks(events, prismaIngestDb(prisma));
+  } catch (err) {
+    console.error('ingest failed', err);
+    return new Response('ingest failed', { status: 500, headers: NO_STORE });
+  }
   return new Response(JSON.stringify(result), {
     headers: { ...NO_STORE, 'content-type': 'application/json' }
   });
