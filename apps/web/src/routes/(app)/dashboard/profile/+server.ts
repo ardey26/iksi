@@ -5,6 +5,8 @@ import { checkURL } from '#lib/server/safe-browsing.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { verifyAvatarUrl } from '#lib/server/avatar-url.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
+import { r2MediaStore } from '#lib/server/media-store.js';
+import { deleteMediaQuietly } from '#lib/server/profile-media.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 
@@ -37,17 +39,26 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       if (bio && bio.length > 200) return json({ error: 'Bio ≤200 chars' }, { status: 400 });
       if (accent && !HEX_RE.test(accent)) return json({ error: 'Accent must be #RRGGBB' }, { status: 400 });
 
+      const submitted = typeof avatarUrl === 'string' ? avatarUrl.trim() : '';
+      // The stored CDN url means "unchanged": keep avatarKey so the objects survive.
+      const keepUploaded = !!p.avatarKey && submitted !== '' && submitted === p.avatarUrl;
+
       let finalAvatarUrl: string | null = null;
-      if (typeof avatarUrl === 'string' && avatarUrl.trim().length > 0) {
+      if (keepUploaded) {
+        finalAvatarUrl = p.avatarUrl;
+      } else if (submitted.length > 0) {
         const check = await verifyAvatarUrl(avatarUrl);
         if (!check.ok) return json({ error: check.error }, { status: 400 });
         finalAvatarUrl = check.url;
       }
 
       const data: Record<string, unknown> = { displayName, bio, avatarUrl: finalAvatarUrl, accent };
+      const oldKey = keepUploaded ? null : p.avatarKey;
+      if (oldKey) data.avatarKey = null;
       if (validTheme(theme)) data.theme = theme;
       if (typeof publicClicks === 'boolean') data.publicClicks = publicClicks;
       await prisma.profile.update({ where: { id: p.id }, data });
+      await deleteMediaQuietly(r2MediaStore(), oldKey);
       invalidateUserCache(uid);
       return json({ ok: true, avatarUrl: finalAvatarUrl });
     }
