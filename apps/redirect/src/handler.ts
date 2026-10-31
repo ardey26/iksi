@@ -1,6 +1,11 @@
 import {
 	CANONICAL_HOST,
 	classifyPath,
+	continentOf,
+	decideLink,
+	parseUserAgent,
+	referrerHost,
+	resolveDestination,
 	surfaceFromQuery,
 	type ClickEvent,
 	type EventSink,
@@ -34,6 +39,8 @@ export interface HandlerDeps {
 	store: (env: Env) => LinkStore;
 	sink: (env: Env) => EventSink;
 	now: () => number;
+	/** Source of the 0..1 roll for weighted splits. */
+	random: () => number;
 }
 
 const DEFAULT_ORIGIN = 'https://www.iksi.app';
@@ -155,11 +162,14 @@ export function createHandler(deps: HandlerDeps): Handler {
 				}
 			});
 		}
-		if (resolution.kind === 'missing' || resolution.record.flagged) {
+		if (resolution.kind === 'missing') {
 			return passThrough(request, env, 'slug');
 		}
 
 		const { record } = resolution;
+		const now = deps.now();
+		// Refresh every stale record, not only redirected ones, so a link that was
+		// protected or expired returns to the edge once the origin says otherwise.
 		if (resolution.stale) {
 			scheduleRefresh(
 				path.slug,
@@ -167,8 +177,37 @@ export function createHandler(deps: HandlerDeps): Handler {
 				ctx
 			);
 		}
+		// Only a plain redirect is answered here; protected, expired and flagged
+		// links need the origin's pages and emit no click from the edge.
+		if (decideLink(record, now) !== 'redirect') {
+			return passThrough(request, env, 'slug');
+		}
+		const cf = (request as Request & { cf?: { country?: string } }).cf;
+		const agent = parseUserAgent(request.headers.get('user-agent'));
+		const country = cf?.country ?? null;
+		const { destination } = resolveDestination(
+			record.destination,
+			record.rules ?? [],
+			{
+				country,
+				continent: continentOf(country),
+				device: agent.device,
+				os: agent.os,
+				referrerHost: referrerHost(request.headers.get('referer')),
+				now
+			},
+			deps.random
+		);
+		// Built before the click is queued: a destination the URL parser rejects
+		// must not count a click for a redirect that never happens.
+		let location: string;
+		try {
+			location = new URL(destination).href;
+		} catch {
+			console.error(`unusable destination for slug ${path.slug}`);
+			return passThrough(request, env, 'slug');
+		}
 		if (request.method === 'GET') {
-			const cf = (request as Request & { cf?: { country?: string } }).cf;
 			const event: ClickEvent = {
 				v: 1,
 				linkId: record.id,
@@ -189,7 +228,7 @@ export function createHandler(deps: HandlerDeps): Handler {
 		return new Response(null, {
 			status: record.permanent ? 301 : 302,
 			headers: {
-				location: record.destination,
+				location,
 				'cache-control': 'private, no-store',
 				'x-iksi-route': 'slug'
 			}
@@ -215,7 +254,15 @@ function scheduleRefresh(slug: string, run: () => Promise<void>, ctx: ExecutionC
  * folded so an origin that normalizes either cannot be reached around the check.
  */
 function isInternalPath(pathname: string): boolean {
-	const p = pathname.replace(/\/{2,}/g, '/').toLowerCase();
+	let decoded: string;
+	try {
+		// Decoded the way SvelteKit decodes before routing, so %69nternal is /internal.
+		// A malformed escape fails closed as internal: SvelteKit would reject it anyway.
+		decoded = pathname.split('%25').map(decodeURI).join('%25');
+	} catch {
+		return true;
+	}
+	const p = decoded.replace(/\/{2,}/g, '/').toLowerCase();
 	return p === '/internal' || p.startsWith('/internal/');
 }
 
@@ -264,5 +311,6 @@ export const handleRequest: Handler = createHandler({
 	upstream: (request) => fetch(request),
 	store: (env) => kvLinkStore(env.LINKS),
 	sink: (env) => queueEventSink(env.CLICKS),
-	now: () => Date.now()
+	now: () => Date.now(),
+	random: () => Math.random()
 });

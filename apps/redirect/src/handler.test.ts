@@ -91,7 +91,13 @@ function deps(
 	store: LinkStore = memoryStore().store,
 	sink: EventSink = recordingSink().sink
 ): HandlerDeps {
-	return { upstream, store: () => store, sink: () => sink, now: () => NOW };
+	return {
+		upstream,
+		store: () => store,
+		sink: () => sink,
+		now: () => NOW,
+		random: () => 0.5
+	};
 }
 
 test('health is answered locally, origin is not called', async () => {
@@ -285,6 +291,19 @@ describe('visitor identity forwarded to origin', () => {
 	});
 });
 
+describe('malformed paths', () => {
+	test('a malformed escape gets the Worker 404 and is never forwarded', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response('origin'));
+		const res = await createHandler(deps(upstream))(
+			new Request('https://www.iksi.app/abc%ZZ'),
+			testEnv({ EDGE_SECRET: 's3cret' }),
+			ctx
+		);
+		expect(res.status).toBe(404);
+		expect(seen).toHaveLength(0);
+	});
+});
+
 describe('internal endpoints', () => {
 	const internal = (path: string, method: string, headers: Record<string, string> = {}) =>
 		new Request(`https://www.iksi.app${path}`, {
@@ -315,19 +334,24 @@ describe('internal endpoints', () => {
 		});
 	});
 
-	test.each(['/Internal/ingest', '//internal/ingest', '/internal/'])(
-		'%s is refused too',
-		async (path) => {
-			const { upstream, seen } = recordingUpstream(() => new Response('x'));
-			const res = await createHandler(deps(upstream))(
-				internal(path, 'POST'),
-				testEnv({ EDGE_SECRET: 's3cret' }),
-				ctx
-			);
-			expect(res.status).toBe(404);
-			expect(seen).toHaveLength(0);
-		}
-	);
+	test.each([
+		'/Internal/ingest',
+		'//internal/ingest',
+		'/internal/',
+		'/%69nternal/ping',
+		'/inte%72nal/ping',
+		'/%49nternal/ping',
+		'/%E0%A4%A/ping'
+	])('%s is refused too', async (path) => {
+		const { upstream, seen } = recordingUpstream(() => new Response('x'));
+		const res = await createHandler(deps(upstream))(
+			internal(path, 'POST'),
+			testEnv({ EDGE_SECRET: 's3cret' }),
+			ctx
+		);
+		expect(res.status).toBe(404);
+		expect(seen).toHaveLength(0);
+	});
 
 	test('no EDGE_SECRET configured refuses even an empty x-iksi-internal', async () => {
 		const { upstream, seen } = recordingUpstream(() => new Response('x'));
@@ -753,5 +777,140 @@ describe('POST /_edge/purge', () => {
 			ctx
 		);
 		expect(seen).toHaveLength(1);
+	});
+});
+
+describe('routing and decisions at the edge', () => {
+	const get = (path: string, init: RequestInit & { cf?: unknown } = {}) =>
+		new Request(`https://www.iksi.app${path}`, init as RequestInit);
+	const IPHONE =
+		'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+	const DESKTOP =
+		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+	const run = async (r: LinkRecord, req: Request, random = () => 0.5) => {
+		const { upstream, seen } = recordingUpstream(() => new Response('origin'));
+		const { store } = memoryStore({ QdM2whH: fresh(r) });
+		const { sink, events } = recordingSink();
+		const c = recordingCtx();
+		const res = await createHandler({ ...deps(upstream, store, sink), random })(
+			req,
+			testEnv(),
+			c.ctx
+		);
+		await c.settle();
+		return { res, seen, events };
+	};
+	const mobileRule: LinkRecord = {
+		...record,
+		rules: [
+			{
+				id: 'rule0001',
+				when: { devices: ['mobile'] },
+				destination: 'https://m.example.com/'
+			}
+		]
+	};
+
+	test('a device rule sends an iPhone to its destination', async () => {
+		const { res, events } = await run(
+			mobileRule,
+			get('/QdM2whH', { headers: { 'user-agent': IPHONE } })
+		);
+		expect(res.status).toBe(302);
+		expect(res.headers.get('location')).toBe('https://m.example.com/');
+		expect(events).toHaveLength(1);
+	});
+
+	test('a desktop UA falls to the default destination', async () => {
+		const { res } = await run(mobileRule, get('/QdM2whH', { headers: { 'user-agent': DESKTOP } }));
+		expect(res.headers.get('location')).toBe('https://example.com/a?x=1');
+	});
+
+	test('a continent rule matches cf.country', async () => {
+		const r: LinkRecord = {
+			...record,
+			rules: [
+				{
+					id: 'rule0002',
+					when: { continents: ['EU'] },
+					destination: 'https://eu.example.com/'
+				}
+			]
+		};
+		const { res } = await run(r, get('/QdM2whH', { cf: { country: 'DE' } }));
+		expect(res.headers.get('location')).toBe('https://eu.example.com/');
+	});
+
+	test('a 50/50 split follows random', async () => {
+		const r: LinkRecord = {
+			...record,
+			rules: [
+				{
+					id: 'rule0003',
+					when: {},
+					split: [
+						{ destination: 'https://a.example.com/', weight: 50 },
+						{ destination: 'https://b.example.com/', weight: 50 }
+					]
+				}
+			]
+		};
+		const first = await run(r, get('/QdM2whH'), () => 0.2);
+		const second = await run(r, get('/QdM2whH'), () => 0.7);
+		expect(first.res.headers.get('location')).toBe('https://a.example.com/');
+		expect(second.res.headers.get('location')).toBe('https://b.example.com/');
+	});
+
+	test.each([
+		['protected', { ...record, protected: true }],
+		['expired by time', { ...record, expiresAt: NOW - 1 }],
+		['expired flag', { ...record, expired: true }]
+	] as [string, LinkRecord][])('%s passes through with no click', async (_n, r) => {
+		const { res, seen, events } = await run(r, get('/QdM2whH'));
+		expect(await res.text()).toBe('origin');
+		expect(seen).toHaveLength(1);
+		expect(events).toHaveLength(0);
+	});
+
+	test('no UA, referer or cf resolves to the default, 302', async () => {
+		const { res } = await run(mobileRule, get('/QdM2whH'));
+		expect(res.status).toBe(302);
+		expect(res.headers.get('location')).toBe('https://example.com/a?x=1');
+	});
+
+	test('an unusable destination passes through with no click', async () => {
+		const bad: LinkRecord = {
+			...record,
+			rules: [{ id: 'rule0009', when: {}, destination: 'not a url' }]
+		};
+		const { res, seen, events } = await run(bad, get('/QdM2whH'));
+		expect(await res.text()).toBe('origin');
+		expect(seen).toHaveLength(1);
+		expect(events).toHaveLength(0);
+	});
+
+	test('a stale protected record passes through and schedules one refresh', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response('origin'));
+		const stale: LinkLookup = {
+			kind: 'found',
+			stored: { record: { ...record, protected: true }, storedAt: NOW - 24 * 3600 * 1000 }
+		};
+		const { store } = memoryStore({ QdM2whH: stale });
+		const { sink, events } = recordingSink();
+		const c = recordingCtx();
+		const res = await createHandler(deps(upstream, store, sink))(get('/QdM2whH'), testEnv(), c.ctx);
+		expect(await res.text()).toBe('origin');
+		expect(c.pending).toHaveLength(1);
+		await c.settle();
+		expect(events).toHaveLength(0);
+		expect(seen.map((r) => new URL(r.url).pathname)).toContain('/internal/resolve');
+	});
+
+	test('a permanent link redirects with 301', async () => {
+		const { res } = await run(
+			{ ...mobileRule, permanent: true },
+			get('/QdM2whH', { headers: { 'user-agent': IPHONE } })
+		);
+		expect(res.status).toBe(301);
 	});
 });
