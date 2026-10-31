@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 
   // Stream: page shell renders immediately; the KPI numbers arrive when the DB responds.
   const stats = (async () => {
-    const { prisma } = await import('$lib/prisma.js');
+    const { prisma } = await import('#lib/prisma.js');
     const rows = await prisma.$queryRaw<Array<{ views: number; clicks: number }>>`
       SELECT
         (SELECT COUNT(*)::int FROM "ProfileView" WHERE "profileId" = ${user.profileId}) AS views,

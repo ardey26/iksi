@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
-import { prisma } from '$lib/prisma.js';
-import { decodeURL } from '$lib/server/crypto.js';
-import { recordClick } from '$lib/server/tracking';
+import { prisma } from '#lib/prisma.js';
+import { decodeURL } from '#lib/server/crypto.js';
+import { recordClick } from '#lib/server/tracking.js';
 
 const redirectCache = new Map();
 const CACHE_TTL = 300000;
@@ -15,7 +15,7 @@ export const load = async (event) => {
 
 	const cached = redirectCache.get(slug);
 	if (cached && cached.expires > now) {
-		throw redirect(302, cached.url);
+		redirect(302, cached.url, { external: true });
 	}
 
 	const longURL = await prisma.longURL.findFirst({
@@ -24,7 +24,7 @@ export const load = async (event) => {
 	});
 
 	if (!longURL) {
-		throw error(404, 'not found');
+		error(404, 'not found');
 	}
 
 	const decodedURL = await decodeURL(longURL.originalURL);
@@ -53,5 +53,5 @@ export const load = async (event) => {
 		}
 	}
 
-	throw redirect(302, decodedURL);
+	redirect(302, decodedURL, { external: true });
 };

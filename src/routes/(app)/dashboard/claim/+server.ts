@@ -1,14 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { validateHandle } from '$lib/server/handles';
-import { verifyUserSession } from '$lib/server/user-auth';
-import { invalidateUserCache } from '$lib/server/user-cache';
+import { validateHandle } from '#lib/server/handles.js';
+import { verifyUserSession } from '#lib/server/user-auth.js';
+import { invalidateUserCache } from '#lib/server/user-cache.js';
 
 const CLAIM_LIMIT_PER_HOUR_IP = 3;
 const CLAIM_LIMIT_PER_HOUR_USER = 1;
 
 async function checkAndBump(key: string, max: number): Promise<boolean> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const now = new Date();
   const existing = await prisma.handleClaimRateLimit.findUnique({ where: { id: key } });
   if (existing && existing.resetAt > now) {
@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
   const userOk = await checkAndBump(`handle_claim:user:${uid}`, CLAIM_LIMIT_PER_HOUR_USER);
   if (!ipOk || !userOk) return json({ error: 'Too many attempts, wait an hour' }, { status: 429 });
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   try {
     await prisma.handle.create({ data: { handle: v.handle, userId: uid } });
     invalidateUserCache(uid);

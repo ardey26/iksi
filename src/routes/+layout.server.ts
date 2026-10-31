@@ -1,7 +1,7 @@
 import type { LayoutServerLoad } from './$types';
-import { verifyUserSession } from '$lib/server/user-auth';
-import { normalizeAvatarUrl } from '$lib/server/avatar-url';
-import { getCachedUser, setCachedUser, type CachedUserPayload } from '$lib/server/user-cache';
+import { verifyUserSession } from '#lib/server/user-auth.js';
+import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
+import { getCachedUser, setCachedUser, type CachedUserPayload } from '#lib/server/user-cache.js';
 
 // Public profile pages are edge-cached and identical for every viewer, so the
 // viewer's own user record must never be embedded in that HTML.
@@ -16,7 +16,7 @@ export const load: LayoutServerLoad = async ({ cookies, route }) => {
   const cached = getCachedUser(uid);
   if (cached !== undefined) return { user: cached };
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const row = await prisma.user.findUnique({
     where: { id: uid },
     select: {

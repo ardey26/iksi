@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 // Get initial theme from localStorage or default to 'dark'
 function getInitialTheme() {
@@ -24,7 +24,7 @@ export const theme = writable(getInitialTheme());
 // Theme toggle function
 let switchTimer;
 export function toggleTheme() {
-	theme.update(currentTheme => {
+	theme.update((currentTheme) => {
 		const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 
 		if (browser) {
@@ -45,7 +45,7 @@ export function toggleTheme() {
 
 // Initialize theme on page load
 if (browser) {
-	theme.subscribe(value => {
+	theme.subscribe((value) => {
 		document.documentElement.setAttribute('data-theme', value);
 		localStorage.setItem('theme', value);
 	});

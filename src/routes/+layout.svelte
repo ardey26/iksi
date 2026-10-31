@@ -1,10 +1,10 @@
 <script>
   import '../app.css';
   import { ThemeToggle, SEO } from '../lib/components';
-  import UserMenu from '$lib/components/UserMenu.svelte';
-  import { page, navigating } from '$app/stores';
+  import UserMenu from '#lib/components/UserMenu.svelte';
+  import { page, navigating } from '$app/state';
 
-  export let data;
+  let { data, children } = $props();
 
   const HOMEPAGE_STRUCTURED_DATA = {
     '@context': 'https://schema.org',
@@ -64,13 +64,13 @@
     };
   }
 
-  $: seo = seoForRoute($page.url.pathname, $page.url.host);
-  $: isAdminSurface = ($page.url.host === 'admin.iksi.app' || $page.url.host === 'admin.localhost' || $page.url.host.startsWith('admin.localhost:')) || $page.url.pathname.startsWith('/admin');
-  $: onLoginPage = $page.url.pathname === '/login';
-  $: isProfilePage = $page.url.pathname.startsWith('/@');
+  const seo = $derived(seoForRoute(page.url.pathname, page.url.host));
+  const isAdminSurface = $derived(page.url.host === 'admin.iksi.app' || page.url.host === 'admin.localhost' || page.url.host.startsWith('admin.localhost:') || page.url.pathname.startsWith('/admin'));
+  const onLoginPage = $derived(page.url.pathname === '/login');
+  const isProfilePage = $derived(page.url.pathname.startsWith('/@'));
   // Public homepage + login use a full-height centered layout.
   // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
-  $: centerContent = $page.url.pathname === '/' || onLoginPage;
+  const centerContent = $derived(page.url.pathname === '/' || onLoginPage);
 
   // Theme is resolved by the inline script in app.html before first paint and
   // kept in sync by $lib/stores/theme.js. Nothing to do on mount.
@@ -93,42 +93,39 @@
 {/if}
 
 <!-- Top-of-page navigation progress bar; only visible during a route change -->
-{#if $navigating}
+{#if navigating.to}
   <div class="nav-progress" aria-hidden="true"></div>
 {/if}
 
-<style>
-  .nav-progress {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 2px;
-    background: var(--accent);
-    z-index: 100;
-    animation: nav-progress-slide 900ms ease-in-out infinite;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
-  }
-  @keyframes nav-progress-slide {
-    0%   { left: -30%; width: 30%; }
-    50%  { left: 40%;  width: 30%; }
-    100% { left: 100%; width: 30%; }
-  }
-</style>
-
 {#if isAdminSurface}
-  <slot />
+  {@render children()}
 {:else if isProfilePage}
   <!-- Profile pages render their own themed background + no site chrome -->
-  <slot />
+  {@render children()}
 {:else}
   <div class="min-h-screen flex flex-col relative" style="background: var(--bg);">
     <!-- Brand mark: top-left -->
-    <a href="/" class="fixed top-6 left-6 z-50 flex items-center gap-2 hover:opacity-70 transition-opacity">
-      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" style="color: var(--text-muted);">
-        <circle cx="12" cy="12" r="11" fill="currentColor" />
-        <g transform="rotate(-45 12 12)" stroke="var(--bg)" stroke-width="1.5" fill="none">
-          <rect x="4" y="10" width="7" height="4" rx="2" />
-          <rect x="13" y="10" width="7" height="4" rx="2" />
+
+    <a
+      href="/"
+      class="fixed top-6 left-6 z-50 flex items-center gap-2 hover:opacity-70 transition-opacity"
+    >
+      <svg
+        class="w-5 h-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        style="color: var(--text-muted);"
+      >
+        <circle cx="12" cy="12" r="11" fill="currentColor"></circle>
+
+        <g
+          transform="rotate(-45 12 12)"
+          stroke="var(--bg)"
+          stroke-width="1.5"
+          fill="none"
+        >
+          <rect x="4" y="10" width="7" height="4" rx="2"></rect>
+          <rect x="13" y="10" width="7" height="4" rx="2"></rect>
         </g>
       </svg>
       <span class="text-sm font-medium tracking-tight" style="color: var(--text-muted);">iksi</span>
@@ -151,13 +148,39 @@
     </div>
 
     {#if centerContent}
-      <main class="flex-1 flex items-center justify-center px-4">
-        <slot />
-      </main>
+      <main
+        class="flex-1 flex items-center justify-center px-4"
+      >{@render children()}</main>
     {:else}
-      <main class="flex-1 flex flex-col pt-24 pb-24 px-4">
-        <slot />
-      </main>
+      <main class="flex-1 flex flex-col pt-24 pb-24 px-4">{@render children()}</main>
     {/if}
   </div>
 {/if}
+
+<style>
+  .nav-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: var(--accent);
+    z-index: 100;
+    animation: nav-progress-slide 900ms ease-in-out infinite;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  @keyframes nav-progress-slide {
+    0% {
+      left: -30%;
+      width: 30%;
+    }
+    50% {
+      left: 40%;
+      width: 30%;
+    }
+    100% {
+      left: 100%;
+      width: 30%;
+    }
+  }
+</style>

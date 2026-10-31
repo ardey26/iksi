@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
-import { dev } from '$app/environment';
-import * as twitter from '$lib/server/twitter-oauth';
-import * as google from '$lib/server/google-oauth';
+import { dev } from '$app/env';
+import * as twitter from '#lib/server/twitter-oauth.js';
+import * as google from '#lib/server/google-oauth.js';
 
 const cookieOpts = () => ({
   path: '/',
@@ -23,7 +23,9 @@ export const actions: Actions = {
     cookies.set('oauth_pkce', verifier, cookieOpts());
     cookies.set('oauth_state', state, cookieOpts());
 
-    throw redirect(302, twitter.buildAuthorizeURL({ clientId, redirectUri, state, codeChallenge: challenge }));
+    redirect(302, twitter.buildAuthorizeURL({ clientId, redirectUri, state, codeChallenge: challenge }), {
+      external: ['https://twitter.com']
+    });
   },
 
   google: async ({ cookies }) => {
@@ -36,6 +38,8 @@ export const actions: Actions = {
     cookies.set('oauth_pkce', verifier, cookieOpts());
     cookies.set('oauth_state', state, cookieOpts());
 
-    throw redirect(302, google.buildAuthorizeURL({ clientId, redirectUri, state, codeChallenge: challenge }));
+    redirect(302, google.buildAuthorizeURL({ clientId, redirectUri, state, codeChallenge: challenge }), {
+      external: ['https://accounts.google.com']
+    });
   }
 };

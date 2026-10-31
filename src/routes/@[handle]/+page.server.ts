@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { decodeURL } from '$lib/server/crypto.js';
-import { normalizeAvatarUrl } from '$lib/server/avatar-url';
+import { decodeURL } from '#lib/server/crypto.js';
+import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 
 // Popular social domains we recognize on row destinations — used to build
 // Schema.org `sameAs` entries so Google can associate the profile with the
@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
   const raw = params.handle;
   const handle = (raw.startsWith('@') ? raw.slice(1) : raw).toLowerCase();
 
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   // Start from Profile and filter through the relation. Prisma 4 issues one
   // query per nested relation, so this is 3 round trips (profile, rows, link)
   // instead of 5 (handle, user, profile, rows, link).
@@ -61,7 +61,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
     }
   });
 
-  if (!p) throw error(404, 'not found');
+  if (!p) error(404, 'not found');
 
   // Decode originalURL once per row so we can (a) compute the social sameAs
   // list for JSON-LD and (b) not send the encrypted ciphertext to the client.
@@ -86,7 +86,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
   // function once the response is sent, so a fire-and-forget write here was
   // silently dropped. With the function co-located with the DB this is one
   // short round trip, and with edge caching it only runs on cache misses.
-  const { recordProfileView } = await import('$lib/server/tracking');
+  const { recordProfileView } = await import('#lib/server/tracking.js');
   await recordProfileView(p.id, { request } as any);
 
   setHeaders({ 'cache-control': CACHE_CONTROL });

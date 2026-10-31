@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { decodeURL } from '$lib/server/crypto.js';
+import { decodeURL } from '#lib/server/crypto.js';
 
 // Cap the initial dashboard load. Fetching + decoding every link a user has
 // ever created scales linearly with account age; on top of that, any
@@ -11,7 +11,7 @@ const MAX_LIMIT = 500;
 
 export const load: PageServerLoad = async ({ parent, url }) => {
   const { user } = await parent();
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
 
   const limitParam = Number(url.searchParams.get('limit'));
   const limit = Number.isInteger(limitParam) && limitParam > 0 && limitParam <= MAX_LIMIT

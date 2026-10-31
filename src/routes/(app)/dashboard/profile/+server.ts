@@ -1,10 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { verifyUserSession } from '$lib/server/user-auth';
-import { checkURL } from '$lib/server/safe-browsing';
-import { decodeURL } from '$lib/server/crypto.js';
-import { verifyAvatarUrl } from '$lib/server/avatar-url';
-import { invalidateUserCache } from '$lib/server/user-cache';
+import { verifyUserSession } from '#lib/server/user-auth.js';
+import { checkURL } from '#lib/server/safe-browsing.js';
+import { decodeURL } from '#lib/server/crypto.js';
+import { verifyAvatarUrl } from '#lib/server/avatar-url.js';
+import { invalidateUserCache } from '#lib/server/user-cache.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 
@@ -18,7 +18,7 @@ function validTheme(v: unknown): v is string {
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 async function requireProfile(uid: number) {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const p = await prisma.profile.findUnique({ where: { userId: uid } });
   if (!p) throw new Error('No profile');
   return { prisma, p };

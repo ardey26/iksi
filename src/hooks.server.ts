@@ -1,7 +1,7 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
-import { prisma } from '$lib/prisma.js';
-import { decodeURL } from '$lib/server/crypto.js';
+import { prisma } from '#lib/prisma.js';
+import { decodeURL } from '#lib/server/crypto.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
@@ -50,7 +50,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     // 3. Special case: "admin" as a custom short link on the public host.
     if (!isAdminHost && event.url.pathname === '/admin') {
         const decodedURL = await getAdminSlugURL();
-        if (decodedURL) throw redirect(302, decodedURL);
+        if (decodedURL) redirect(302, decodedURL, { external: true });
     }
 
     // 4. Block direct GETs to /api on the public host, EXCEPT for public

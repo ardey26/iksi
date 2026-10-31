@@ -1,13 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { checkURL } from '$lib/server/safe-browsing';
+import { checkURL } from '#lib/server/safe-browsing.js';
 
 export const GET: RequestHandler = async ({ request }) => {
   const auth = request.headers.get('authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) return new Response('Unauthorized', { status: 401 });
 
-  const { prisma } = await import('$lib/prisma.js');
-  const { decodeURL } = await import('$lib/server/crypto.js');
+  const { prisma } = await import('#lib/prisma.js');
+  const { decodeURL } = await import('#lib/server/crypto.js');
   const cutoff = new Date(Date.now() - 86400000);
 
   const links = await prisma.longURL.findMany({

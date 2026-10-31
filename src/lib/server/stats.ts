@@ -14,7 +14,7 @@ function startOfToday(): Date {
 }
 
 export async function getKPIs(): Promise<KPIs> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const today = startOfToday();
   const noBots = { NOT: { device: 'bot' } };
 
@@ -41,7 +41,7 @@ export type TimeSeriesOpts = {
 };
 
 export async function getTimeSeries(opts: TimeSeriesOpts): Promise<TimeSeries> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const end = opts.endDate ?? new Date();
   // Truncate to UTC midnight to avoid timezone-sensitive behavior
   const endDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
@@ -103,7 +103,7 @@ export type TopLink = {
 export type TopLinksOpts = { sort: 'clicks' | 'created' };
 
 export async function getTopLinks(opts: TopLinksOpts): Promise<TopLink[]> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   if (opts.sort === 'created') {
     return prisma.$queryRaw<TopLink[]>(Prisma.sql`
       SELECT "shortURL", "originalURL", "clickCount", "createdAt"
@@ -123,7 +123,7 @@ export async function getTopLinks(opts: TopLinksOpts): Promise<TopLink[]> {
 export type ReferrerRow = { referrer: string | null; count: number; isDirect?: boolean };
 
 export async function getReferrerBreakdown(opts: { includeBots: boolean }): Promise<ReferrerRow[]> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const botFilter = opts.includeBots ? Prisma.empty : Prisma.sql`AND "device" IS DISTINCT FROM 'bot'`;
 
   const top = await prisma.$queryRaw<Array<{ referrer: string; count: number }>>(Prisma.sql`
@@ -150,7 +150,7 @@ export async function getReferrerBreakdown(opts: { includeBots: boolean }): Prom
 export type CountryRow = { country: string | null; count: number; isOther?: boolean };
 
 export async function getCountryBreakdown(opts: { includeBots: boolean }): Promise<CountryRow[]> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const botFilter = opts.includeBots ? Prisma.empty : Prisma.sql`AND "device" IS DISTINCT FROM 'bot'`;
 
   const top = await prisma.$queryRaw<Array<{ country: string | null; count: number }>>(Prisma.sql`
@@ -188,7 +188,7 @@ export type UABreakdown = {
 };
 
 export async function getUABreakdown(opts: { includeBots: boolean }): Promise<UABreakdown> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const botFilter = opts.includeBots ? Prisma.empty : Prisma.sql`AND "device" IS DISTINCT FROM 'bot'`;
 
   const browsers = await prisma.$queryRaw<Array<{ browser: string | null; count: number }>>(Prisma.sql`
@@ -217,7 +217,7 @@ export type ProfileStats = {
 };
 
 export async function getProfileStats(profileId: number, opts: { includeBots: boolean }): Promise<ProfileStats> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const botFilter = opts.includeBots ? Prisma.empty : Prisma.sql`AND "device" IS DISTINCT FROM 'bot'`;
 
   const [viewsRow] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
@@ -246,7 +246,7 @@ export async function getProfileTimeSeries(
   profileId: number,
   opts: { days: 7 | 30 | 90; endDate?: Date; includeBots?: boolean }
 ): Promise<ProfileTimeSeries> {
-  const { prisma } = await import('$lib/prisma.js');
+  const { prisma } = await import('#lib/prisma.js');
   const end = opts.endDate ?? new Date();
   const endDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
   const start = new Date(endDay);
