@@ -1,26 +1,18 @@
 <script>
   import { enhance } from '$app/forms';
   import { page } from '$app/state';
+  import LinkNotice from '#lib/components/LinkNotice.svelte';
+  import { PASSWORD_MAX } from '#lib/password-limits.js';
 
   let { data, form } = $props();
 
   let submitting = $state(false);
 
-  const TITLES = {
-    preview: 'Link preview',
-    password: 'Password required',
-    expired: 'Link expired',
-    flagged: 'Link disabled'
-  };
-
-  let title = $derived(`${TITLES[data.view]} | iksi`);
+  let title = $derived(
+    `${data.view === 'password' ? 'Password required' : data.flagged ? 'Link disabled' : data.expired ? 'Link expired' : 'Link preview'} | iksi`
+  );
   let error = $derived(form?.error ?? data.error ?? null);
 
-  const VERDICTS = {
-    malware: 'malware',
-    phishing: 'phishing',
-    unwanted: 'unwanted software'
-  };
 </script>
 
 <svelte:head>
@@ -30,7 +22,9 @@
 
 <div class="flex-1 flex items-center justify-center">
   <div class="w-full max-w-[500px] text-center">
-    {#if data.view === 'preview'}
+    {#if data.view === 'preview' && (data.flagged || data.expired)}
+      <LinkNotice view={data.flagged ? 'flagged' : 'expired'} verdict={data.flagged} host={data.host} />
+    {:else if data.view === 'preview'}
       <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
         {data.destination === null ? 'Password protected' : data.host}
       </h1>
@@ -46,11 +40,12 @@
         {#if data.destination === null}
           The destination is hidden until you unlock the link.
         {:else if data.hasRules}
-          Where you land may depend on your location, device or the time.
+          This link may send some visitors elsewhere
         {/if}
       </p>
       <a
         href={page.url.pathname.replace(/\+$/, '')}
+        data-sveltekit-reload
         class="inline-flex items-center justify-center mt-6 px-5 text-sm font-medium rounded-lg transition-opacity hover:opacity-90"
         style="background: var(--text-primary); color: var(--bg); height: 44px;"
       >
@@ -82,7 +77,7 @@
           name="password"
           autocomplete="current-password"
           placeholder="Password"
-          maxlength="200"
+          maxlength={PASSWORD_MAX}
           required
           class="w-full outline-none transition-all py-4 px-5 text-lg rounded-xl"
           style="background: var(--surface); border: 1px solid {error ? 'var(--error)' : 'var(--border)'}; color: var(--text-primary); transition-duration: var(--duration-normal); min-height: 60px;"
@@ -97,23 +92,6 @@
           Continue
         </button>
       </form>
-    {:else if data.view === 'expired'}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
-        This link has expired.
-      </h1>
-      <a href="/" class="inline-block mt-6 text-sm hover:opacity-70 transition-opacity" style="color: var(--accent);">
-        Back to iksi
-      </a>
-    {:else if data.view === 'flagged'}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
-        Link disabled
-      </h1>
-      <p class="mt-2 text-sm" style="color: var(--text-muted);">
-        This link was flagged by Google Safe Browsing as {VERDICTS[data.verdict] ?? data.verdict} and has been disabled.
-      </p>
-      <a href="/" class="inline-block mt-6 text-sm hover:opacity-70 transition-opacity" style="color: var(--accent);">
-        Back to iksi
-      </a>
     {/if}
   </div>
 </div>

@@ -2,6 +2,7 @@ import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import bcrypt from 'bcrypt';
 import { waitUntil } from '@vercel/functions';
 import { classifyPath, decideLink, resolveDestination, surfaceFromQuery } from '@iksi/core';
+import { PASSWORD_MAX } from '#lib/password-limits.js';
 import { prisma } from '#lib/prisma.js';
 import { rateLimit } from '#lib/rateLimit.js';
 import { decodeURL } from '#lib/server/crypto.js';
@@ -12,7 +13,6 @@ import { recordClick } from '#lib/server/tracking.js';
 
 const UNLOCK_MAX = 10;
 const UNLOCK_WINDOW_MS = 10 * 60 * 1000;
-const MAX_PASSWORD_LENGTH = 200;
 
 const SELECT = {
   id: true,
@@ -24,11 +24,6 @@ const SELECT = {
   passwordHash: true,
   permanent: true
 } as const;
-
-/** Where the hook should send a non-200 status for a rendered view (load cannot set one). */
-function setViewStatus(event: RequestEvent, status: number) {
-  (event.locals as Record<string, unknown>).viewStatus = status;
-}
 
 function slugOf(event: RequestEvent, mode: 'redirect' | 'preview'): string {
   const path = classifyPath(event.url.pathname);
@@ -70,7 +65,8 @@ function followLink(
     Math.random
   );
   const target = normalize(destination) ?? record.destination;
-  if (event.request.method !== 'HEAD') {
+  // Hover preloads fetch the data endpoint; they must not count as visits.
+  if (event.request.method !== 'HEAD' && !event.isDataRequest) {
     const { surface, profileId, rowId } = surfaceFromQuery(event.url.searchParams);
     const opts =
       surface === 'profile'
@@ -88,22 +84,28 @@ export const load = async (event: RequestEvent) => {
   const now = Date.now();
   const { row, record } = await loadLink(path.slug);
 
+  const decision = decideLink(record, now);
+
   if (path.mode === 'preview') {
     return {
       view: 'preview' as const,
       host: record.protected ? '' : new URL(record.destination).host,
-      destination: record.protected ? null : record.destination,
-      hasRules: (record.rules ?? []).length > 0
+      destination: decision === 'redirect' || decision === 'protected' ? (record.protected ? null : record.destination) : null,
+      hasRules: (record.rules ?? []).length > 0,
+      flagged: decision === 'flagged' ? (row.safeVerdict as string) : null,
+      expired: decision === 'expired'
     };
   }
 
-  switch (decideLink(record, now)) {
+  switch (decision) {
     case 'flagged':
-      setViewStatus(event, 403);
-      return { view: 'flagged' as const, verdict: row.safeVerdict as string };
+      error(403, {
+        message: 'This link has been disabled.',
+        view: 'flagged',
+        verdict: row.safeVerdict as string
+      });
     case 'expired':
-      setViewStatus(event, 410);
-      return { view: 'expired' as const };
+      error(410, { message: 'This link has expired.', view: 'expired' });
     case 'protected':
       return { view: 'password' as const, error: null };
     default:
@@ -133,7 +135,7 @@ export const actions = {
     const ok =
       typeof given === 'string' &&
       given.length > 0 &&
-      given.length <= MAX_PASSWORD_LENGTH &&
+      given.length <= PASSWORD_MAX &&
       (await bcrypt.compare(given, row.passwordHash));
     if (!ok) return fail(400, { error: 'Wrong password' });
 

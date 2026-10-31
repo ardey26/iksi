@@ -46,7 +46,7 @@ async function run(path: string, headers: Record<string, string> = {}, method = 
     return { data, event } as { data: any; event: typeof event; redirect?: undefined; error?: undefined };
   } catch (e: any) {
     if (e?.location) return { redirect: { status: e.status, location: e.location }, event } as any;
-    if (typeof e?.status === 'number') return { error: { status: e.status }, event } as any;
+    if (typeof e?.status === 'number') return { error: { status: e.status, body: e.body }, event } as any;
     throw e;
   }
 }
@@ -86,6 +86,13 @@ describe('redirect', () => {
     findUnique.mockResolvedValue({ ...ROW, permanent: true });
     const r = await run('/AbC');
     expect(r.redirect?.status).toBe(301);
+  });
+
+  it('does not record a click for a data request (hover preload)', async () => {
+    const event: any = makeEvent('/AbC');
+    event.isDataRequest = true;
+    await expect(load(event)).rejects.toMatchObject({ status: 302 });
+    expect(recordClick).not.toHaveBeenCalled();
   });
 
   it('does not record a click for HEAD', async () => {
@@ -137,27 +144,28 @@ describe('redirect', () => {
 });
 
 describe('views', () => {
-  it('shows flagged with 403, no click and no destination', async () => {
+  it('throws 403 for flagged, no click and no destination', async () => {
     findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'phishing' });
     const r = await run('/AbC');
-    expect(r.data).toEqual({ view: 'flagged', verdict: 'phishing' });
-    expect(r.event.locals.viewStatus).toBe(403);
+    expect(r.error.status).toBe(403);
+    expect(r.error.body).toMatchObject({ view: 'flagged', verdict: 'phishing' });
+    expect(JSON.stringify(r.error.body)).not.toContain('example.com');
     expect(recordClick).not.toHaveBeenCalled();
   });
 
-  it('shows expired with 410 when expiresAt is past', async () => {
+  it('throws 410 for expired when expiresAt is past', async () => {
     findUnique.mockResolvedValue({ ...ROW, expiresAt: new Date(Date.now() - 1000) });
     const r = await run('/AbC');
-    expect(r.data).toEqual({ view: 'expired' });
-    expect(r.event.locals.viewStatus).toBe(410);
+    expect(r.error.status).toBe(410);
+    expect(r.error.body).toMatchObject({ view: 'expired', message: 'This link has expired.' });
     expect(recordClick).not.toHaveBeenCalled();
   });
 
-  it('shows expired with 410 when expiredAt is set', async () => {
+  it('throws 410 when expiredAt is set', async () => {
     findUnique.mockResolvedValue({ ...ROW, expiredAt: new Date() });
     const r = await run('/AbC');
-    expect(r.data).toEqual({ view: 'expired' });
-    expect(r.event.locals.viewStatus).toBe(410);
+    expect(r.error.status).toBe(410);
+    expect(r.error.body).toMatchObject({ view: 'expired' });
   });
 
   it('shows the password view for a protected link without recording a click', async () => {
@@ -186,7 +194,9 @@ describe('preview', () => {
       view: 'preview',
       host: 'example.com',
       destination: 'https://example.com/a?b=1',
-      hasRules: false
+      hasRules: false,
+      flagged: null,
+      expired: false
     });
     expect(recordClick).not.toHaveBeenCalled();
   });
@@ -205,6 +215,18 @@ describe('preview', () => {
     expect(r.data.view).toBe('preview');
     expect(r.data.destination).toBeNull();
     expect(JSON.stringify(r.data)).not.toContain('example.com');
+  });
+
+  it('marks a flagged link with its verdict and withholds the destination', async () => {
+    findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'malware' });
+    const r = await run('/AbC+');
+    expect(r.data).toMatchObject({ view: 'preview', flagged: 'malware', expired: false, host: 'example.com', destination: null });
+  });
+
+  it('marks an expired link and withholds the destination', async () => {
+    findUnique.mockResolvedValue({ ...ROW, expiredAt: new Date() });
+    const r = await run('/AbC+');
+    expect(r.data).toMatchObject({ view: 'preview', flagged: null, expired: true, destination: null });
   });
 
   it('404s an unknown slug', async () => {
@@ -226,6 +248,11 @@ describe('unlock', () => {
 
   it('rejects a missing password field', async () => {
     const { result } = await unlock('/AbC', null);
+    expect(result.status).toBe(400);
+  });
+
+  it('rejects a password over 128 characters without comparing', async () => {
+    const { result } = await unlock('/AbC', 'a'.repeat(129));
     expect(result.status).toBe(400);
   });
 

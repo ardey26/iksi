@@ -2,14 +2,13 @@ import bcrypt from 'bcrypt';
 import { parseRules, type Rule } from '@iksi/core';
 import type { Prisma } from '@prisma/client';
 import { encodeURL } from '#lib/server/crypto.js';
+import { PASSWORD_MIN, PASSWORD_MAX } from '#lib/password-limits.js';
 import { addPrefix, isValidURLServer } from '#lib/utils/urlValidation.js';
 
 const MAX_URL = 2048;
 const MAX_CLICKS_CAP = 1_000_000_000;
 const INVALID_URL = 'Enter a valid URL';
 const BCRYPT_COST = 10;
-const PASSWORD_MIN = 4;
-const PASSWORD_MAX = 128;
 
 export interface SettingsInput {
   destination?: string;
