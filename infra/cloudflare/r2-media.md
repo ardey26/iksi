@@ -7,6 +7,8 @@ Avatars are uploaded to the `iksi-media` bucket and served from `https://cdn.iks
 - Section 2.6: `iksi-media` bucket exists, `cdn.iksi.app` is connected, `r2.dev` stays **disabled**.
 - Section 2.7: the R2 token is scoped to `iksi-backups` and `iksi-media`.
 - Section 4.2: Vercel has `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_MEDIA_BUCKET=iksi-media` and `MEDIA_BASE_URL=https://cdn.iksi.app` for Production and Preview.
+- Section 3: the two `prisma migrate resolve` commands were run. If skipped, the deploy workflow's "Database migrations" step fails trying to re-run them; run section 3, then re-run the workflow.
+- Section 5: the GitHub `production` environment and its secrets exist, including `DATABASE_SESSION_URL`. Without them the migration step cannot connect.
 
 ## 2. Migration
 
@@ -24,7 +26,7 @@ npx -y pnpm@10.34.6 --filter @iksi/web exec prisma migrate deploy
 Light and dark themes, at 375 px and 1280 px:
 
 1. Upload an avatar. The layout must not shift while it uploads.
-2. Trigger an upload error. The error line's space is reserved, so nothing jumps.
+2. Trigger an upload error: upload a file over 4 MB, or a text file renamed to `.png`. The error line's space is reserved, so nothing jumps.
 
 ## 4. Verify after deploy
 
@@ -40,7 +42,18 @@ Light and dark themes, at 375 px and 1280 px:
 
 ## 5. Mirror existing avatars
 
-Copies avatars hosted elsewhere into R2. It needs `DATABASE_URL` (the Supabase session-pooler URL, as in `infra/SETUP.md` section 3) and the `R2_*` variables from section 4.2 in the shell.
+Copies avatars hosted elsewhere into R2. Set these in your shell first (placeholders below; `DATABASE_SESSION_URL` is the session-pooler URL from `infra/SETUP.md` section 3). Do not paste the real values anywhere else.
+
+```sh
+export DATABASE_URL='<DATABASE_SESSION_URL>'
+export DIRECT_URL='<DATABASE_SESSION_URL>'
+export R2_ACCOUNT_ID='<account id>'
+export R2_ACCESS_KEY_ID='<access key id>'
+export R2_SECRET_ACCESS_KEY='<secret access key>'
+# Optional, defaults shown:
+# export R2_MEDIA_BUCKET='iksi-media'
+# export MEDIA_BASE_URL='https://cdn.iksi.app'
+```
 
 1. Dry run, then read the JSON report:
 
