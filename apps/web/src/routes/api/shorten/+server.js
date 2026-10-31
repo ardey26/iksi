@@ -7,7 +7,7 @@ import { encodeURL } from '#lib/server/crypto.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
 import { clientOf } from '#lib/server/client.js';
-import { settleVerdict } from '#lib/server/link-verdict.js';
+import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -198,10 +198,8 @@ export const POST = async (event) => {
 			});
 
 			// Fire safe-browsing async; failures never block shorten response
-			const verdictPromise = settleVerdict(url.shortURL, prefixedURL).catch(() => {});
-			if (event.platform?.context?.waitUntil) {
-				event.platform.context.waitUntil(verdictPromise);
-			}
+			settleVerdictInBackground(url.shortURL, prefixedURL);
+
 
 			return new Response(JSON.stringify({
 				shortURL: url.shortURL,

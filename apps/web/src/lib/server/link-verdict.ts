@@ -1,5 +1,6 @@
 import { prisma } from '#lib/prisma.js';
 import { checkURL } from '#lib/server/safe-browsing.js';
+import { waitUntil } from '@vercel/functions';
 import { purgeEdge } from '#lib/server/edge-purge.js';
 
 /**
@@ -20,4 +21,12 @@ export async function settleVerdict(shortURL: string, prefixedURL: string): Prom
     });
   }
   await purgeEdge([shortURL]);
+}
+
+/**
+ * Run settleVerdict past the response. waitUntil keeps the Vercel function
+ * alive until it finishes (a no-op outside a Vercel request). Never rejects.
+ */
+export function settleVerdictInBackground(shortURL: string, prefixedURL: string): void {
+  waitUntil(settleVerdict(shortURL, prefixedURL).catch(() => {}));
 }

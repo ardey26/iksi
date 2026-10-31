@@ -5,11 +5,13 @@ const update = vi.hoisted(() => vi.fn());
 const updateMany = vi.hoisted(() => vi.fn());
 const checkURL = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
+const waitUntil = vi.hoisted(() => vi.fn());
+vi.mock('@vercel/functions', () => ({ waitUntil }));
 vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { update }, profileRow: { updateMany } } }));
 vi.mock('#lib/server/safe-browsing.js', () => ({ checkURL }));
 vi.mock('#lib/server/edge-purge.js', () => ({ purgeEdge }));
 
-import { settleVerdict } from './link-verdict';
+import { settleVerdict, settleVerdictInBackground } from './link-verdict';
 
 describe('settleVerdict', () => {
   beforeEach(() => {
@@ -37,5 +39,29 @@ describe('settleVerdict', () => {
     checkURL.mockRejectedValue(new Error('x'));
     await expect(settleVerdict('Xy', 'https://e.com')).rejects.toThrow();
     expect(purgeEdge).not.toHaveBeenCalled();
+  });
+});
+
+describe('settleVerdictInBackground', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    update.mockResolvedValue({});
+    purgeEdge.mockResolvedValue(true);
+  });
+
+  it('registers the verdict promise with waitUntil', async () => {
+    checkURL.mockResolvedValue('safe');
+    settleVerdictInBackground('Xy', 'https://e.com');
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    const p = waitUntil.mock.calls[0][0];
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+    expect(purgeEdge).toHaveBeenCalledWith(['Xy']);
+  });
+
+  it('never rejects when the check fails', async () => {
+    checkURL.mockRejectedValue(new Error('x'));
+    settleVerdictInBackground('Xy', 'https://e.com');
+    await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined();
   });
 });
