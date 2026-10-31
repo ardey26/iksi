@@ -1,29 +1,11 @@
 import type { RequestEvent } from '@sveltejs/kit';
+import { parseUserAgent } from '@iksi/core';
 import { clientOf } from '#lib/server/client.js';
 
 export type UAInfo = { browser: string; device: string };
 
-const BOT_RE = /bot|crawl|spider|slurp|fetch|monitor/i;
-
 export function parseUA(ua: string | null | undefined): UAInfo {
-  if (!ua) return { browser: 'Other', device: 'desktop' };
-
-  const device: string = BOT_RE.test(ua)
-    ? 'bot'
-    : /iPad|Tablet/i.test(ua)
-      ? 'tablet'
-      : /Mobi|Android/i.test(ua)
-        ? 'mobile'
-        : 'desktop';
-
-  let browser = 'Other';
-  if (device !== 'bot') {
-    if (/Edg\//.test(ua)) browser = 'Edge';
-    else if (/Firefox\//.test(ua)) browser = 'Firefox';
-    else if (/Chrome\//.test(ua)) browser = 'Chrome';
-    else if (/Safari\//.test(ua)) browser = 'Safari';
-  }
-
+  const { browser, device } = parseUserAgent(ua ?? null);
   return { browser, device };
 }
 
