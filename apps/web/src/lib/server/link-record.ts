@@ -36,3 +36,19 @@ export function toLinkRecord(
     protected: row.passwordHash !== null
   };
 }
+
+/**
+ * Every URL a link can send a visitor to: the default, then each rule and split
+ * destination, once each. Safe Browsing checks all of them.
+ */
+export function destinationsOf(destination: string, rules: unknown): string[] {
+  const urls = [destination];
+  const parsed = rules == null ? null : parseRules(rules);
+  if (parsed?.ok) {
+    for (const rule of parsed.rules) {
+      if ('split' in rule) urls.push(...rule.split.map((s) => s.destination));
+      else urls.push(rule.destination);
+    }
+  }
+  return [...new Set(urls)];
+}

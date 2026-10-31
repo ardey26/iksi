@@ -28,11 +28,19 @@ describe('validateSettings', () => {
     expect(r.destinationChanged).toBe('https://example.com/x');
   });
 
+  it('marks the verdict pending and reports a rules change so rule destinations are re-checked', async () => {
+    const rules = [{ id: 'rule-aaa', when: { countries: ['SG'] }, destination: 'https://sg.example.com/' }];
+    const r = await pass({ rules });
+    expect(r.data.safeVerdict).toBe('pending');
+    expect(r.rulesChanged).toBe(true);
+  });
+
   it('leaves the verdict alone when the destination is absent', async () => {
     const r = await pass({ permanent: true });
     expect(r.data).not.toHaveProperty('originalURL');
     expect(r.data).not.toHaveProperty('safeVerdict');
     expect(r.destinationChanged).toBeNull();
+    expect(r.rulesChanged).toBe(false);
     expect(r.data.permanent).toBe(true);
   });
 

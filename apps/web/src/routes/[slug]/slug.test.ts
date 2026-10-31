@@ -196,6 +196,19 @@ describe('views', () => {
     expect(recordClick).not.toHaveBeenCalled();
   });
 
+  it('throws 403 for a link flagged by a rule destination, even when the rule matches', async () => {
+    findUnique.mockResolvedValue({
+      ...ROW,
+      safeVerdict: 'malware',
+      rules: [{ id: 'abcdefgh', when: { countries: ['SG'] }, destination: 'https://bad.example.com/' }]
+    });
+    const r = await run('/AbC', { 'x-iksi-edge': 'edge', 'x-iksi-client-country': 'SG' });
+    expect(r.error.status).toBe(403);
+    expect(r.error.body).toMatchObject({ view: 'flagged', verdict: 'malware' });
+    expect(JSON.stringify(r.error.body)).not.toContain('bad.example.com');
+    expect(recordClick).not.toHaveBeenCalled();
+  });
+
   it('throws 410 for expired when expiresAt is past', async () => {
     findUnique.mockResolvedValue({ ...ROW, expiresAt: new Date(Date.now() - 1000) });
     const r = await run('/AbC');

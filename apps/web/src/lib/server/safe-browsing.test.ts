@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { checkURL } from './safe-browsing';
+import { checkURL, checkURLs } from './safe-browsing';
 
 const originalFetch = global.fetch;
 const originalKey = process.env.SAFE_BROWSING_API_KEY;
@@ -57,5 +57,43 @@ describe('checkURL', () => {
   it('returns "pending" when fetch throws', async () => {
     global.fetch = vi.fn(async () => { throw new Error('network'); }) as any;
     expect(await checkURL('https://example.com')).toBe('pending');
+  });
+});
+
+describe('checkURLs', () => {
+  const sent = (f: any) => JSON.parse(f.mock.calls[0][1].body).threatInfo.threatEntries;
+
+  it('looks every URL up in one request, deduped', async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }));
+    global.fetch = f as any;
+    const v = await checkURLs(['https://a.example/', 'https://b.example/', 'https://a.example/']);
+    expect(v).toBe('safe');
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(sent(f)).toEqual([{ url: 'https://a.example/' }, { url: 'https://b.example/' }]);
+  });
+
+  it('the worst match wins, whichever URL it is on', async () => {
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({
+      matches: [
+        { threatType: 'UNWANTED_SOFTWARE', threat: { url: 'https://b.example/' } },
+        { threatType: 'MALWARE', threat: { url: 'https://c.example/' } },
+        { threatType: 'SOCIAL_ENGINEERING', threat: { url: 'https://d.example/' } }
+      ]
+    }), { status: 200 })) as any;
+    expect(await checkURLs(['https://a.example/', 'https://b.example/', 'https://c.example/'])).toBe('malware');
+  });
+
+  it('phishing beats unwanted', async () => {
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({
+      matches: [{ threatType: 'UNWANTED_SOFTWARE' }, { threatType: 'SOCIAL_ENGINEERING' }]
+    }), { status: 200 })) as any;
+    expect(await checkURLs(['https://a.example/', 'https://b.example/'])).toBe('phishing');
+  });
+
+  it('is safe with no URLs and makes no request', async () => {
+    const f = vi.fn();
+    global.fetch = f as any;
+    expect(await checkURLs([])).toBe('safe');
+    expect(f).not.toHaveBeenCalled();
   });
 });

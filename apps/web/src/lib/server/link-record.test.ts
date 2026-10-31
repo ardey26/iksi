@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { parseLinkRecord } from '@iksi/core';
-import { toLinkRecord } from './link-record';
+import { destinationsOf, toLinkRecord } from './link-record';
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 3,
@@ -89,5 +89,32 @@ describe('toLinkRecord', () => {
     const rec = toLinkRecord(row({ passwordHash: 'scrypt$secret' }), 'https://e.com');
     expect(rec.protected).toBe(true);
     expect(JSON.stringify(rec)).not.toContain('scrypt$secret');
+  });
+});
+
+describe('destinationsOf', () => {
+  it('lists the default, each rule destination and each split destination once', () => {
+    const rules = [
+      { id: 'rule0001', when: { devices: ['mobile'] }, destination: 'https://m.e.com/' },
+      {
+        id: 'rule0002',
+        when: {},
+        split: [
+          { destination: 'https://a.e.com/', weight: 50 },
+          { destination: 'https://e.com/', weight: 50 }
+        ]
+      },
+      { id: 'rule0003', when: { os: ['ios'] }, destination: 'https://m.e.com/' }
+    ];
+    expect(destinationsOf('https://e.com/', rules)).toEqual([
+      'https://e.com/',
+      'https://m.e.com/',
+      'https://a.e.com/'
+    ]);
+  });
+
+  it('is only the default with no rules or unparseable rules', () => {
+    expect(destinationsOf('https://e.com/', null)).toEqual(['https://e.com/']);
+    expect(destinationsOf('https://e.com/', [{ nope: 1 }])).toEqual(['https://e.com/']);
   });
 });

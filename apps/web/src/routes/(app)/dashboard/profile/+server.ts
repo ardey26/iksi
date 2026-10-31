@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { verifyUserSession } from '#lib/server/user-auth.js';
-import { checkURL } from '#lib/server/safe-browsing.js';
+import { checkURLs } from '#lib/server/safe-browsing.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { verifyAvatarUrl } from '#lib/server/avatar-url.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
+import { destinationsOf } from '#lib/server/link-record.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 
@@ -19,7 +20,13 @@ function validTheme(v: unknown): v is string {
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 type Db = Awaited<ReturnType<typeof requireProfile>>['prisma'];
-type CheckedLink = { id: number; shortURL: string; originalURL: string; safeVerdict: string | null };
+type CheckedLink = {
+  id: number;
+  shortURL: string;
+  originalURL: string;
+  safeVerdict: string | null;
+  rules: unknown;
+};
 
 /**
  * Re-run Safe Browsing and store the verdict. A changed verdict can flip the
@@ -27,7 +34,8 @@ type CheckedLink = { id: number; shortURL: string; originalURL: string; safeVerd
  */
 async function recheckVerdict(prisma: Db, link: CheckedLink): Promise<string> {
   const raw = await decodeURL(link.originalURL);
-  const verdict = await checkURL(raw);
+  // Rule destinations too: a clean default must not clear a bad rule's flag.
+  const verdict = await checkURLs(destinationsOf(raw, link.rules));
   await prisma.longURL.update({
     where: { id: link.id },
     data: { safeVerdict: verdict, safeCheckedAt: new Date() }

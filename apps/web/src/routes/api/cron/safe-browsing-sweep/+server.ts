@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { checkURL } from '#lib/server/safe-browsing.js';
+import { checkURLs } from '#lib/server/safe-browsing.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
+import { destinationsOf } from '#lib/server/link-record.js';
 
 export const GET: RequestHandler = async ({ request }) => {
   const auth = request.headers.get('authorization');
@@ -19,7 +20,7 @@ export const GET: RequestHandler = async ({ request }) => {
       ],
       profileRows: { some: { enabled: true } }
     },
-    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true }
+    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true, rules: true }
   });
 
   let checked = 0;
@@ -33,7 +34,8 @@ export const GET: RequestHandler = async ({ request }) => {
   try {
     for (const l of links) {
       const raw = await decodeURL(l.originalURL);
-      const verdict = await checkURL(raw);
+      // Rule and split destinations redirect too; one lookup covers them all.
+      const verdict = await checkURLs(destinationsOf(raw, l.rules));
       await prisma.longURL.update({ where: { id: l.id }, data: { safeVerdict: verdict, safeCheckedAt: new Date() } });
       await prisma.profileRow.updateMany({
         where: { linkId: l.id },

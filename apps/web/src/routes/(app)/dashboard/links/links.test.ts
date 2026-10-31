@@ -145,6 +145,36 @@ describe('dashboard links PATCH settings', () => {
     expect(update.mock.calls[0][0].data.rules).toEqual(rules);
     expect(purgeEdge).toHaveBeenCalledTimes(1);
     expect(purgeEdge).toHaveBeenCalledWith(['Xy']);
+  });
+
+  it('a rules change marks the verdict pending and re-checks the plaintext default and every rule destination', async () => {
+    findUnique.mockResolvedValue({ ...row, originalURL: 'enc:https://e.com/' });
+    const split = {
+      id: 'rule-bbb',
+      when: { devices: ['mobile'] },
+      split: [
+        { destination: 'https://b.example.com/', weight: 50 },
+        { destination: 'https://c.example.com/', weight: 50 }
+      ]
+    };
+    update.mockResolvedValue({ ...saved, originalURL: 'enc:https://e.com/', rules: [...rules, split] });
+    const r = await call(PATCH, { id: 5, rules: [...rules, split] });
+    expect(r.status).toBe(200);
+    expect(update.mock.calls[0][0].data.safeVerdict).toBe('pending');
+    expect(settleVerdictInBackground).toHaveBeenCalledTimes(1);
+    expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', [
+      'https://e.com/',
+      'https://a.example.com/',
+      'https://b.example.com/',
+      'https://c.example.com/'
+    ]);
+  });
+
+  it('a settings change that touches neither destination nor rules does not re-check', async () => {
+    update.mockResolvedValue({ ...saved, permanent: true });
+    const r = await call(PATCH, { id: 5, permanent: true });
+    expect(r.status).toBe(200);
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('safeVerdict');
     expect(settleVerdictInBackground).not.toHaveBeenCalled();
   });
 
@@ -160,7 +190,8 @@ describe('dashboard links PATCH settings', () => {
     settleVerdictInBackground.mockReturnValue(new Promise(() => {}));
     const r = await call(PATCH, { id: 5, destination: 'example.com' });
     expect(r.status).toBe(200);
-    expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', 'https://example.com');
+    // The saved row still has its rule, so its destination is re-checked with the new default.
+    expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', ['https://example.com', 'https://a.example.com/']);
   });
 
   it('rejects invalid settings with 400 and writes nothing', async () => {

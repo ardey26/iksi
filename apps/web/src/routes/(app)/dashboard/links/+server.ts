@@ -5,6 +5,7 @@ import { decodeURL } from '#lib/server/crypto.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { validateSettings, toLinkSettings, type SettingsInput } from '#lib/server/link-settings.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
+import { destinationsOf } from '#lib/server/link-record.js';
 
 export const PATCH: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
@@ -41,12 +42,17 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
   if (Object.keys(result.data).length === 0) return json({ error: 'Nothing to change' }, { status: 400 });
 
   const saved = await prisma.longURL.update({ where: { id }, data: result.data });
+  const row = { ...link, ...saved };
   await purgeEdge([link.shortURL]);
-  // The verdict re-check purges again once it settles.
-  if (result.destinationChanged) settleVerdictInBackground(link.shortURL, result.destinationChanged);
 
   const destination = result.destinationChanged ?? currentDestination ?? '';
-  return json({ ok: true, settings: toLinkSettings({ ...link, ...saved }, destination) });
+  // Stored destinations are encrypted, so the check uses the plaintext held here.
+  // The verdict re-check purges again once it settles.
+  if (result.destinationChanged || result.rulesChanged) {
+    settleVerdictInBackground(link.shortURL, destinationsOf(destination, row.rules).filter(Boolean));
+  }
+
+  return json({ ok: true, settings: toLinkSettings(row, destination) });
 };
 
 export const DELETE: RequestHandler = async ({ request, cookies }) => {

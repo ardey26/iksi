@@ -29,7 +29,13 @@ export interface LinkSettings {
 }
 
 type Result =
-  | { ok: true; data: Prisma.LongURLUpdateInput; destinationChanged: string | null }
+  | {
+      ok: true;
+      data: Prisma.LongURLUpdateInput;
+      destinationChanged: string | null;
+      /** Rule destinations are served as redirects too, so a change needs a fresh verdict. */
+      rulesChanged: boolean;
+    }
   | { ok: false; error: string };
 
 const bad = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -48,6 +54,7 @@ export async function validateSettings(
 ): Promise<Result> {
   const data: Prisma.LongURLUpdateInput = {};
   let destinationChanged: string | null = null;
+  let rulesChanged = false;
 
   if (input.destination !== undefined) {
     if (typeof input.destination !== 'string') return bad('Invalid input');
@@ -73,6 +80,8 @@ export async function validateSettings(
       }
     }
     data.rules = parsed.rules as unknown as Prisma.InputJsonValue;
+    data.safeVerdict = 'pending';
+    rulesChanged = true;
   }
 
   if (input.expiresAt !== undefined) {
@@ -130,7 +139,7 @@ export async function validateSettings(
     data.permanent = input.permanent;
   }
 
-  return { ok: true, data, destinationChanged };
+  return { ok: true, data, destinationChanged, rulesChanged };
 }
 
 /** Shape a stored row for the client. Never includes the password hash. */

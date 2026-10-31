@@ -7,7 +7,7 @@ const rowAggregate = vi.hoisted(() => vi.fn());
 const rowCreate = vi.hoisted(() => vi.fn());
 const rowFindFirst = vi.hoisted(() => vi.fn());
 const rowUpdate = vi.hoisted(() => vi.fn());
-const checkURL = vi.hoisted(() => vi.fn());
+const checkURLs = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
 
 vi.mock('#lib/prisma.js', () => ({
@@ -19,7 +19,7 @@ vi.mock('#lib/prisma.js', () => ({
 }));
 vi.mock('#lib/server/user-auth.js', () => ({ verifyUserSession: vi.fn(() => 7) }));
 vi.mock('#lib/server/crypto.js', () => ({ decodeURL: vi.fn(async (u: string) => u) }));
-vi.mock('#lib/server/safe-browsing.js', () => ({ checkURL }));
+vi.mock('#lib/server/safe-browsing.js', () => ({ checkURLs }));
 vi.mock('#lib/server/edge-purge.js', () => ({ purgeEdge }));
 vi.mock('#lib/server/avatar-url.js', () => ({ verifyAvatarUrl: vi.fn() }));
 vi.mock('#lib/server/user-cache.js', () => ({ invalidateUserCache: vi.fn() }));
@@ -41,7 +41,8 @@ const staleLink = (safeVerdict: string | null) => ({
   shortURL: 'Xy',
   originalURL: 'https://e.com',
   safeVerdict,
-  safeCheckedAt: null
+  safeCheckedAt: null,
+  rules: null as unknown
 });
 
 const actions = [
@@ -62,7 +63,7 @@ describe('dashboard profile verdict changes purge the edge', () => {
   describe.each(actions)('%s', (_name, body) => {
     it('a newly flagged verdict is purged after the write, then refused', async () => {
       linkFindUnique.mockResolvedValue(staleLink('safe'));
-      checkURL.mockResolvedValue('malware');
+      checkURLs.mockResolvedValue('malware');
       const order: string[] = [];
       linkUpdate.mockImplementation(async () => { order.push('update'); });
       purgeEdge.mockImplementation(async () => { order.push('purge'); return true; });
@@ -74,7 +75,7 @@ describe('dashboard profile verdict changes purge the edge', () => {
 
     it('a verdict that clears a flag is purged too', async () => {
       linkFindUnique.mockResolvedValue(staleLink('phishing'));
-      checkURL.mockResolvedValue('safe');
+      checkURLs.mockResolvedValue('safe');
       const r = await call(body);
       expect(r.status).toBe(200);
       expect(purgeEdge).toHaveBeenCalledWith(['Xy']);
@@ -82,18 +83,30 @@ describe('dashboard profile verdict changes purge the edge', () => {
 
     it('an unchanged verdict does not purge', async () => {
       linkFindUnique.mockResolvedValue(staleLink('safe'));
-      checkURL.mockResolvedValue('safe');
+      checkURLs.mockResolvedValue('safe');
       const r = await call(body);
       expect(r.status).toBe(200);
       expect(linkUpdate).toHaveBeenCalled();
       expect(purgeEdge).not.toHaveBeenCalled();
     });
 
+    it('the re-check covers rule destinations, so a bad rule is not cleared by a clean default', async () => {
+      const rules = [{ id: 'rule0001', when: { countries: ['SG'] }, destination: 'https://bad.example/' }];
+      linkFindUnique.mockResolvedValue({ ...staleLink('malware'), rules });
+      checkURLs.mockImplementation(async (urls: string[]) =>
+        urls.includes('https://bad.example/') ? 'malware' : 'safe'
+      );
+      const r = await call(body);
+      expect(r.status).toBe(422);
+      expect(checkURLs).toHaveBeenCalledWith(['https://e.com', 'https://bad.example/']);
+      expect(linkUpdate.mock.calls[0][0].data.safeVerdict).toBe('malware');
+    });
+
     it('a fresh verdict is not re-checked or purged', async () => {
       linkFindUnique.mockResolvedValue({ ...staleLink('safe'), safeCheckedAt: new Date() });
       const r = await call(body);
       expect(r.status).toBe(200);
-      expect(checkURL).not.toHaveBeenCalled();
+      expect(checkURLs).not.toHaveBeenCalled();
       expect(purgeEdge).not.toHaveBeenCalled();
     });
   });

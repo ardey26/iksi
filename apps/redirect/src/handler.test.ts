@@ -862,6 +862,14 @@ describe('routing and decisions at the edge', () => {
 	});
 
 	test.each([
+		[
+			'flagged with a matching rule',
+			{
+				...record,
+				flagged: true,
+				rules: [{ id: 'rule0010', when: {}, destination: 'https://bad.example.com/' }]
+			}
+		],
 		['protected', { ...record, protected: true }],
 		['expired by time', { ...record, expiresAt: NOW - 1 }],
 		['expired flag', { ...record, expired: true }]
