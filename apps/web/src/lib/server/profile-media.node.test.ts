@@ -76,6 +76,24 @@ describe('replaceMedia', () => {
 	});
 });
 
+describe('key ownership', () => {
+	it('every key and prefix starts with the uploading userId', async () => {
+		const a = setup({ avatarKey: '7/avatar/u1', backgroundKey: null });
+		await replaceMedia(7, 'avatar', await png(), { db: a.db, store: a.store, newId: () => 'u2' });
+		const b = setup({ avatarKey: null, backgroundKey: '42/background/b1' });
+		await replaceMedia(42, 'background', await png(), { db: b.db, store: b.store, newId: () => 'b2' });
+
+		expect(a.puts.length).toBeGreaterThan(0);
+		expect(b.puts.length).toBeGreaterThan(0);
+		for (const k of [...a.puts, ...a.deletes]) expect(k.startsWith('7/')).toBe(true);
+		for (const k of [...b.puts, ...b.deletes]) {
+			expect(k.startsWith('42/')).toBe(true);
+			expect(k.startsWith('7/')).toBe(false);
+		}
+		expect(b.deletes).toEqual(['42/background/b1.']);
+	});
+});
+
 describe('removeMedia', () => {
 	it('clears the row then deletes the old prefix', async () => {
 		const s = setup({ avatarKey: null, backgroundKey: '7/background/b1' });
