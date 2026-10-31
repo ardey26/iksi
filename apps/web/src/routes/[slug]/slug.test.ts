@@ -32,9 +32,18 @@ const ROW = {
 function makeEvent(path: string, init: { headers?: Record<string, string>; method?: string; body?: FormData } = {}) {
   const url = new URL(`https://www.iksi.app${path}`);
   const slug = decodeURIComponent(url.pathname.slice(1));
+  const headers: Record<string, string> = {};
   return {
     url,
     params: { slug },
+    headers,
+    // Mirrors SvelteKit: a header may be set once per response.
+    setHeaders: (h: Record<string, string>) => {
+      for (const [k, v] of Object.entries(h)) {
+        if (k.toLowerCase() in headers) throw new Error(`header ${k} already set`);
+        headers[k.toLowerCase()] = v;
+      }
+    },
     request: new Request(url, { method: init.method ?? 'GET', headers: init.headers, body: init.body }),
     locals: {} as Record<string, unknown>,
     getClientAddress: () => '1.2.3.4'
@@ -142,6 +151,38 @@ describe('redirect', () => {
     expect(r.error?.status).toBe(404);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe('cache-control', () => {
+  it('marks the origin redirect private, no-store so a browser never keeps it', async () => {
+    const r = await run('/AbC');
+    expect(r.redirect?.status).toBe(302);
+    expect(r.event.headers['cache-control']).toBe('private, no-store');
+  });
+
+  it('marks a permanent (301) redirect private, no-store too', async () => {
+    findUnique.mockResolvedValue({ ...ROW, permanent: true });
+    const r = await run('/AbC');
+    expect(r.redirect?.status).toBe(301);
+    expect(r.event.headers['cache-control']).toBe('private, no-store');
+  });
+
+  it('marks the unlock redirect private, no-store', async () => {
+    findUnique.mockResolvedValue({ ...ROW, passwordHash: HASH });
+    const { redirect, event } = await unlock('/AbC', 'hunter2');
+    expect(redirect?.status).toBe(303);
+    expect(event.headers['cache-control']).toBe('private, no-store');
+  });
+
+  it.each([
+    ['expired', { expiredAt: new Date() }],
+    ['flagged', { safeVerdict: 'malware' }],
+    ['password', { passwordHash: 'x' }]
+  ])('marks the %s view private, no-store so a later change applies', async (_n, over) => {
+    findUnique.mockResolvedValue({ ...ROW, ...over });
+    const r = await run('/AbC');
+    expect(r.event.headers['cache-control']).toBe('private, no-store');
   });
 });
 

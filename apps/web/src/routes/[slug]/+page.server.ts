@@ -11,6 +11,13 @@ import { toLinkRecord } from '#lib/server/link-record.js';
 import { requestContext } from '#lib/server/request-context.js';
 import { recordClick } from '#lib/server/tracking.js';
 
+/**
+ * A browser must never keep a slug response: a redirect it cached would skip a
+ * password, expiry or rule set later. Set exactly once per response, so load
+ * sets it for every view and the unlock action only on its own redirect.
+ */
+const NO_STORE = { 'cache-control': 'private, no-store' };
+
 const UNLOCK_MAX = 10;
 const UNLOCK_WINDOW_MS = 10 * 60 * 1000;
 
@@ -82,6 +89,7 @@ function followLink(
 export const load = async (event: RequestEvent) => {
   const path = classifyPath(event.url.pathname);
   if (path.kind !== 'slug' || path.mode === 'stats') error(404, 'not found');
+  event.setHeaders(NO_STORE);
 
   const now = Date.now();
   const { row, record } = await loadLink(path.slug);
@@ -141,6 +149,8 @@ export const actions = {
       (await bcrypt.compare(given, row.passwordHash));
     if (!ok) return fail(400, { error: 'Wrong password' });
 
+    // A failed attempt renders through load, which sets this itself.
+    event.setHeaders(NO_STORE);
     return followLink(event, record, 303, now);
   }
 };
