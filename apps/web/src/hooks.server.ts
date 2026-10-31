@@ -65,7 +65,17 @@ export const handle: Handle = async ({ event, resolve }) => {
         }
     }
 
-    const response = await resolve(event);
+    let response = await resolve(event);
+
+    // A rendered view (expired, flagged) can ask for a status the page load cannot set itself.
+    const viewStatus = (event.locals as Record<string, unknown>).viewStatus;
+    if (typeof viewStatus === 'number') {
+        response = new Response(response.body, {
+            status: viewStatus,
+            statusText: response.statusText,
+            headers: response.headers
+        });
+    }
 
     // Security + performance headers (unchanged from before)
     response.headers.set('X-Content-Type-Options', 'nosniff');
