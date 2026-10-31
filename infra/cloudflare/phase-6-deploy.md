@@ -1,6 +1,6 @@
 # Phase 6 deploy: smart routing, expiry, passwords and preview
 
-Adds routing rules, expiry (date and click cap), link passwords, `/{slug}+` preview and the flagged-link page. Schema change is additive: five nullable columns and one defaulted boolean on `LongURL` (`prisma/migrations/20261101010000_link_settings`). Old code ignores them, so the migration is safe while old code runs.
+Adds routing rules, expiry (date and click cap), link passwords, `/{slug}+` preview and the flagged-link page. Schema change is additive: five nullable columns, one defaulted boolean (`prisma/migrations/20261101010000_link_settings`) and one defaulted integer, `settingsVersion` (`prisma/migrations/20261101020000_settings_version`), on `LongURL`. Old code ignores them, so the migrations are safe while old code runs. New code needs both: `prisma migrate deploy` applies every pending one. If the first was already applied by hand for a preview, run it again for the second.
 
 ## 1. Before the first preview (manual migration)
 

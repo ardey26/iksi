@@ -52,7 +52,8 @@ beforeEach(() => {
     shortURL: data.shortURL,
     clickCount: 0,
     createdAt: new Date(0),
-    safeVerdict: null
+    safeVerdict: null,
+    settingsVersion: 0
   }));
 });
 
@@ -81,7 +82,8 @@ describe('anonymous dedupe', () => {
     expect(create).toHaveBeenCalledTimes(1);
     // The hash stays with the existing row (it is unique), so the new one stores none.
     expect(create.mock.calls[0][0].data.urlHash).toBeNull();
-    expect(settleVerdictInBackground).toHaveBeenCalledWith(body.shortURL, [URL_IN]);
+    expect(settleVerdictInBackground).toHaveBeenCalledWith(body.shortURL, [URL_IN], 0);
+    expect(create.mock.calls[0][0].select).toMatchObject({ settingsVersion: true });
   });
 
   it('stores the hash on a first anonymous shorten', async () => {

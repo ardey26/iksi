@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ request }) => {
       ],
       profileRows: { some: { enabled: true } }
     },
-    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true, rules: true }
+    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true, rules: true, settingsVersion: true }
   });
 
   let checked = 0;
@@ -38,8 +38,16 @@ export const GET: RequestHandler = async ({ request }) => {
       const verdict = await checkURLs(destinationsOf(raw, l.rules));
       // An incomplete check keeps an existing flag and its quarantine; retried next run.
       const keepFlag = verdict === 'pending' && isFlagged(l.safeVerdict);
-      if (!keepFlag) {
-        await prisma.longURL.update({ where: { id: l.id }, data: { safeVerdict: verdict, safeCheckedAt: new Date() } });
+      // Rows are read up front: one edited since then is settled by its own check.
+      const written = keepFlag
+        ? 0
+        : (
+            await prisma.longURL.updateMany({
+              where: { id: l.id, settingsVersion: l.settingsVersion },
+              data: { safeVerdict: verdict, safeCheckedAt: new Date() }
+            })
+          ).count;
+      if (written > 0) {
         await prisma.profileRow.updateMany({
           where: { linkId: l.id },
           data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }

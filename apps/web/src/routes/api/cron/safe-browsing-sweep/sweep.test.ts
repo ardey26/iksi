@@ -6,7 +6,7 @@ const updateMany = vi.hoisted(() => vi.fn());
 const checkURLs = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
 vi.mock('#lib/prisma.js', () => ({
-  prisma: { longURL: { findMany, update }, profileRow: { updateMany } }
+  prisma: { longURL: { findMany, updateMany: update }, profileRow: { updateMany } }
 }));
 vi.mock('#lib/server/crypto.js', () => ({ decodeURL: vi.fn(async (u: string) => u) }));
 vi.mock('#lib/server/safe-browsing.js', () => ({ checkURLs }));
@@ -20,7 +20,7 @@ const call = () =>
   } as never);
 
 const link = (id: number, shortURL: string, safeVerdict: string | null, rules: unknown = null) => ({
-  id, shortURL, safeVerdict, rules, originalURL: `https://e.com/${id}`
+  id, shortURL, safeVerdict, rules, originalURL: `https://e.com/${id}`, settingsVersion: 2
 });
 
 describe('safe-browsing sweep purge', () => {
@@ -28,6 +28,7 @@ describe('safe-browsing sweep purge', () => {
     vi.clearAllMocks();
     process.env.CRON_SECRET = 's3';
     purgeEdge.mockResolvedValue(true);
+    update.mockResolvedValue({ count: 1 });
   });
 
   it('purges only links whose verdict changed', async () => {
@@ -64,10 +65,21 @@ describe('safe-browsing sweep purge', () => {
     checkURLs.mockResolvedValue('pending');
     await call();
     expect(update).toHaveBeenCalledTimes(1);
-    expect(update.mock.calls[0][0].where).toEqual({ id: 2 });
+    expect(update.mock.calls[0][0].where).toEqual({ id: 2, settingsVersion: 2 });
     expect(updateMany).toHaveBeenCalledTimes(1);
     expect(updateMany.mock.calls[0][0].where).toEqual({ linkId: 2 });
     expect(purgeEdge).toHaveBeenCalledWith(['Bb']);
+  });
+
+  it('skips the write, quarantine and purge for a row edited after the sweep read it', async () => {
+    findMany.mockResolvedValue([link(1, 'aa', 'malware')]);
+    checkURLs.mockResolvedValue('safe');
+    update.mockResolvedValue({ count: 0 });
+    await call();
+    expect(findMany.mock.calls[0][0].select).toMatchObject({ settingsVersion: true });
+    expect(update.mock.calls[0][0].where).toEqual({ id: 1, settingsVersion: 2 });
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(purgeEdge).not.toHaveBeenCalled();
   });
 
   it('flushes every 50 changed slugs', async () => {

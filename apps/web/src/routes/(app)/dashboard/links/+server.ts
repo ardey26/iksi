@@ -50,7 +50,11 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
   // Stored destinations are encrypted, so the check uses the plaintext held here.
   // The verdict re-check purges again once it settles.
   if (result.destinationChanged || result.rulesChanged) {
-    settleVerdictInBackground(link.shortURL, destinationsOf(destination, row.rules).filter(Boolean));
+    settleVerdictInBackground(
+      link.shortURL,
+      destinationsOf(destination, row.rules).filter(Boolean),
+      row.settingsVersion
+    );
   }
 
   return json({ ok: true, settings: toLinkSettings(row, destination) });

@@ -115,7 +115,11 @@ describe('dashboard links PATCH destination validation', () => {
     expect(r.status).toBe(200);
     expect(update).toHaveBeenCalledWith({
       where: { id: 5 },
-      data: { originalURL: 'enc:https://example.com/path', safeVerdict: 'pending' }
+      data: {
+        originalURL: 'enc:https://example.com/path',
+        safeVerdict: 'pending',
+        settingsVersion: { increment: 1 }
+      }
     });
   });
 });
@@ -129,7 +133,8 @@ describe('dashboard links PATCH settings', () => {
     expiresAt: null,
     maxClicks: null,
     passwordHash: '$2b$10$secret',
-    permanent: false
+    permanent: false,
+    settingsVersion: 4
   };
 
   beforeEach(() => {
@@ -167,7 +172,8 @@ describe('dashboard links PATCH settings', () => {
       'https://a.example.com/',
       'https://b.example.com/',
       'https://c.example.com/'
-    ]);
+    ], 4);
+    expect(update.mock.calls[0][0].data.settingsVersion).toEqual({ increment: 1 });
   });
 
   it('a settings change that touches neither destination nor rules does not re-check', async () => {
@@ -175,6 +181,7 @@ describe('dashboard links PATCH settings', () => {
     const r = await call(PATCH, { id: 5, permanent: true });
     expect(r.status).toBe(200);
     expect(update.mock.calls[0][0].data).not.toHaveProperty('safeVerdict');
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('settingsVersion');
     expect(settleVerdictInBackground).not.toHaveBeenCalled();
   });
 
@@ -191,7 +198,7 @@ describe('dashboard links PATCH settings', () => {
     const r = await call(PATCH, { id: 5, destination: 'example.com' });
     expect(r.status).toBe(200);
     // The saved row still has its rule, so its destination is re-checked with the new default.
-    expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', ['https://example.com', 'https://a.example.com/']);
+    expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', ['https://example.com', 'https://a.example.com/'], 4);
   });
 
   it('rejects invalid settings with 400 and writes nothing', async () => {

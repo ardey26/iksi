@@ -150,6 +150,9 @@ export async function validateSettings(
     data.permanent = input.permanent;
   }
 
+  // A verdict is only written for the version it checked (see settleVerdict).
+  if (destinationChanged !== null || rulesChanged) data.settingsVersion = { increment: 1 };
+
   return { ok: true, data, destinationChanged, rulesChanged };
 }
 

@@ -227,7 +227,8 @@ export const POST = async (event) => {
 					shortURL: true,
 					clickCount: true,
 					createdAt: true,
-					safeVerdict: true
+					safeVerdict: true,
+					settingsVersion: true
 				}
 			});
 
@@ -251,7 +252,7 @@ export const POST = async (event) => {
 		}
 
 		// Fire safe-browsing async; failures never block shorten response
-		settleVerdictInBackground(url.shortURL, [prefixedURL]);
+		settleVerdictInBackground(url.shortURL, [prefixedURL], url.settingsVersion);
 
 
 		return new Response(JSON.stringify({

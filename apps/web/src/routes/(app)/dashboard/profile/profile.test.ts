@@ -13,7 +13,7 @@ const purgeEdge = vi.hoisted(() => vi.fn());
 vi.mock('#lib/prisma.js', () => ({
   prisma: {
     profile: { findUnique: profileFindUnique },
-    longURL: { findUnique: linkFindUnique, update: linkUpdate },
+    longURL: { findUnique: linkFindUnique, updateMany: linkUpdate },
     profileRow: { aggregate: rowAggregate, create: rowCreate, findFirst: rowFindFirst, update: rowUpdate }
   }
 }));
@@ -42,7 +42,8 @@ const staleLink = (safeVerdict: string | null) => ({
   originalURL: 'https://e.com',
   safeVerdict,
   safeCheckedAt: null,
-  rules: null as unknown
+  rules: null as unknown,
+  settingsVersion: 2
 });
 
 const actions = [
@@ -58,6 +59,7 @@ describe('dashboard profile verdict changes purge the edge', () => {
     rowCreate.mockResolvedValue({ id: 9 });
     rowFindFirst.mockResolvedValue(null);
     purgeEdge.mockResolvedValue(true);
+    linkUpdate.mockResolvedValue({ count: 1 });
   });
 
   describe.each(actions)('%s', (_name, body) => {
@@ -65,7 +67,7 @@ describe('dashboard profile verdict changes purge the edge', () => {
       linkFindUnique.mockResolvedValue(staleLink('safe'));
       checkURLs.mockResolvedValue('malware');
       const order: string[] = [];
-      linkUpdate.mockImplementation(async () => { order.push('update'); });
+      linkUpdate.mockImplementation(async () => { order.push('update'); return { count: 1 }; });
       purgeEdge.mockImplementation(async () => { order.push('purge'); return true; });
       const r = await call(body);
       expect(r.status).toBe(422);
@@ -109,6 +111,18 @@ describe('dashboard profile verdict changes purge the edge', () => {
       expect(r.status).toBe(422);
       expect(linkUpdate).not.toHaveBeenCalled();
       expect(purgeEdge).not.toHaveBeenCalled();
+    });
+
+    it('a check of a row edited meanwhile writes nothing, purges nothing, and gates on the current verdict', async () => {
+      linkFindUnique
+        .mockResolvedValueOnce(staleLink('safe'))
+        .mockResolvedValueOnce({ safeVerdict: 'malware' });
+      checkURLs.mockResolvedValue('safe');
+      linkUpdate.mockResolvedValue({ count: 0 });
+      const r = await call(body);
+      expect(linkUpdate.mock.calls[0][0].where).toEqual({ id: 5, settingsVersion: 2 });
+      expect(purgeEdge).not.toHaveBeenCalled();
+      expect(r.status).toBe(422);
     });
 
     it('a fresh verdict is not re-checked or purged', async () => {

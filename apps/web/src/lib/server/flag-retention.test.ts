@@ -19,18 +19,25 @@ function matches(row: Row, where: Record<string, any>): boolean {
   });
 }
 
+/** Applies Prisma update data, including `{ increment }`. */
+function apply(row: Row, data: Record<string, any>) {
+  for (const [k, v] of Object.entries(data)) {
+    row[k] = v !== null && typeof v === 'object' && 'increment' in v ? (row[k] as number) + v.increment : v;
+  }
+}
+
 vi.mock('#lib/prisma.js', () => ({
   prisma: {
     longURL: {
       findUnique: vi.fn(async ({ where }: any) => (matches(db.row, where) ? { ...db.row } : null)),
       update: vi.fn(async ({ where, data }: any) => {
         if (!matches(db.row, where)) throw new Error('not found');
-        Object.assign(db.row, data);
+        apply(db.row, data);
         return { ...db.row };
       }),
       updateMany: vi.fn(async ({ where, data }: any) => {
         if (!matches(db.row, where)) return { count: 0 };
-        Object.assign(db.row, data);
+        apply(db.row, data);
         return { count: 1 };
       })
     },
@@ -108,7 +115,8 @@ beforeEach(() => {
     expiredAt: null,
     passwordHash: null,
     permanent: false,
-    clickCount: 0
+    clickCount: 0,
+    settingsVersion: 0
   };
 });
 afterEach(() => {
@@ -155,6 +163,33 @@ describe('a flagged link keeps its flag through edits', () => {
     expect(sentURLs()).toEqual(['https://e.com/', 'https://ok.example/']);
     expect(db.row.safeVerdict).toBe('safe');
     expect(await visit()).toEqual({ status: 302, location: 'https://e.com/' });
+  });
+
+  it('a slower check of an earlier edit cannot overwrite the flag a later edit earned', async () => {
+    // Each lookup answers only when the test releases it, in the order chosen here.
+    const lookups: { urls: string[]; answer: () => void }[] = [];
+    global.fetch = vi.fn(
+      (_u: string, init: { body: string }) =>
+        new Promise<Response>((resolve) => {
+          const urls = JSON.parse(init.body).threatInfo.threatEntries.map((e: any) => e.url);
+          const body = urls.includes(BAD) ? { matches: [{ threatType: 'MALWARE' }] } : {};
+          lookups.push({ urls, answer: () => resolve(new Response(JSON.stringify(body), { status: 200 })) });
+        })
+    ) as never;
+
+    await patch({ rules: [rule('rule-ok1', 'https://ok.example/')] }); // edit A, clean
+    await patch({ rules: [rule('rule-bad', BAD)] }); // edit B, bad rule
+    const [settleA, settleB] = db.pending.splice(0);
+    await vi.waitFor(() => expect(lookups).toHaveLength(2));
+
+    lookups[1].answer(); // B settles first: flagged
+    await settleB;
+    expect(db.row.safeVerdict).toBe('malware');
+
+    lookups[0].answer(); // A settles late with a clean answer for a superseded edit
+    await settleA;
+    expect(db.row.safeVerdict).toBe('malware');
+    expect((await visit()).status).toBe(403);
   });
 
   it('an unflagged link still goes pending on a rules edit', async () => {

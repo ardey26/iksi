@@ -80,24 +80,26 @@ model HandleClaimRateLimit {
 }
 
 model LongURL {
-  id            Int          @id @default(autoincrement())
-  createdAt     DateTime     @default(now())
-  originalURL   String
-  urlHash       String?      @unique
-  shortURL      String       @unique
-  clickCount    Int          @default(0)
-  userId        Int?
-  safeVerdict   String?
-  safeCheckedAt DateTime?
-  rules         Json?
-  expiresAt     DateTime?
-  maxClicks     Int?
-  expiredAt     DateTime?
-  passwordHash  String?
-  permanent     Boolean      @default(false)
-  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  clicks        Click[]
-  profileRows   ProfileRow[]
+  id              Int          @id @default(autoincrement())
+  createdAt       DateTime     @default(now())
+  originalURL     String
+  urlHash         String?      @unique
+  shortURL        String       @unique
+  clickCount      Int          @default(0)
+  userId          Int?
+  safeVerdict     String?
+  safeCheckedAt   DateTime?
+  rules           Json?
+  expiresAt       DateTime?
+  maxClicks       Int?
+  expiredAt       DateTime?
+  passwordHash    String?
+  permanent       Boolean      @default(false)
+  /// Bumped whenever the destination or rules change, so a verdict is only written for what was checked.
+  settingsVersion Int          @default(0)
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clicks          Click[]
+  profileRows     ProfileRow[]
 
   @@index([createdAt(sort: Desc)])
   @@index([clickCount(sort: Desc)])

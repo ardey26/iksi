@@ -26,6 +26,7 @@ type CheckedLink = {
   originalURL: string;
   safeVerdict: string | null;
   rules: unknown;
+  settingsVersion: number;
 };
 
 /**
@@ -38,10 +39,16 @@ async function recheckVerdict(prisma: Db, link: CheckedLink): Promise<string> {
   const verdict = await checkURLs(destinationsOf(raw, link.rules));
   // An incomplete check cannot clear a flag.
   if (verdict === 'pending' && isFlagged(link.safeVerdict)) return link.safeVerdict as string;
-  await prisma.longURL.update({
-    where: { id: link.id },
+  // Written only if the row is still the version that was checked.
+  const { count } = await prisma.longURL.updateMany({
+    where: { id: link.id, settingsVersion: link.settingsVersion },
     data: { safeVerdict: verdict, safeCheckedAt: new Date() }
   });
+  if (count === 0) {
+    // Edited meanwhile: that edit's own check settles it; gate on what is stored now.
+    const now = await prisma.longURL.findUnique({ where: { id: link.id }, select: { safeVerdict: true } });
+    return now?.safeVerdict ?? 'pending';
+  }
   if (verdict !== link.safeVerdict) await purgeEdge([link.shortURL]);
   return verdict;
 }
