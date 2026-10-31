@@ -1,8 +1,11 @@
+import { normalizeHost } from '../links/record';
+import { httpUrlError } from '../links/url';
 import type { Device, Os } from './agent';
 import type { Continent } from './continent';
 
 export const MAX_RULES = 20;
-const MAX_DESTINATION = 2048;
+const MAX_REFERRER_HOSTS = 50;
+const ID_RE = /^[A-Za-z0-9_-]{8}$/;
 
 export interface Conditions {
 	countries?: string[];
@@ -39,34 +42,26 @@ type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 const isObject = (v: unknown): v is Record<string, unknown> =>
 	typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function normalizeRefHost(host: string): string {
-	return host.toLowerCase().replace(/^www\./, '');
-}
+// Filled lazily so importing the module has no side effects. Constructing a formatter is the slow part.
+const formatters = new Map<string, Intl.DateTimeFormat | null>();
 
 function formatterFor(tz: string): Intl.DateTimeFormat | null {
-	try {
-		return new Intl.DateTimeFormat('en-US', {
-			timeZone: tz,
-			hour: '2-digit',
-			minute: '2-digit',
-			weekday: 'short',
-			hourCycle: 'h23'
-		});
-	} catch {
-		return null;
+	let f = formatters.get(tz);
+	if (f === undefined) {
+		try {
+			f = new Intl.DateTimeFormat('en-US', {
+				timeZone: tz,
+				hour: '2-digit',
+				minute: '2-digit',
+				weekday: 'short',
+				hourCycle: 'h23'
+			});
+		} catch {
+			f = null;
+		}
+		formatters.set(tz, f);
 	}
-}
-
-function destinationError(value: unknown): string | null {
-	if (typeof value !== 'string' || value.length === 0) return 'must be an http(s) URL';
-	if (value.length > MAX_DESTINATION) return `must be at most ${MAX_DESTINATION} characters`;
-	try {
-		const u = new URL(value);
-		if (u.protocol !== 'http:' && u.protocol !== 'https:') return 'must be an http(s) URL';
-	} catch {
-		return 'must be an http(s) URL';
-	}
-	return null;
+	return f;
 }
 
 function stringList(value: unknown, allowed: (s: string) => boolean): string[] | null {
@@ -103,12 +98,15 @@ function parseConditions(raw: unknown): Result<Conditions> {
 		when.os = v as Os[];
 	}
 	if (raw.referrerHosts !== undefined) {
+		if (Array.isArray(raw.referrerHosts) && raw.referrerHosts.length > MAX_REFERRER_HOSTS) {
+			return { ok: false, error: `at most ${MAX_REFERRER_HOSTS} referrer hosts` };
+		}
 		const v = stringList(
 			raw.referrerHosts,
 			(s) => s.length > 0 && s.length <= 253 && !/[\s/:@?#]/.test(s)
 		);
 		if (!v) return { ok: false, error: 'referrerHosts must be a list of host names' };
-		when.referrerHosts = v;
+		when.referrerHosts = v.map(normalizeHost);
 	}
 	if (raw.time !== undefined) {
 		const t = raw.time;
@@ -152,8 +150,8 @@ function parseRule(raw: unknown, seen: Set<string>): Result<Rule> {
 		if (!RULE_KEYS.includes(key)) return { ok: false, error: `unknown field "${key}"` };
 	}
 	const id = raw.id;
-	if (typeof id !== 'string' || id.length === 0 || id.length > 64) {
-		return { ok: false, error: 'id must be a non-empty string of at most 64 characters' };
+	if (typeof id !== 'string' || !ID_RE.test(id)) {
+		return { ok: false, error: 'id must be 8 letters, digits, _ or -' };
 	}
 	if (seen.has(id)) return { ok: false, error: `id "${id}" is already used` };
 	seen.add(id);
@@ -167,7 +165,7 @@ function parseRule(raw: unknown, seen: Set<string>): Result<Rule> {
 	if (!hasDest && !hasSplit) return { ok: false, error: 'needs a destination or a split' };
 
 	if (hasDest) {
-		const e = destinationError(raw.destination);
+		const e = httpUrlError(raw.destination);
 		if (e) return { ok: false, error: `destination ${e}` };
 		return { ok: true, value: { id, when: when.value, destination: raw.destination as string } };
 	}
@@ -186,7 +184,7 @@ function parseRule(raw: unknown, seen: Set<string>): Result<Rule> {
 				return { ok: false, error: `split[${i}]: unknown field "${key}"` };
 			}
 		}
-		const e = destinationError(entry.destination);
+		const e = httpUrlError(entry.destination);
 		if (e) return { ok: false, error: `split[${i}] destination ${e}` };
 		const w = entry.weight;
 		if (typeof w !== 'number' || !Number.isInteger(w) || w < 1 || w > 100) {
@@ -215,6 +213,12 @@ export function parseRules(
 	return { ok: true, rules };
 }
 
+// Input is validated as HH:MM by parseRules, so read the digits directly without allocating.
+function toMinutes(hhmm: string): number {
+	const d = (i: number) => hhmm.charCodeAt(i) - 48;
+	return (d(0) * 10 + d(1)) * 60 + d(3) * 10 + d(4);
+}
+
 function inTimeWindow(time: NonNullable<Conditions['time']>, now: number): boolean {
 	const fmt = formatterFor(time.tz);
 	if (!fmt) return false;
@@ -227,10 +231,8 @@ function inTimeWindow(time: NonNullable<Conditions['time']>, now: number): boole
 		else if (p.type === 'weekday') day = WEEKDAYS.indexOf(p.value);
 	}
 	const mins = hour * 60 + minute;
-	const [sh, sm] = time.start.split(':').map(Number);
-	const [eh, em] = time.end.split(':').map(Number);
-	const start = sh * 60 + sm;
-	const end = eh * 60 + em;
+	const start = toMinutes(time.start);
+	const end = toMinutes(time.end);
 	const overnight = start > end;
 	const inside = overnight ? mins >= start || mins < end : mins >= start && mins < end;
 	if (!inside) return false;
@@ -247,13 +249,10 @@ export function matches(when: Conditions, ctx: RequestContext): boolean {
 	if (when.devices && (ctx.device === 'bot' || !when.devices.includes(ctx.device))) return false;
 	if (when.os && !when.os.includes(ctx.os)) return false;
 	if (when.referrerHosts) {
-		const host = ctx.referrerHost ? normalizeRefHost(ctx.referrerHost) : null;
+		// Rule hosts are normalized by parseRules.
+		const host = ctx.referrerHost ? normalizeHost(ctx.referrerHost) : null;
 		if (!host) return false;
-		const hit = when.referrerHosts.some((h) => {
-			const want = normalizeRefHost(h);
-			return host === want || host.endsWith('.' + want);
-		});
-		if (!hit) return false;
+		if (!when.referrerHosts.some((h) => host === h || host.endsWith('.' + h))) return false;
 	}
 	if (when.time && !inTimeWindow(when.time, ctx.now)) return false;
 	return true;

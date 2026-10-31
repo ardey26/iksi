@@ -28,3 +28,4 @@ export {
 	type Rule,
 	type RequestContext
 } from './routing/rules';
+export { httpUrlError, isHttpUrl, MAX_URL_LENGTH } from './links/url';

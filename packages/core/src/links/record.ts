@@ -1,8 +1,7 @@
 import { isDbId } from '../ids';
+import { isHttpUrl } from './url';
 
 export const CANONICAL_HOST = 'iksi.app';
-
-const MAX_STRING = 2048;
 
 /** Lowercases, strips any port and a leading `www.` so every alias keys to one host. */
 export function normalizeHost(host: string): string {
@@ -27,16 +26,6 @@ export interface LinkRecord {
 export interface StoredLink {
 	record: LinkRecord;
 	storedAt: number;
-}
-
-function isHttpUrl(value: unknown): value is string {
-	if (typeof value !== 'string' || value.length > MAX_STRING) return false;
-	try {
-		const { protocol } = new URL(value);
-		return protocol === 'http:' || protocol === 'https:';
-	} catch {
-		return false;
-	}
 }
 
 /** Hand-written (not zod) to keep the edge Worker bundle small. Unknown keys are dropped. */

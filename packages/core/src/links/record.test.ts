@@ -15,7 +15,9 @@ test.each([
 	{ v: 1, id: 7, destination: 'javascript:alert(1)', flagged: false, permanent: false },
 	{ v: 1, id: 0, destination: 'https://e.com', flagged: false, permanent: false },
 	{ v: 1, id: 7, destination: 'https://e.com' },
-	{ v: 1, id: 7, destination: 'https://e.com/' + 'a'.repeat(2048), flagged: false, permanent: false }
+	{ v: 1, id: 7, destination: 'https://e.com/' + 'a'.repeat(2048), flagged: false, permanent: false },
+	{ v: 1, id: 7, destination: 'https://e.com/x\ny', flagged: false, permanent: false },
+	{ v: 1, id: 7, destination: 'https://e.com/\tx', flagged: false, permanent: false }
 ])('rejects %o', (r) => expect(parseLinkRecord(r)).toBeNull());
 
 describe('id is Postgres INT4', () => {

@@ -33,11 +33,11 @@ describe('resolveDestination', () => {
 		expect(resolveDestination(DEF, [], ctx(), () => 0)).toEqual({ destination: DEF, ruleId: null });
 	});
 	it('first match wins', () => {
-		const rules = [rule('a', { countries: ['SG'] }), rule('b', { continents: ['AS'] })];
-		expect(resolveDestination(DEF, rules, ctx(), () => 0).ruleId).toBe('a');
+		const rules = [rule('rule-aaa', { countries: ['SG'] }), rule('rule-bbb', { continents: ['AS'] })];
+		expect(resolveDestination(DEF, rules, ctx(), () => 0).ruleId).toBe('rule-aaa');
 	});
 	it('falls through to the default when nothing matches', () => {
-		expect(resolveDestination(DEF, [rule('a', { countries: ['US'] })], ctx(), () => 0)).toEqual({
+		expect(resolveDestination(DEF, [rule('rule-aaa', { countries: ['US'] })], ctx(), () => 0)).toEqual({
 			destination: DEF,
 			ruleId: null
 		});
@@ -45,16 +45,16 @@ describe('resolveDestination', () => {
 	it('all-null context resolves to the default', () => {
 		const c = ctx({ country: null, continent: null, referrerHost: null });
 		const rules = [
-			rule('a', { countries: ['SG'] }),
-			rule('b', { continents: ['AS'] }),
-			rule('c', { referrerHosts: ['x.com'] })
+			rule('rule-aaa', { countries: ['SG'] }),
+			rule('rule-bbb', { continents: ['AS'] }),
+			rule('rule-ccc', { referrerHosts: ['x.com'] })
 		];
 		expect(resolveDestination(DEF, rules, c, () => 0)).toEqual({ destination: DEF, ruleId: null });
 	});
 	it('splits 70/30 exactly across the random range', () => {
 		const rules: Rule[] = [
 			{
-				id: 's',
+				id: 'rule-sss',
 				when: {},
 				split: [
 					{ destination: 'https://a.example/', weight: 70 },
@@ -72,7 +72,7 @@ describe('resolveDestination', () => {
 		expect(resolveDestination(DEF, rules, ctx(), () => 0.999999).destination).toBe(
 			'https://b.example/'
 		);
-		expect(resolveDestination(DEF, rules, ctx(), () => 0.999999).ruleId).toBe('s');
+		expect(resolveDestination(DEF, rules, ctx(), () => 0.999999).ruleId).toBe('rule-sss');
 	});
 });
 
@@ -99,7 +99,6 @@ describe('matches', () => {
 		expect(matches(w, ctx({ referrerHost: 'm.x.com' }))).toBe(true);
 		expect(matches(w, ctx({ referrerHost: 'notx.com' }))).toBe(false);
 		expect(matches(w, ctx({ referrerHost: null }))).toBe(false);
-		expect(matches({ referrerHosts: ['www.x.com'] }, ctx({ referrerHost: 'x.com' }))).toBe(true);
 		expect(matches(w, ctx({ referrerHost: 'www.x.com' }))).toBe(true);
 	});
 	it('matches business hours in Manila', () => {
@@ -120,28 +119,27 @@ describe('matches', () => {
 	});
 	it('handles an overnight window across DST changes', () => {
 		const w = { time: { start: '22:00', end: '02:00', tz: 'America/New_York' } };
-		// [year, month0, day, utcOffsetHours at that local time]
-		const days: [number, number, number, number][] = [
-			[2026, 5, 15, -4], // normal day
-			[2026, 2, 8, -4], // spring forward: 23:30 and 21:59 are EDT, 01:30 is EST
-			[2026, 10, 1, -4] // fall back day
-		];
-		const local = (y: number, mo: number, d: number, off: number, h: number, m: number) =>
+		const at = (y: number, mo: number, d: number, off: number, h: number, m: number) =>
 			ctx({ now: Date.UTC(y, mo, d, h - off, m) });
-		for (const [y, mo, d, off] of days) {
-			expect(matches(w, local(y, mo, d, off, 23, 30))).toBe(true);
-			expect(matches(w, local(y, mo, d, off, 21, 59))).toBe(false);
-		}
-		// Early-morning checks with the correct offset for each date.
-		expect(matches(w, local(2026, 5, 15, -4, 1, 30))).toBe(true);
-		expect(matches(w, local(2026, 5, 15, -4, 2, 0))).toBe(false);
-		// 2026-03-08: 01:30 EST (UTC-5) exists; 02:00 EST == 03:00 EDT.
-		expect(matches(w, local(2026, 2, 8, -5, 1, 30))).toBe(true);
-		expect(matches(w, ctx({ now: Date.UTC(2026, 2, 8, 7, 0) }))).toBe(false); // 03:00 EDT
-		// 2026-11-01: 01:30 EDT, then 01:30 EST again; 02:00 EST is out.
-		expect(matches(w, ctx({ now: Date.UTC(2026, 10, 1, 5, 30) }))).toBe(true); // 01:30 EDT
-		expect(matches(w, ctx({ now: Date.UTC(2026, 10, 1, 6, 30) }))).toBe(true); // 01:30 EST
-		expect(matches(w, ctx({ now: Date.UTC(2026, 10, 1, 7, 0) }))).toBe(false); // 02:00 EST
+		const EDT = -4;
+		const EST = -5;
+		// Normal day (EDT).
+		expect(matches(w, at(2026, 5, 15, EDT, 23, 30))).toBe(true);
+		expect(matches(w, at(2026, 5, 15, EDT, 1, 30))).toBe(true);
+		expect(matches(w, at(2026, 5, 15, EDT, 2, 0))).toBe(false);
+		expect(matches(w, at(2026, 5, 15, EDT, 21, 59))).toBe(false);
+		// 2026-03-08 spring forward: 02:00 does not exist, 01:59 EST is followed by 03:00 EDT.
+		expect(matches(w, at(2026, 2, 8, EST, 1, 30))).toBe(true);
+		expect(matches(w, at(2026, 2, 8, EST, 1, 59))).toBe(true);
+		expect(matches(w, at(2026, 2, 8, EDT, 3, 0))).toBe(false);
+		expect(matches(w, at(2026, 2, 8, EDT, 21, 59))).toBe(false);
+		expect(matches(w, at(2026, 2, 8, EDT, 23, 30))).toBe(true);
+		// 2026-11-01 fall back: 01:30 happens twice (EDT then EST), 02:00 EST is outside.
+		expect(matches(w, at(2026, 10, 1, EDT, 1, 30))).toBe(true);
+		expect(matches(w, at(2026, 10, 1, EST, 1, 30))).toBe(true);
+		expect(matches(w, at(2026, 10, 1, EST, 2, 0))).toBe(false);
+		expect(matches(w, at(2026, 10, 1, EST, 21, 59))).toBe(false);
+		expect(matches(w, at(2026, 10, 1, EST, 23, 30))).toBe(true);
 	});
 	it('overnight days refer to the day the window starts', () => {
 		const w = { time: { days: [5], start: '22:00', end: '02:00', tz: 'UTC' } };
@@ -152,13 +150,13 @@ describe('matches', () => {
 });
 
 describe('parseRules', () => {
-	const good = { id: 'a', when: { countries: ['SG'] }, destination: 'https://a.example/' };
+	const good = { id: 'rule-aaa', when: { countries: ['SG'] }, destination: 'https://a.example/' };
 	it('accepts empty and valid rules', () => {
 		expect(ok([])).toEqual([]);
 		const rules = ok([
 			good,
 			{
-				id: 'b',
+				id: 'rule-bbb',
 				when: {
 					continents: ['AS'],
 					devices: ['mobile'],
@@ -169,7 +167,7 @@ describe('parseRules', () => {
 				destination: 'http://b.example/'
 			},
 			{
-				id: 'c',
+				id: 'rule-ccc',
 				when: {},
 				split: [
 					{ destination: 'https://a.example/', weight: 50 },
@@ -184,20 +182,45 @@ describe('parseRules', () => {
 		expect(err([1])).toMatch(/^Rule 1:/);
 	});
 	it('rejects too many rules', () => {
-		const many = Array.from({ length: MAX_RULES + 1 }, (_, i) => ({ ...good, id: `r${i}` }));
+		const many = Array.from({ length: MAX_RULES + 1 }, (_, i) => ({ ...good, id: `rule-${String(i).padStart(3, '0')}` }));
 		expect(err(many)).toMatch(/at most 20/);
 		expect(ok(many.slice(0, 20))).toHaveLength(20);
 	});
 	it('rejects duplicate ids', () => {
-		expect(err([good, good])).toBe('Rule 2: id "a" is already used');
+		expect(err([good, good])).toBe('Rule 2: id "rule-aaa" is already used');
 	});
 	it('rejects bad ids', () => {
-		expect(err([{ ...good, id: '' }])).toMatch(/^Rule 1: id/);
-		expect(err([{ ...good, id: 5 }])).toMatch(/^Rule 1: id/);
+		const msg = 'Rule 1: id must be 8 letters, digits, _ or -';
+		expect(err([{ ...good, id: '' }])).toBe(msg);
+		expect(err([{ ...good, id: 5 }])).toBe(msg);
+		expect(err([{ ...good, id: 'abcdefg' }])).toBe(msg);
+		expect(err([{ ...good, id: 'abcdefghi' }])).toBe(msg);
+		expect(err([{ ...good, id: 'abcdef!h' }])).toBe(msg);
+		expect(ok([{ ...good, id: 'aB3_-xYz' }])).toHaveLength(1);
 	});
 	it('rejects unknown keys', () => {
 		expect(err([{ ...good, when: { colour: ['red'] } }])).toBe('Rule 1: unknown condition "colour"');
 		expect(err([{ ...good, extra: 1 }])).toBe('Rule 1: unknown field "extra"');
+	});
+	it('normalizes referrer hosts and caps them at 50', () => {
+		const rules = ok([{ ...good, when: { referrerHosts: ['WWW.X.com'] } }]);
+		expect(rules[0].when.referrerHosts).toEqual(['x.com']);
+		expect(matches(rules[0].when, ctx({ referrerHost: 'x.com' }))).toBe(true);
+		const hosts = Array.from({ length: 51 }, (_, i) => `h${i}.com`);
+		expect(err([{ ...good, when: { referrerHosts: hosts } }])).toBe(
+			'Rule 1: at most 50 referrer hosts'
+		);
+		expect(ok([{ ...good, when: { referrerHosts: hosts.slice(0, 50) } }])).toHaveLength(1);
+	});
+	it('rejects destinations with control characters', () => {
+		for (const bad of ['https://a.example/x\ny', 'https://a.example/\tx', 'https://a.example/\x7f']) {
+			expect(err([{ ...good, destination: bad }])).toMatch(/^Rule 1: destination/);
+		}
+		const split = [
+			{ destination: 'https://a.example/\r', weight: 50 },
+			{ destination: 'https://b.example/', weight: 50 }
+		];
+		expect(err([{ id: 'rule-aaa', when: {}, split }])).toMatch(/^Rule 1: split\[0\]/);
 	});
 	it('rejects bad countries and continents', () => {
 		expect(err([{ ...good, when: { continents: ['XX'] } }])).toMatch(/^Rule 1: continents/);
@@ -219,7 +242,7 @@ describe('parseRules', () => {
 		expect(bad({ ...t, zone: 'x' })).toMatch(/^Rule 1: time/);
 	});
 	it('rejects bad splits', () => {
-		const s = (split: unknown) => err([{ id: 'a', when: {}, split }]);
+		const s = (split: unknown) => err([{ id: 'rule-aaa', when: {}, split }]);
 		const e = (w: number) => ({ destination: 'https://a.example/', weight: w });
 		expect(s([e(100)])).toBe('Rule 1: split needs 2 to 5 entries');
 		expect(s([e(1), e(1), e(1), e(1), e(1), e(95)])).toBe('Rule 1: split needs 2 to 5 entries');
@@ -233,7 +256,7 @@ describe('parseRules', () => {
 			{ destination: 'https://a.example/', weight: 50 },
 			{ destination: 'https://b.example/', weight: 49 }
 		];
-		expect(err([good, { id: 'x', when: {}, split }, good])).toBe(
+		expect(err([good, { id: 'rule-xxx', when: {}, split }, good])).toBe(
 			'Rule 2: weights must add up to 100'
 		);
 	});
@@ -251,9 +274,9 @@ describe('parseRules', () => {
 			{ destination: 'https://b.example/', weight: 50 }
 		];
 		expect(err([{ ...good, split }])).toBe('Rule 1: use either destination or split, not both');
-		expect(err([{ id: 'a', when: {} }])).toBe('Rule 1: needs a destination or a split');
+		expect(err([{ id: 'rule-aaa', when: {} }])).toBe('Rule 1: needs a destination or a split');
 	});
 	it('requires a when object', () => {
-		expect(err([{ id: 'a', destination: 'https://a.example/' }])).toMatch(/^Rule 1: when/);
+		expect(err([{ id: 'rule-aaa', destination: 'https://a.example/' }])).toMatch(/^Rule 1: when/);
 	});
 });
