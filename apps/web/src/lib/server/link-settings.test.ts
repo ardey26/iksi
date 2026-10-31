@@ -7,13 +7,14 @@ import { validateSettings } from './link-settings';
 
 const NOW = Date.UTC(2026, 10, 1, 12, 0);
 const current = { clickCount: 5 };
-const run = (input: object, c = current) => validateSettings(input, c, NOW);
-const fail = async (input: object, c = current) => {
+type Cur = { clickCount: number; destination?: string; expiresAt?: Date | null; maxClicks?: number | null };
+const run = (input: object, c: Cur = current) => validateSettings(input, c, NOW);
+const fail = async (input: object, c: Cur = current) => {
   const r = await run(input, c);
   if (r.ok) throw new Error('expected rejection');
   return r.error;
 };
-const pass = async (input: object, c = current) => {
+const pass = async (input: object, c: Cur = current) => {
   const r = await run(input, c);
   if (!r.ok) throw new Error(r.error);
   return r;
@@ -108,5 +109,51 @@ describe('validateSettings', () => {
   it('password null removes it, absent leaves it alone', async () => {
     expect((await pass({ password: null })).data.passwordHash).toBeNull();
     expect(await pass({ permanent: false })).toSatisfy((r: { data: object }) => !('passwordHash' in r.data));
+  });
+
+  it.each([
+    [0, false],
+    [1000000001, false],
+    [5000000000, false]
+  ])('rejects maxClicks %s outside 1 to 1,000,000,000', async (n) => {
+    expect(await fail({ maxClicks: n }, { clickCount: 0 })).toBe('Max clicks must be between 1 and 1,000,000,000');
+  });
+
+  it.each([1, 1000000000])('accepts maxClicks %s', async (n) => {
+    expect((await pass({ maxClicks: n }, { clickCount: 0 })).data.maxClicks).toBe(n);
+  });
+
+  it('treats an unchanged destination as no change', async () => {
+    const r = await pass({ destination: 'example.com/x' }, { clickCount: 5, destination: 'https://example.com/x' });
+    expect(r.data).not.toHaveProperty('originalURL');
+    expect(r.data).not.toHaveProperty('safeVerdict');
+    expect(r.destinationChanged).toBeNull();
+    const c = await pass({ destination: 'example.com/y' }, { clickCount: 5, destination: 'https://example.com/x' });
+    expect(c.destinationChanged).toBe('https://example.com/y');
+  });
+
+  it('words a too-long rule destination without mangling it', async () => {
+    const rules = [{ id: 'rule-aaa', when: {}, destination: 'https://e.com/' + 'a'.repeat(2048) }];
+    expect(await fail({ rules })).toBe('Rule 1: destination must be at most 2048 characters');
+  });
+
+  describe('expiredAt revival', () => {
+    const past = new Date(NOW - 1000);
+    it('keeps expiredAt when only maxClicks changes on a date-expired link', async () => {
+      const r = await pass({ maxClicks: 6 }, { clickCount: 5, expiresAt: past });
+      expect(r.data).not.toHaveProperty('expiredAt');
+    });
+    it('clears expiredAt when expiresAt moves to the future and no click limit is exhausted', async () => {
+      const r = await pass({ expiresAt: new Date(NOW + 5000).toISOString() }, { clickCount: 5, expiresAt: past, maxClicks: 50 });
+      expect(r.data.expiredAt).toBeNull();
+    });
+    it('keeps expiredAt when the stored click limit is still exhausted', async () => {
+      const r = await pass({ expiresAt: new Date(NOW + 5000).toISOString() }, { clickCount: 5, maxClicks: 5 });
+      expect(r.data).not.toHaveProperty('expiredAt');
+    });
+    it('clears expiredAt when both limits are cleared', async () => {
+      const r = await pass({ expiresAt: null, maxClicks: null }, { clickCount: 5, expiresAt: past, maxClicks: 5 });
+      expect(r.data.expiredAt).toBeNull();
+    });
   });
 });

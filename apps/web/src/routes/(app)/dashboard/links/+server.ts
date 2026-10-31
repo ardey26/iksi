@@ -21,22 +21,31 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
   const link = await prisma.longURL.findUnique({ where: { id } });
   if (!link || link.userId !== uid) return json({ error: 'Not found' }, { status: 404 });
 
-  const result = await validateSettings(input, { clickCount: link.clickCount ?? 0 }, Date.now());
+  let currentDestination: string | undefined;
+  try {
+    currentDestination = await decodeURL(link.originalURL);
+  } catch {
+    currentDestination = undefined;
+  }
+  const result = await validateSettings(
+    input,
+    {
+      clickCount: link.clickCount ?? 0,
+      destination: currentDestination,
+      expiresAt: link.expiresAt,
+      maxClicks: link.maxClicks
+    },
+    Date.now()
+  );
   if (!result.ok) return json({ error: result.error }, { status: 400 });
+  if (Object.keys(result.data).length === 0) return json({ error: 'Nothing to change' }, { status: 400 });
 
   const saved = await prisma.longURL.update({ where: { id }, data: result.data });
   await purgeEdge([link.shortURL]);
   // The verdict re-check purges again once it settles.
   if (result.destinationChanged) settleVerdictInBackground(link.shortURL, result.destinationChanged);
 
-  let destination = result.destinationChanged;
-  if (destination === null) {
-    try {
-      destination = await decodeURL(saved?.originalURL ?? link.originalURL);
-    } catch {
-      destination = '';
-    }
-  }
+  const destination = result.destinationChanged ?? currentDestination ?? '';
   return json({ ok: true, settings: toLinkSettings({ ...link, ...saved }, destination) });
 };
 

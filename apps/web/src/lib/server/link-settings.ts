@@ -5,6 +5,8 @@ import { encodeURL } from '#lib/server/crypto.js';
 import { addPrefix, isValidURLServer } from '#lib/utils/urlValidation.js';
 
 const MAX_URL = 2048;
+const MAX_CLICKS_CAP = 1_000_000_000;
+const INVALID_URL = 'Enter a valid URL';
 const BCRYPT_COST = 10;
 const PASSWORD_MIN = 4;
 const PASSWORD_MAX = 128;
@@ -36,13 +38,13 @@ const bad = (error: string): { ok: false; error: string } => ({ ok: false, error
 /** The edge serves these as redirects without re-checking, so every destination gets the same server rules. */
 function destinationError(url: string): string | null {
   if (url.length > MAX_URL) return `URL is too long (max ${MAX_URL} characters)`;
-  if (!isValidURLServer(url)) return 'Enter a valid URL';
+  if (!isValidURLServer(url)) return INVALID_URL;
   return null;
 }
 
 export async function validateSettings(
   input: SettingsInput,
-  current: { clickCount: number },
+  current: { clickCount: number; destination?: string; expiresAt?: Date | null; maxClicks?: number | null },
   now: number
 ): Promise<Result> {
   const data: Prisma.LongURLUpdateInput = {};
@@ -53,9 +55,11 @@ export async function validateSettings(
     const destination = addPrefix(input.destination);
     const err = destinationError(destination);
     if (err) return bad(err);
-    data.originalURL = encodeURL(destination);
-    data.safeVerdict = 'pending';
-    destinationChanged = destination;
+    if (destination !== current.destination) {
+      data.originalURL = encodeURL(destination);
+      data.safeVerdict = 'pending';
+      destinationChanged = destination;
+    }
   }
 
   if (input.rules !== undefined) {
@@ -66,7 +70,7 @@ export async function validateSettings(
       const urls = 'split' in rule ? rule.split.map((s) => s.destination) : [rule.destination];
       for (const u of urls) {
         const err = destinationError(u);
-        if (err) return bad(`Rule ${i + 1}: ${err.charAt(0).toLowerCase()}${err.slice(1)}`);
+        if (err) return bad(`Rule ${i + 1}: ${err === INVALID_URL ? 'enter a valid URL' : err}`);
       }
     }
     data.rules = parsed.rules as unknown as Prisma.InputJsonValue;
@@ -81,7 +85,6 @@ export async function validateSettings(
       if (at.getTime() <= now) return bad('Expiry must be in the future');
       data.expiresAt = at;
     }
-    data.expiredAt = null;
   }
 
   if (input.maxClicks !== undefined) {
@@ -89,12 +92,23 @@ export async function validateSettings(
       data.maxClicks = null;
     } else {
       if (!Number.isInteger(input.maxClicks)) return bad('Click limit must be a whole number');
+      if (input.maxClicks < 1 || input.maxClicks > MAX_CLICKS_CAP) {
+        return bad('Max clicks must be between 1 and 1,000,000,000');
+      }
       if (input.maxClicks <= current.clickCount) {
         return bad(`Click limit must be more than the ${current.clickCount} clicks so far`);
       }
       data.maxClicks = input.maxClicks;
     }
-    data.expiredAt = null;
+  }
+
+  // Revive an expired link only when neither limit still blocks it.
+  if (input.expiresAt !== undefined || input.maxClicks !== undefined) {
+    const expiresAt = input.expiresAt !== undefined ? (data.expiresAt as Date | null) : (current.expiresAt ?? null);
+    const maxClicks = input.maxClicks !== undefined ? (data.maxClicks as number | null) : (current.maxClicks ?? null);
+    if ((expiresAt === null || expiresAt.getTime() > now) && (maxClicks === null || maxClicks > current.clickCount)) {
+      data.expiredAt = null;
+    }
   }
 
   if (input.password !== undefined) {

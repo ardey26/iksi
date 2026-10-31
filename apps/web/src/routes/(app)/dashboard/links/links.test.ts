@@ -157,6 +157,7 @@ describe('dashboard links PATCH settings', () => {
   });
 
   it('re-checks a changed destination in the background without awaiting it', async () => {
+    settleVerdictInBackground.mockReturnValue(new Promise(() => {}));
     const r = await call(PATCH, { id: 5, destination: 'example.com' });
     expect(r.status).toBe(200);
     expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', 'https://example.com');
@@ -176,5 +177,23 @@ describe('dashboard links PATCH settings', () => {
     expect(update).not.toHaveBeenCalled();
     expect(purgeEdge).not.toHaveBeenCalled();
     expect(settleVerdictInBackground).not.toHaveBeenCalled();
+  });
+
+  it('does not re-check or write an unchanged destination', async () => {
+    findUnique.mockResolvedValue({ ...row, originalURL: 'enc:https://example.com' });
+    const r = await call(PATCH, { id: 5, destination: 'example.com' });
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toBe('Nothing to change');
+    expect(update).not.toHaveBeenCalled();
+    expect(purgeEdge).not.toHaveBeenCalled();
+    expect(settleVerdictInBackground).not.toHaveBeenCalled();
+  });
+
+  it('rejects a body with only unknown keys', async () => {
+    const r = await call(PATCH, { id: 5, foo: 1 });
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toBe('Nothing to change');
+    expect(update).not.toHaveBeenCalled();
+    expect(purgeEdge).not.toHaveBeenCalled();
   });
 });
