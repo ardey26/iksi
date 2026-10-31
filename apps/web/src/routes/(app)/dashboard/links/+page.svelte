@@ -1,5 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
+  import LinkSettings from '#lib/components/links/LinkSettings.svelte';
+  import type { LinkSettingsData } from '#lib/rules-form.js';
 
   export let data;
 
@@ -11,6 +13,7 @@
     createdAt: string | Date;
     safeVerdict: string | null;
     profileRow: { id: number; title: string; enabled: boolean; position: number } | null;
+    settings?: LinkSettingsData;
     // Set true on optimistic rows while the server call is in flight; used to
     // dim the row visually. Never persisted by the loader.
     pending?: boolean;
@@ -28,6 +31,16 @@
   }
 
   let copiedId: number | null = null;
+
+  // --- Per-link settings panel (one open at a time) ---
+  let settingsOpenId: number | null = null;
+  function settingsOf(l: Link): LinkSettingsData {
+    return l.settings ?? { destination: l.originalURL, rules: [], expiresAt: null, maxClicks: null, hasPassword: false, permanent: false };
+  }
+  function onSettingsSaved(id: number, s: LinkSettingsData) {
+    links = links.map((l) => (l.id === id ? { ...l, originalURL: s.destination, settings: s } : l));
+    toast('Settings saved');
+  }
 
   // --- Lightweight toast (single message, auto-dismiss) ---
   let toastMessage: string | null = null;
@@ -394,6 +407,7 @@
           <th class="text-left py-2.5 pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Link</th>
           <th class="w-20 text-center whitespace-nowrap font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">On page</th>
           <th class="w-16 text-right pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Clicks</th>
+          <th class="w-9"></th>
           <th class="w-10 pr-2"></th>
         </tr>
       </thead>
@@ -480,6 +494,24 @@
               <div class="text-sm" style="color: var(--text-primary);" title={relDate(l.createdAt)}>{fmtClicks(l.clickCount)}</div>
             </td>
 
+            <!-- Settings -->
+            <td class="w-9 text-center align-middle">
+              <button
+                on:click={() => (settingsOpenId = settingsOpenId === l.id ? null : l.id)}
+                aria-label="Link settings"
+                aria-expanded={settingsOpenId === l.id}
+                title="Link settings"
+                disabled={l.pending}
+                class="settings-btn p-1 align-middle"
+                style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </td>
+
             <!-- Delete -->
             <td class="w-10 pr-2 text-center align-middle">
               <button
@@ -495,6 +527,13 @@
               </button>
             </td>
           </tr>
+          {#if settingsOpenId === l.id}
+            <tr style="border-top: 1px solid var(--border);">
+              <td colspan="6" class="p-0">
+                <LinkSettings id={l.id} settings={settingsOf(l)} on:saved={(e) => onSettingsSaved(l.id, e.detail)} />
+              </td>
+            </tr>
+          {/if}
         {/each}
 
         <!-- Add-row -->
@@ -541,7 +580,7 @@
                     style="background: white; transform: translateX({newPublish ? '18px' : '2px'});"></span>
             </button>
           </td>
-          <td class="align-middle text-right pr-2" colspan="2">
+          <td class="align-middle text-right pr-2" colspan="3">
             <button
               on:click={add}
               disabled={!canAdd}
@@ -560,6 +599,9 @@
 </section>
 
 <style>
+  .settings-btn:disabled { opacity: 0.3; cursor: default; }
+  .settings-btn:not(:disabled):hover { opacity: 0.8; }
+  .settings-btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
   .title-input::placeholder {
     color: var(--text-muted);
     opacity: 0.6;
