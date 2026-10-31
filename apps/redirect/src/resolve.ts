@@ -1,5 +1,6 @@
 import { parseLinkRecord, type LinkLookup, type LinkRecord, type LinkStore } from '@iksi/core';
 import type { Upstream } from './handler';
+import { internalHeaders } from './auth';
 
 /** Found entries older than this are served, then re-checked against origin in the background. */
 export const STALE_AFTER_MS = 3_600_000;
@@ -25,10 +26,10 @@ type OriginAnswer =
 
 async function askOrigin(slug: string, deps: ResolveDeps): Promise<OriginAnswer> {
 	try {
-		const headers = new Headers();
-		if (deps.secret) headers.set('x-iksi-edge', deps.secret);
 		const res = await deps.upstream(
-			new Request(`${deps.origin}/internal/resolve?slug=${encodeURIComponent(slug)}`, { headers })
+			new Request(`${deps.origin}/internal/resolve?slug=${encodeURIComponent(slug)}`, {
+				headers: internalHeaders(deps.secret)
+			})
 		);
 		if (res.status === 404) return { kind: 'missing' };
 		if (res.status !== 200) return { kind: 'unavailable' };

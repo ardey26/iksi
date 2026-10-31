@@ -95,7 +95,8 @@ test('unknown + origin 200 resolves, stores the record and signs the call', asyn
 	});
 	expect(m.current()).toEqual(found(NOW));
 	expect(seen[0].url).toBe('https://www.iksi.app/internal/resolve?slug=AbC');
-	expect(seen[0].headers.get('x-iksi-edge')).toBe('s3cret');
+	expect(seen[0].headers.get('x-iksi-internal')).toBe('s3cret');
+	expect(seen[0].headers.get('x-iksi-edge')).toBeNull();
 });
 
 test('unknown + origin 404 is missing and writes a negative entry', async () => {

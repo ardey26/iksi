@@ -25,21 +25,33 @@ describe('GET /internal/resolve', () => {
   });
 
   it('401s with a wrong secret', async () => {
-    const res = await call('AbC', { 'x-iksi-edge': 'nope' });
+    const res = await call('AbC', { 'x-iksi-internal': 'nope' });
     expect(res.status).toBe(401);
     expect(findUnique).not.toHaveBeenCalled();
   });
 
+  it('401s for the visitor-identity header x-iksi-edge alone, even with the real secret', async () => {
+    const res = await call('AbC', { 'x-iksi-edge': 'edge' });
+    expect(res.status).toBe(401);
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it('200s for a matching x-iksi-internal', async () => {
+    findUnique.mockResolvedValue({ id: 9, originalURL: 'https://example.com', safeVerdict: null });
+    const res = await call('AbC', { 'x-iksi-internal': 'edge' });
+    expect(res.status).toBe(200);
+  });
+
   it('404s for an unknown slug', async () => {
     findUnique.mockResolvedValue(null);
-    const res = await call('AbC', { 'x-iksi-edge': 'edge' });
+    const res = await call('AbC', { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ found: false });
   });
 
   it('returns the record for a known slug, case preserved', async () => {
     findUnique.mockResolvedValue({ id: 9, originalURL: 'https://example.com', safeVerdict: null });
-    const res = await call('AbC', { 'x-iksi-edge': 'edge' });
+    const res = await call('AbC', { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(await res.json()).toEqual({
@@ -52,12 +64,12 @@ describe('GET /internal/resolve', () => {
   });
 
   it('400s for a 65-char slug', async () => {
-    const res = await call('a'.repeat(65), { 'x-iksi-edge': 'edge' });
+    const res = await call('a'.repeat(65), { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(400);
   });
 
   it('400s for a missing slug', async () => {
-    const res = await call(null, { 'x-iksi-edge': 'edge' });
+    const res = await call(null, { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(400);
   });
 });

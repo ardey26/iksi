@@ -1,5 +1,6 @@
 import { parseClickEvent, type ClickEvent } from '@iksi/core';
 import { originOf, type Env, type Upstream } from './handler';
+import { internalHeaders } from './auth';
 
 const RETRY_DELAY_SECONDS = 30;
 
@@ -31,10 +32,8 @@ export function createQueueHandler(deps: QueueDeps) {
 		};
 
 		try {
-			const headers: Record<string, string> = {
-				'content-type': 'application/json'
-			};
-			if (env.EDGE_SECRET) headers['x-iksi-edge'] = env.EDGE_SECRET;
+			const headers = internalHeaders(env.EDGE_SECRET);
+			headers.set('content-type', 'application/json');
 			const response = await deps.upstream(
 				new Request(`${originOf(env)}/internal/ingest`, {
 					method: 'POST',

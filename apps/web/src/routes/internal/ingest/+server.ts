@@ -1,12 +1,12 @@
 import type { RequestHandler } from './$types';
-import { isFromEdge } from '#lib/server/edge-auth.js';
+import { isInternalCall } from '#lib/server/edge-auth.js';
 import { ingestClicks, prismaIngestDb } from '#lib/server/ingest.js';
 
 const NO_STORE = { 'cache-control': 'no-store' };
 const MAX_EVENTS = 500;
 
 export const POST: RequestHandler = async ({ request }) => {
-  if (!isFromEdge(request.headers)) {
+  if (!isInternalCall(request.headers)) {
     return new Response('unauthorized', { status: 401, headers: NO_STORE });
   }
 

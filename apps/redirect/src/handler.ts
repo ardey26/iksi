@@ -9,6 +9,7 @@ import {
 import { kvLinkStore } from './store';
 import { queueEventSink } from './sink';
 import { refreshLink, resolveLink } from './resolve';
+import { EDGE_SECRET_HEADER, INTERNAL_HEADER, secretMatches } from './auth';
 
 export interface Env {
 	VERSION?: string;
@@ -20,7 +21,6 @@ export interface Env {
 }
 
 /** Must match EDGE_HEADERS in apps/web/src/lib/server/client.ts. */
-const EDGE_SECRET_HEADER = 'x-iksi-edge';
 const CLIENT_IP_HEADER = 'x-iksi-client-ip';
 const CLIENT_COUNTRY_HEADER = 'x-iksi-client-country';
 
@@ -51,12 +51,17 @@ const MAX_PURGE_SLUGS = 100;
 export function createHandler(deps: HandlerDeps): Handler {
 	const { upstream } = deps;
 
-	const passThrough = async (request: Request, env: Env, route: string): Promise<Response> => {
+	const passThrough = async (
+		request: Request,
+		env: Env,
+		route: string,
+		internal = false
+	): Promise<Response> => {
 		let origin: Response;
 		try {
 			// On its own route, a same-URL fetch from a Worker goes to the zone's
 			// origin, not back into the Worker.
-			origin = await upstream(withVisitorIdentity(request, env));
+			origin = await upstream(withVisitorIdentity(request, env, internal));
 		} catch {
 			return new Response('origin unavailable', {
 				status: 502,
@@ -82,6 +87,18 @@ export function createHandler(deps: HandlerDeps): Handler {
 
 		if (url.pathname === '/_edge/purge' && request.method === 'POST') {
 			return purge(request, env, deps.store(env));
+		}
+
+		if (isInternalPath(url.pathname)) {
+			// Only the Worker's own calls (re-entering through this route) carry the
+			// internal secret; to everyone else these endpoints do not exist.
+			if (!(await secretMatches(request.headers.get(INTERNAL_HEADER), env.EDGE_SECRET))) {
+				return new Response('Not found', {
+					status: 404,
+					headers: { 'cache-control': 'no-store', 'x-iksi-route': 'reserved' }
+				});
+			}
+			return passThrough(request, env, 'reserved', true);
 		}
 
 		const path = classifyPath(url.pathname);
@@ -165,6 +182,15 @@ function scheduleRefresh(slug: string, run: () => Promise<void>, ctx: ExecutionC
 	);
 }
 
+/**
+ * Matches /internal and below, generously: case and repeated slashes are
+ * folded so an origin that normalizes either cannot be reached around the check.
+ */
+function isInternalPath(pathname: string): boolean {
+	const p = pathname.replace(/\/{2,}/g, '/').toLowerCase();
+	return p === '/internal' || p.startsWith('/internal/');
+}
+
 async function purge(request: Request, env: Env, store: LinkStore): Promise<Response> {
 	if (!(await secretMatches(request.headers.get(EDGE_SECRET_HEADER), env.EDGE_SECRET))) {
 		return new Response(null, { status: 401 });
@@ -182,27 +208,21 @@ async function purge(request: Request, env: Env, store: LinkStore): Promise<Resp
 	return new Response(null, { status: 204 });
 }
 
-/** Constant-time: both sides are hashed to equal length, then compared with timingSafeEqual. */
-async function secretMatches(given: string | null, expected: string | undefined): Promise<boolean> {
-	if (!expected || !given) return false;
-	const digest = async (value: string) =>
-		new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
-	const [a, b] = await Promise.all([digest(given), digest(expected)]);
-	return crypto.subtle.timingSafeEqual(a, b);
-}
-
 /**
  * Behind Cloudflare, the origin sees Cloudflare's IP and location. Forward the
  * visitor's own, signed with the shared secret; strip any copies the client
- * sent so they cannot be spoofed.
+ * sent so they cannot be spoofed. The internal header is always stripped and is
+ * set again only for an already-verified internal call.
  */
-function withVisitorIdentity(request: Request, env: Env): Request {
+function withVisitorIdentity(request: Request, env: Env, internal: boolean): Request {
 	const headers = new Headers(request.headers);
 	headers.delete(EDGE_SECRET_HEADER);
+	headers.delete(INTERNAL_HEADER);
 	headers.delete(CLIENT_IP_HEADER);
 	headers.delete(CLIENT_COUNTRY_HEADER);
 
 	if (env.EDGE_SECRET) {
+		if (internal) headers.set(INTERNAL_HEADER, env.EDGE_SECRET);
 		headers.set(EDGE_SECRET_HEADER, env.EDGE_SECRET);
 		const ip = request.headers.get('cf-connecting-ip');
 		if (ip) headers.set(CLIENT_IP_HEADER, ip);

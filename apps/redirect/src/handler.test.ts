@@ -219,15 +219,87 @@ describe('visitor identity forwarded to origin', () => {
 			body: 'x',
 			headers: {
 				'x-iksi-edge': 'guess',
+				'x-iksi-internal': 'guess',
 				'x-iksi-client-ip': '6.6.6.6',
 				'x-iksi-client-country': 'KP'
 			}
 		});
 		await createHandler(deps(upstream))(spoofed, testEnv(), ctx);
 		expect(seen[0].headers.get('x-iksi-edge')).toBeNull();
+		expect(seen[0].headers.get('x-iksi-internal')).toBeNull();
 		expect(seen[0].headers.get('x-iksi-client-ip')).toBeNull();
 		expect(seen[0].headers.get('x-iksi-client-country')).toBeNull();
 		expect(await seen[0].text()).toBe('x');
+	});
+});
+
+describe('internal endpoints', () => {
+	const internal = (path: string, method: string, headers: Record<string, string> = {}) =>
+		new Request(`https://www.iksi.app${path}`, {
+			method,
+			headers,
+			body: method === 'POST' ? '{"events":[]}' : undefined
+		});
+	const paths = ['/internal/resolve?slug=QdM2whH', '/internal/ingest', '/internal/ping'];
+	const spoofs: [string, Record<string, string>][] = [
+		['no header', {}],
+		['a spoofed x-iksi-edge', { 'x-iksi-edge': 'guess' }],
+		['a spoofed x-iksi-internal', { 'x-iksi-internal': 'guess' }],
+		['the real secret in x-iksi-edge', { 'x-iksi-edge': 's3cret' }]
+	];
+
+	describe.each(paths)('%s', (path) => {
+		test.each(['GET', 'POST'])('%s from a visitor is 404 and never forwarded', async (method) => {
+			for (const [, headers] of spoofs) {
+				const { upstream, seen } = recordingUpstream(() => new Response('secret data'));
+				const res = await createHandler(deps(upstream))(
+					internal(path, method, headers),
+					testEnv({ EDGE_SECRET: 's3cret' }),
+					ctx
+				);
+				expect(res.status).toBe(404);
+				expect(seen).toHaveLength(0);
+			}
+		});
+	});
+
+	test.each(['/Internal/ingest', '//internal/ingest', '/internal/'])(
+		'%s is refused too',
+		async (path) => {
+			const { upstream, seen } = recordingUpstream(() => new Response('x'));
+			const res = await createHandler(deps(upstream))(
+				internal(path, 'POST'),
+				testEnv({ EDGE_SECRET: 's3cret' }),
+				ctx
+			);
+			expect(res.status).toBe(404);
+			expect(seen).toHaveLength(0);
+		}
+	);
+
+	test('no EDGE_SECRET configured refuses even an empty x-iksi-internal', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response('x'));
+		const res = await createHandler(deps(upstream))(
+			internal('/internal/ingest', 'POST', { 'x-iksi-internal': '' }),
+			testEnv(),
+			ctx
+		);
+		expect(res.status).toBe(404);
+		expect(seen).toHaveLength(0);
+	});
+
+	test('a request carrying the matching x-iksi-internal is forwarded with it', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response('{}', { status: 200 }));
+		const res = await createHandler(deps(upstream))(
+			internal('/internal/ingest', 'POST', { 'x-iksi-internal': 's3cret' }),
+			testEnv({ EDGE_SECRET: 's3cret' }),
+			ctx
+		);
+		expect(res.status).toBe(200);
+		expect(seen).toHaveLength(1);
+		expect(seen[0].url).toBe('https://www.iksi.app/internal/ingest');
+		expect(seen[0].headers.get('x-iksi-internal')).toBe('s3cret');
+		expect(await seen[0].text()).toBe('{"events":[]}');
 	});
 });
 

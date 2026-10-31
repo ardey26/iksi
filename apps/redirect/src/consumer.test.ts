@@ -53,7 +53,8 @@ describe('queue consumer', () => {
 		expect(seen).toHaveLength(1);
 		expect(seen[0].method).toBe('POST');
 		expect(seen[0].url).toBe('https://www.iksi.app/internal/ingest');
-		expect(seen[0].headers.get('x-iksi-edge')).toBe('s3cret');
+		expect(seen[0].headers.get('x-iksi-internal')).toBe('s3cret');
+		expect(seen[0].headers.get('x-iksi-edge')).toBeNull();
 		const body = (await seen[0].json()) as { events: ClickEvent[] };
 		expect(body.events).toHaveLength(3);
 		expect(result.explicitAcks).toHaveLength(3);

@@ -55,18 +55,31 @@ describe('POST /internal/ingest', () => {
     expect(createMany).not.toHaveBeenCalled();
   });
 
+  it('401s for the visitor-identity header x-iksi-edge alone, even with the real secret', async () => {
+    const res = await call({ events: [good] }, { 'x-iksi-edge': 'edge' });
+    expect(res.status).toBe(401);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
+  it('401s with a wrong x-iksi-internal', async () => {
+    const res = await call({ events: [good] }, { 'x-iksi-internal': 'nope' });
+    expect(res.status).toBe(401);
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
   it('400s when events is not an array', async () => {
-    const res = await call({ events: 'x' }, { 'x-iksi-edge': 'edge' });
+    const res = await call({ events: 'x' }, { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(400);
   });
 
   it('400s on invalid json', async () => {
-    const res = await call('{nope', { 'x-iksi-edge': 'edge' });
+    const res = await call('{nope', { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(400);
   });
 
   it('400s for more than 500 events', async () => {
-    const res = await call({ events: Array(501).fill(good) }, { 'x-iksi-edge': 'edge' });
+    const res = await call({ events: Array(501).fill(good) }, { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(400);
     expect(createMany).not.toHaveBeenCalled();
   });
@@ -75,7 +88,7 @@ describe('POST /internal/ingest', () => {
     findMany.mockResolvedValue([{ id: 3 }]);
     createMany.mockResolvedValue({ count: 1 });
     $transaction.mockResolvedValue([]);
-    const res = await call({ events: [good, null] }, { 'x-iksi-edge': 'edge' });
+    const res = await call({ events: [good, null] }, { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ accepted: 1, dropped: 1 });
     expect(createMany).toHaveBeenCalledTimes(1);
@@ -85,7 +98,7 @@ describe('POST /internal/ingest', () => {
   it('5xxs when the transaction rejects so the queue retries', async () => {
     findMany.mockResolvedValue([{ id: 3 }]);
     $transaction.mockRejectedValue(new Error('db down'));
-    const res = await call({ events: [good] }, { 'x-iksi-edge': 'edge' });
+    const res = await call({ events: [good] }, { 'x-iksi-internal': 'edge' });
     expect(res.status).toBeGreaterThanOrEqual(500);
   });
 
@@ -95,7 +108,7 @@ describe('POST /internal/ingest', () => {
     $transaction.mockResolvedValue([]);
     const res = await call(
       { events: [{ ...good, surface: 'profile', profileId: 7, rowId: 9 }] },
-      { 'x-iksi-edge': 'edge' }
+      { 'x-iksi-internal': 'edge' }
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ accepted: 1, dropped: 0 });

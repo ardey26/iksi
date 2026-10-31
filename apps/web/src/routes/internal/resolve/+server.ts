@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { isFromEdge } from '#lib/server/edge-auth.js';
+import { isInternalCall } from '#lib/server/edge-auth.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { toLinkRecord } from '#lib/server/link-record.js';
 
@@ -14,7 +14,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 export const GET: RequestHandler = async ({ url, request }) => {
-  if (!isFromEdge(request.headers)) {
+  if (!isInternalCall(request.headers)) {
     return new Response('unauthorized', { status: 401, headers: NO_STORE });
   }
 
