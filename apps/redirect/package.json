@@ -6,8 +6,9 @@
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
-		"test": "vitest",
-		"lint": "tsc -p tsconfig.json"
+		"test": "vitest run",
+		"lint": "tsc -p tsconfig.json",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@iksi/core": "workspace:*"

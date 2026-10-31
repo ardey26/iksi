@@ -69,7 +69,7 @@ pnpm --filter @iksi/web exec prisma db push
 ```sh
 pnpm --filter @iksi/web dev        # app at http://localhost:5173/
 pnpm --filter @iksi/redirect dev   # edge Worker via wrangler dev
-pnpm -r test -- --run              # every workspace's tests
+pnpm -r test                       # every workspace's tests
 ```
 
 ---
@@ -233,7 +233,7 @@ A pass-through Worker sits in front of `iksi.app` and tags every response with `
 
 ### **Available Scripts**
 Run from the repo root:
-- `pnpm -r test -- --run` - Run every workspace's tests
+- `pnpm -r test` - Run every workspace's tests
 - `pnpm -r build` - Build every workspace
 - `pnpm -r lint` - Lint every workspace
 - `pnpm --filter @iksi/web dev` - Start the app's dev server

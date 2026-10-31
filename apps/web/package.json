@@ -9,12 +9,13 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
-		"test": "vitest",
+		"test": "vitest run",
 		"test:ui": "vitest --ui",
 		"test:coverage": "vitest --coverage",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"postinstall": "prisma generate"
+		"postinstall": "prisma generate",
+		"test:watch": "vitest"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.5",
