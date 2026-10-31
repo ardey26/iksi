@@ -100,7 +100,7 @@
       </span>
     </div>
   </div>
-  <p class="text-sm h-5" style="color: var(--error);" role={error ? 'alert' : undefined}>{error}</p>
+  <p class="text-sm min-h-5" style="color: var(--error);" role={error ? 'alert' : undefined}>{error}</p>
   <input bind:this={input} type="file" class="hidden" on:change={onPick}
          accept="image/jpeg,image/png,image/webp,image/gif,image/avif" />
 </div>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { MAX_UPLOAD_BYTES, MediaError, mediaBaseKey, processImage, variantKey } from './media';
 
@@ -129,5 +129,18 @@ describe('keys', () => {
 	it('builds base and variant keys', () => {
 		expect(mediaBaseKey(7, 'avatar', 'u1')).toBe('7/avatar/u1');
 		expect(variantKey('7/avatar/u1', '96')).toBe('7/avatar/u1.96.webp');
+	});
+});
+
+describe('unexpected failures', () => {
+	it('logs a non-MediaError before mapping it to unsupported', async () => {
+		const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const png = await sharp({ create: { width: 300, height: 300, channels: 3, background: '#123' } })
+			.png()
+			.toBuffer();
+		const truncated = new Uint8Array(png.subarray(0, Math.floor(png.length / 2)));
+		await expect(processImage(truncated, 'avatar')).rejects.toMatchObject({ code: 'unsupported' });
+		expect(err).toHaveBeenCalled();
+		err.mockRestore();
 	});
 });

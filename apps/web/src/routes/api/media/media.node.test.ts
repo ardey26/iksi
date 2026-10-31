@@ -60,6 +60,20 @@ describe('/api/media', () => {
 		expect(res.status).toBe(400);
 		expect(await res.json()).toMatchObject({ code: 'unsupported' });
 	});
+	it.each([
+		['too_large', 'Images must be under 4 MB.'],
+		['unsupported', 'Use a JPEG, PNG, WebP, GIF or AVIF image.'],
+		['too_many_pixels', 'Images must be 8000 px or smaller on each side.'],
+		['empty', 'That file is empty.']
+	])('maps %s to friendly text', async (code, text) => {
+		const { MediaError } = await import('#lib/server/media.js');
+		h.put.mockImplementationOnce(async () => {
+			throw new MediaError(code as any);
+		});
+		const res = await post(new Blob([await png()]), 'avatar');
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: text, code });
+	});
 	it('400 for a bad kind', async () => {
 		expect((await post(new Blob([await png()]), 'banner')).status).toBe(400);
 	});

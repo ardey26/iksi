@@ -78,6 +78,7 @@ export async function processImage(input: Uint8Array, kind: MediaKind): Promise<
 		);
 	} catch (e) {
 		if (e instanceof MediaError) throw e;
+		console.error('media: image processing failed', e);
 		throw new MediaError('unsupported');
 	}
 }

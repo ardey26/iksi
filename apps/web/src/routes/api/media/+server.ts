@@ -7,6 +7,13 @@ import { MAX_UPLOAD_BYTES, MediaError, type MediaKind } from '#lib/server/media.
 import { r2MediaStore } from '#lib/server/media-store.js';
 import { NoProfileError, prismaProfileMediaDb, removeMedia, replaceMedia } from '#lib/server/profile-media.js';
 
+const MEDIA_ERROR_TEXT: Record<MediaError['code'], string> = {
+	too_large: 'Images must be under 4 MB.',
+	unsupported: 'Use a JPEG, PNG, WebP, GIF or AVIF image.',
+	too_many_pixels: 'Images must be 8000 px or smaller on each side.',
+	empty: 'That file is empty.'
+};
+
 function parseKind(v: unknown): MediaKind | null {
 	return v === 'avatar' || v === 'background' ? v : null;
 }
@@ -28,7 +35,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	if (!kind) return json({ error: 'Invalid kind' }, { status: 400 });
 	const file = form.get('file');
 	if (!(file instanceof File)) return json({ error: 'File required' }, { status: 400 });
-	if (file.size > MAX_UPLOAD_BYTES) return json({ error: 'File too large', code: 'too_large' }, { status: 400 });
+	if (file.size > MAX_UPLOAD_BYTES) return json({ error: MEDIA_ERROR_TEXT.too_large, code: 'too_large' }, { status: 400 });
 
 	try {
 		const bytes = new Uint8Array(await file.arrayBuffer());
@@ -40,7 +47,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		if (kind === 'avatar') invalidateUserCache(uid);
 		return json({ url });
 	} catch (err) {
-		if (err instanceof MediaError) return json({ error: err.message, code: err.code }, { status: 400 });
+		if (err instanceof MediaError) return json({ error: MEDIA_ERROR_TEXT[err.code], code: err.code }, { status: 400 });
 		if (err instanceof NoProfileError) return json({ error: 'No profile' }, { status: 404 });
 		throw err;
 	}
