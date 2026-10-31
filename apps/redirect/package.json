@@ -1,0 +1,22 @@
+{
+	"name": "@iksi/redirect",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"test": "vitest",
+		"lint": "tsc -p tsconfig.json"
+	},
+	"dependencies": {
+		"@iksi/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-plugin": "^1.4.11",
+		"@cloudflare/workers-types": "^5.20261031.1",
+		"typescript": "^5.6",
+		"vitest": "^4.1.12",
+		"wrangler": "^4"
+	}
+}
