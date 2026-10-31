@@ -135,6 +135,7 @@
       <div class="body" id={`ls-${id}-destination`}>
         <label class="label" for={`ls-${id}-dest-input`}>Destination</label>
         <input id={`ls-${id}-dest-input`} class="field" type="text" inputmode="url" maxlength="2048" bind:value={destination} />
+        <p class="hint mt-1">https:// is added if missing</p>
       </div>
     {/if}
   </div>

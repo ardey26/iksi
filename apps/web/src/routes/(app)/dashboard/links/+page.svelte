@@ -34,9 +34,6 @@
 
   // --- Per-link settings panel (one open at a time) ---
   let settingsOpenId: number | null = null;
-  function settingsOf(l: Link): LinkSettingsData {
-    return l.settings ?? { destination: l.originalURL, rules: [], expiresAt: null, maxClicks: null, hasPassword: false, permanent: false };
-  }
   function onSettingsSaved(id: number, s: LinkSettingsData) {
     links = links.map((l) => (l.id === id ? { ...l, originalURL: s.destination, settings: s } : l));
     toast('Settings saved');
@@ -496,12 +493,12 @@
 
             <!-- Settings -->
             <td class="w-9 text-center align-middle">
+              {#if l.settings}
               <button
                 on:click={() => (settingsOpenId = settingsOpenId === l.id ? null : l.id)}
                 aria-label="Link settings"
                 aria-expanded={settingsOpenId === l.id}
                 title="Link settings"
-                disabled={l.pending}
                 class="settings-btn p-1 align-middle"
                 style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
               >
@@ -510,6 +507,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
+              {/if}
             </td>
 
             <!-- Delete -->
@@ -527,10 +525,10 @@
               </button>
             </td>
           </tr>
-          {#if settingsOpenId === l.id}
+          {#if settingsOpenId === l.id && l.settings}
             <tr style="border-top: 1px solid var(--border);">
               <td colspan="6" class="p-0">
-                <LinkSettings id={l.id} settings={settingsOf(l)} on:saved={(e) => onSettingsSaved(l.id, e.detail)} />
+                <LinkSettings id={l.id} settings={l.settings} on:saved={(e) => onSettingsSaved(l.id, e.detail)} />
               </td>
             </tr>
           {/if}

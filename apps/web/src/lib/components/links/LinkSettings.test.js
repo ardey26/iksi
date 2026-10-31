@@ -47,7 +47,11 @@ describe('LinkSettings', () => {
   });
 
   it('saves a country rule', async () => {
-    const fetchFn = mockFetch({ body: { ok: true, settings: base } });
+    const saved = {
+      ...base,
+      rules: [{ id: 'zzzzzzz1', when: { countries: ['SG'] }, destination: 'https://sg.example.com' }]
+    };
+    const fetchFn = mockFetch({ body: { ok: true, settings: saved } });
     render(LinkSettings, { props: { id: 7, settings: base } });
     await open(/Routing rules/);
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
@@ -62,6 +66,84 @@ describe('LinkSettings', () => {
       id: 7,
       rules: [{ id: expect.stringMatching(/^[A-Za-z0-9_-]{8}$/), when: { countries: ['SG'] }, destination: 'https://sg.example.com' }]
     });
+    // State now follows the response, not the typed edits.
+    await waitFor(() => expect(saveBtn()).toBeDisabled());
+    expect(screen.getByLabelText('Countries')).toHaveValue('SG');
+    expect(screen.getByRole('button', { name: 'Remove rule 1' })).toBeInTheDocument();
+    expect(screen.getByText('1 rule')).toBeInTheDocument();
+  });
+
+  it('keeps rule edits after a 400', async () => {
+    mockFetch({ status: 400, body: { error: 'Rule 1: destination is not allowed' } });
+    render(LinkSettings, { props: { id: 7, settings: base } });
+    await open(/Routing rules/);
+    await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    await fireEvent.input(screen.getByLabelText('Go to'), { target: { value: 'https://x.example.com' } });
+    await fireEvent.click(saveBtn());
+    expect(await screen.findByText('Rule 1: destination is not allowed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Go to')).toHaveValue('https://x.example.com');
+  });
+
+  it('emits saved with the returned settings', async () => {
+    const saved = { ...base, permanent: true };
+    mockFetch({ body: { ok: true, settings: saved } });
+    const events = { saved: vi.fn() };
+    render(LinkSettings, { props: { id: 7, settings: base }, events });
+    await open(/Permanent redirect/);
+    await fireEvent.click(screen.getByRole('switch', { name: 'Permanent redirect' }));
+    await fireEvent.click(saveBtn());
+    await waitFor(() => expect(events.saved).toHaveBeenCalled());
+    expect(events.saved.mock.calls[0][0].detail ?? events.saved.mock.calls[0][0]).toEqual(saved);
+  });
+
+  it('builds a time condition with days, start, end and zone', async () => {
+    const fetchFn = mockFetch({ body: { ok: true, settings: base } });
+    render(LinkSettings, { props: { id: 7, settings: base } });
+    await open(/Routing rules/);
+    await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    await fireEvent.change(screen.getByLabelText('Add condition'), { target: { value: 'time' } });
+    await fireEvent.click(screen.getByLabelText('Fri'));
+    await fireEvent.click(screen.getByLabelText('Mon'));
+    await fireEvent.input(screen.getByLabelText('Start'), { target: { value: '22:00' } });
+    await fireEvent.input(screen.getByLabelText('End'), { target: { value: '06:00' } });
+    await fireEvent.change(screen.getByLabelText('Time zone'), { target: { value: 'UTC' } });
+    await fireEvent.input(screen.getByLabelText('Go to'), { target: { value: 'https://night.example.com' } });
+    await fireEvent.click(saveBtn());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+    expect(sent(fetchFn).rules[0].when).toEqual({ time: { days: [1, 5], start: '22:00', end: '06:00', tz: 'UTC' } });
+  });
+
+  it('enters an A/B split with a live total', async () => {
+    const fetchFn = mockFetch({ body: { ok: true, settings: base } });
+    render(LinkSettings, { props: { id: 7, settings: base } });
+    await open(/Routing rules/);
+    await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
+    const one = screen.getByRole('button', { name: 'One URL' });
+    const ab = screen.getByRole('button', { name: 'A/B split' });
+    expect(one).toHaveAttribute('aria-pressed', 'true');
+    await fireEvent.click(ab);
+    expect(ab).toHaveAttribute('aria-pressed', 'true');
+    expect(one).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('radio')).toBeNull();
+    await fireEvent.input(screen.getByLabelText('Split destination 1'), { target: { value: 'https://a.example.com' } });
+    await fireEvent.input(screen.getByLabelText('Split destination 2'), { target: { value: 'https://b.example.com' } });
+    await fireEvent.input(screen.getByLabelText('Split weight 1'), { target: { value: '60' } });
+    await fireEvent.input(screen.getByLabelText('Split weight 2'), { target: { value: '30' } });
+    expect(screen.getByText(/90 of 100, must add up to 100/)).toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText('Split weight 2'), { target: { value: '40' } });
+    expect(screen.getByText('100 of 100')).toBeInTheDocument();
+    await fireEvent.click(saveBtn());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+    expect(sent(fetchFn).rules[0].split).toEqual([
+      { destination: 'https://a.example.com', weight: 60 },
+      { destination: 'https://b.example.com', weight: 40 }
+    ]);
+  });
+
+  it('hints that https:// is added', async () => {
+    render(LinkSettings, { props: { id: 7, settings: base } });
+    await open(/Destination/);
+    expect(screen.getByText('https:// is added if missing')).toBeInTheDocument();
   });
 
   it('shows the server error and keeps the edits', async () => {

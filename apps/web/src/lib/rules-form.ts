@@ -1,3 +1,4 @@
+import { addPrefix } from '#lib/utils/urlValidation.js';
 import { parseRules, type Rule, type Continent, type Device, type Os } from '@iksi/core';
 
 /** Client-side mirror of the server's LinkSettings, kept here so no server module reaches the browser. */
@@ -65,12 +66,6 @@ export function newRuleId(): string {
 
 const list = (s: string) => s.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean);
 
-/** Bare hosts like "example.com/x" get https://; anything with a scheme is left for the validator. */
-function withScheme(url: string): string {
-  const t = url.trim();
-  return /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
-}
-
 function buildWhen(conditions: ConditionForm[]): Conditions {
   const when: Conditions = {};
   for (const c of conditions) {
@@ -107,13 +102,13 @@ export function fromForm(forms: RuleForm[]): { ok: true; rules: Rule[] } | { ok:
         id: f.id,
         when,
         split: f.split.map((s) => ({
-          destination: withScheme(s.destination),
+          destination: addPrefix(s.destination),
           weight: s.weight.trim() === '' ? 0 : Number(s.weight)
         }))
       });
     } else {
       if (!f.destination.trim()) return { ok: false, error: `Rule ${i + 1}: add a destination` };
-      raw.push({ id: f.id, when, destination: withScheme(f.destination) });
+      raw.push({ id: f.id, when, destination: addPrefix(f.destination) });
     }
   }
   return parseRules(raw);

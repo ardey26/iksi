@@ -110,6 +110,21 @@ describe('rules-form', () => {
     expect(r.ok && r.rules[0]).toMatchObject({ destination: 'https://example.com/x' });
   });
 
+  it('prefixes destinations that carry a port', () => {
+    const r = fromForm([single({ destination: 'example.com:8080/x' })]);
+    expect(r.ok && r.rules[0]).toMatchObject({ destination: 'https://example.com:8080/x' });
+    const sp = fromForm([
+      single({
+        mode: 'split',
+        split: [
+          { destination: 'localhost:3000/x', weight: '50' },
+          { destination: 'b.example.com', weight: '50' }
+        ]
+      })
+    ]);
+    expect(sp.ok && 'split' in sp.rules[0] && sp.rules[0].split[0].destination).toBe('https://localhost:3000/x');
+  });
+
   it('newRuleId makes 8 safe characters', () => {
     for (let i = 0; i < 50; i++) expect(newRuleId()).toMatch(/^[A-Za-z0-9_-]{8}$/);
     expect(newRuleId()).not.toBe(newRuleId());

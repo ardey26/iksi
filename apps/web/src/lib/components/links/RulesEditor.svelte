@@ -1,9 +1,22 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { MAX_RULES } from '@iksi/core';
   import type { Continent, Device, Os } from '@iksi/core';
   import { newRuleId, type ConditionForm, type RuleForm } from '#lib/rules-form.js';
 
   export let rules: RuleForm[] = [];
+
+  let root: HTMLElement;
+
+  /** Moves focus once the DOM reflects a structural change; the first selector that finds an enabled control wins. */
+  async function focusAfter(...selectors: string[]) {
+    await tick();
+    for (const sel of selectors) {
+      const el = root?.querySelector<HTMLElement>(sel);
+      if (el && !(el as HTMLButtonElement).disabled) { el.focus(); return; }
+    }
+  }
+  const ruleSel = (id: string, act: string) => `[data-rule="${id}"] [data-act="${act}"]`;
 
   const MAX_SPLIT = 5;
   const MIN_SPLIT = 2;
@@ -78,7 +91,9 @@
     rules = [...rules, { id: newRuleId(), conditions: [], mode: 'single', destination: '', split: [] }];
   }
   function removeRule(i: number) {
+    const next = rules[i + 1]?.id;
     rules = rules.filter((_, idx) => idx !== i);
+    focusAfter(...(next ? [ruleSel(next, 'remove')] : []), '[data-act="add-rule"]');
   }
   function move(i: number, by: -1 | 1) {
     const j = i + by;
@@ -86,6 +101,7 @@
     const next = [...rules];
     [next[i], next[j]] = [next[j], next[i]];
     rules = next;
+    focusAfter(ruleSel(next[j].id, by === -1 ? 'up' : 'down'), ruleSel(next[j].id, by === -1 ? 'down' : 'up'));
   }
   function addCondition(rule: RuleForm, e: Event) {
     const select = e.currentTarget as HTMLSelectElement;
@@ -94,10 +110,12 @@
     if (!kind) return;
     rule.conditions = [...rule.conditions, defaultCondition(kind)];
     rules = rules;
+    focusAfter(`[data-cond="${rule.id}-${kind}"] input, [data-cond="${rule.id}-${kind}"] select`);
   }
   function removeCondition(rule: RuleForm, ci: number) {
     rule.conditions = rule.conditions.filter((_, idx) => idx !== ci);
     rules = rules;
+    focusAfter(`[data-rule="${rule.id}"] [data-act="add-condition"]`, ruleSel(rule.id, 'up'));
   }
   function toggle<T>(list: T[], value: T): T[] {
     return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -125,6 +143,7 @@
     if (rule.split.length <= MIN_SPLIT) return;
     rule.split = rule.split.filter((_, idx) => idx !== si);
     rules = rules;
+    focusAfter(`[data-rule="${rule.id}"] [data-split="${Math.min(si, rule.split.length - 1)}"]`, `[data-rule="${rule.id}"] [data-act="add-split"]`);
   }
   function total(rule: RuleForm): number {
     return rule.split.reduce((sum, s) => sum + (Number(s.weight) || 0), 0);
@@ -138,23 +157,23 @@
   }
 </script>
 
-<div class="space-y-3">
+<div class="space-y-3" bind:this={root}>
   {#if rules.length === 0}
     <p class="text-sm" style="color: var(--text-muted);">No rules. Everyone goes to the main destination.</p>
   {/if}
 
   {#each rules as rule, i (rule.id)}
-    <fieldset class="rule space-y-3" aria-label={`Rule ${i + 1}`}>
+    <fieldset class="rule space-y-3" aria-label={`Rule ${i + 1}`} data-rule={rule.id}>
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-muted);">Rule {i + 1}</span>
         <div class="flex items-center gap-1">
-          <button type="button" class="icon" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} on:click={() => move(i, -1)}>
+          <button type="button" class="icon" data-act="up" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} on:click={() => move(i, -1)}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
           </button>
-          <button type="button" class="icon" aria-label={`Move rule ${i + 1} down`} disabled={i === rules.length - 1} on:click={() => move(i, 1)}>
+          <button type="button" class="icon" data-act="down" aria-label={`Move rule ${i + 1} down`} disabled={i === rules.length - 1} on:click={() => move(i, 1)}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
           </button>
-          <button type="button" class="icon" aria-label={`Remove rule ${i + 1}`} on:click={() => removeRule(i)}>
+          <button type="button" class="icon" data-act="remove" aria-label={`Remove rule ${i + 1}`} on:click={() => removeRule(i)}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
@@ -167,7 +186,7 @@
           <p class="hint">Always, unless an earlier rule matched.</p>
         {/if}
         {#each rule.conditions as c, ci (c.kind)}
-          <div class="cond space-y-2">
+          <div class="cond space-y-2" data-cond={`${rule.id}-${c.kind}`}>
             <div class="flex items-center justify-between gap-2">
               <span class="text-sm font-medium" style="color: var(--text-primary);">{kindLabel(c.kind)}</span>
               <button type="button" class="icon" aria-label={`Remove ${kindLabel(c.kind)} condition`} on:click={() => removeCondition(rule, ci)}>
@@ -245,7 +264,7 @@
         {/each}
 
         {#if available(rule).length > 0}
-          <select class="field add-select" aria-label="Add condition" on:change={(e) => addCondition(rule, e)}>
+          <select class="field add-select" data-act="add-condition" aria-label="Add condition" on:change={(e) => addCondition(rule, e)}>
             <option value="">Add condition</option>
             {#each available(rule) as k}<option value={k.kind}>{k.label}</option>{/each}
           </select>
@@ -256,19 +275,20 @@
       <div class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <p class="label">Go to</p>
-          <div class="seg" role="radiogroup" aria-label={`Rule ${i + 1} destination type`}>
-            <button type="button" role="radio" aria-checked={rule.mode === 'single'} class:on={rule.mode === 'single'} on:click={() => setMode(rule, 'single')}>One URL</button>
-            <button type="button" role="radio" aria-checked={rule.mode === 'split'} class:on={rule.mode === 'split'} on:click={() => setMode(rule, 'split')}>A/B split</button>
+          <div class="seg" role="group" aria-label={`Rule ${i + 1} destination type`}>
+            <button type="button" aria-pressed={rule.mode === 'single'} class:on={rule.mode === 'single'} on:click={() => setMode(rule, 'single')}>One URL</button>
+            <button type="button" aria-pressed={rule.mode === 'split'} class:on={rule.mode === 'split'} on:click={() => setMode(rule, 'split')}>A/B split</button>
           </div>
         </div>
 
         {#if rule.mode === 'single'}
           <label class="sr-only" for={`${rule.id}-dest`}>Go to</label>
           <input id={`${rule.id}-dest`} class="field" type="text" inputmode="url" placeholder="https://example.com" bind:value={rule.destination} />
+          <p class="hint">https:// is added if missing</p>
         {:else}
           {#each rule.split as s, si}
             <div class="flex items-center gap-2">
-              <input class="field flex-1 min-w-0" type="text" inputmode="url" placeholder="https://example.com" aria-label={`Split destination ${si + 1}`} bind:value={s.destination} />
+              <input class="field flex-1 min-w-0" type="text" inputmode="url" placeholder="https://example.com" data-split={si} aria-label={`Split destination ${si + 1}`} bind:value={s.destination} />
               <input class="field weight" type="text" inputmode="numeric" placeholder="%" aria-label={`Split weight ${si + 1}`} bind:value={s.weight} />
               <button type="button" class="icon" aria-label={`Remove split row ${si + 1}`} disabled={rule.split.length <= MIN_SPLIT} on:click={() => removeSplit(rule, si)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
@@ -276,7 +296,7 @@
             </div>
           {/each}
           <div class="flex items-center justify-between gap-2">
-            <button type="button" class="ghost" disabled={rule.split.length >= MAX_SPLIT} on:click={() => addSplit(rule)}>Add split row</button>
+            <button type="button" class="ghost" data-act="add-split" disabled={rule.split.length >= MAX_SPLIT} on:click={() => addSplit(rule)}>Add split row</button>
             <p class="text-xs tabular-nums" aria-live="polite" style="color: {total(rule) === 100 ? 'var(--accent)' : 'var(--error)'};">
               {total(rule)} of 100{total(rule) === 100 ? '' : ', must add up to 100'}
             </p>
@@ -287,7 +307,7 @@
   {/each}
 
   <div class="flex items-center justify-between gap-2">
-    <button type="button" class="ghost" disabled={rules.length >= MAX_RULES} on:click={addRule}>Add rule</button>
+    <button type="button" class="ghost" data-act="add-rule" disabled={rules.length >= MAX_RULES} on:click={addRule}>Add rule</button>
     <span class="text-xs tabular-nums" style="color: var(--text-muted);">{rules.length} of {MAX_RULES}</span>
   </div>
 </div>
