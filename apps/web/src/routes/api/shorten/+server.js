@@ -6,9 +6,8 @@ import { createURLHash } from '#lib/utils/urlHash.js';
 import { encodeURL } from '#lib/server/crypto.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
-import { checkURL } from '#lib/server/safe-browsing.js';
 import { clientOf } from '#lib/server/client.js';
-import { purgeEdge } from '#lib/server/edge-purge.js';
+import { settleVerdict } from '#lib/server/link-verdict.js';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -199,19 +198,10 @@ export const POST = async (event) => {
 			});
 
 			// Fire safe-browsing async; failures never block shorten response
-			checkURL(prefixedURL).then(async (verdict) => {
-				await prisma.longURL.update({
-					where: { shortURL: url.shortURL },
-					data: { safeVerdict: verdict, safeCheckedAt: new Date() }
-				});
-				await purgeEdge([url.shortURL]);
-				if (verdict !== 'safe' && verdict !== 'pending') {
-					await prisma.profileRow.updateMany({
-						where: { link: { shortURL: url.shortURL } },
-						data: { quarantined: true }
-					});
-				}
-			}).catch(() => {});
+			const verdictPromise = settleVerdict(url.shortURL, prefixedURL).catch(() => {});
+			if (event.platform?.context?.waitUntil) {
+				event.platform.context.waitUntil(verdictPromise);
+			}
 
 			return new Response(JSON.stringify({
 				shortURL: url.shortURL,

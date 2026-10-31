@@ -23,21 +23,30 @@ export const GET: RequestHandler = async ({ request }) => {
   });
 
   let checked = 0;
-  const changed: string[] = [];
-  for (const l of links) {
-    const raw = await decodeURL(l.originalURL);
-    const verdict = await checkURL(raw);
-    await prisma.longURL.update({ where: { id: l.id }, data: { safeVerdict: verdict, safeCheckedAt: new Date() } });
-    await prisma.profileRow.updateMany({
-      where: { linkId: l.id },
-      data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }
-    });
-    if (verdict !== l.safeVerdict) changed.push(l.shortURL);
-    checked++;
-    if (checked >= 500) break;
+  let changed: string[] = [];
+  const flush = async () => {
+    if (!changed.length) return;
+    const batch = changed;
+    changed = [];
+    await purgeEdge(batch);
+  };
+  try {
+    for (const l of links) {
+      const raw = await decodeURL(l.originalURL);
+      const verdict = await checkURL(raw);
+      await prisma.longURL.update({ where: { id: l.id }, data: { safeVerdict: verdict, safeCheckedAt: new Date() } });
+      await prisma.profileRow.updateMany({
+        where: { linkId: l.id },
+        data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }
+      });
+      if (verdict !== l.safeVerdict) changed.push(l.shortURL);
+      if (changed.length >= 50) await flush();
+      checked++;
+      if (checked >= 500) break;
+    }
+  } finally {
+    await flush();
   }
-
-  await purgeEdge(changed);
 
   return json({ checked });
 };
