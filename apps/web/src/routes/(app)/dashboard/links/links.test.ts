@@ -6,13 +6,18 @@ const del = vi.hoisted(() => vi.fn());
 const deleteMany = vi.hoisted(() => vi.fn());
 const $transaction = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
+const settleVerdictInBackground = vi.hoisted(() => vi.fn());
 
 vi.mock('#lib/prisma.js', () => ({
   prisma: { longURL: { findUnique, update, delete: del }, profileRow: { deleteMany }, $transaction }
 }));
 vi.mock('#lib/server/user-auth.js', () => ({ verifyUserSession: vi.fn(() => 7) }));
-vi.mock('#lib/server/crypto.js', () => ({ encodeURL: vi.fn((u: string) => `enc:${u}`) }));
+vi.mock('#lib/server/crypto.js', () => ({
+  encodeURL: vi.fn((u: string) => `enc:${u}`),
+  decodeURL: vi.fn(async (u: string) => u.replace(/^enc:/, ''))
+}));
 vi.mock('#lib/server/edge-purge.js', () => ({ purgeEdge }));
+vi.mock('#lib/server/link-verdict.js', () => ({ settleVerdictInBackground }));
 
 import { PATCH, DELETE } from './+server';
 
@@ -110,7 +115,66 @@ describe('dashboard links PATCH destination validation', () => {
     expect(r.status).toBe(200);
     expect(update).toHaveBeenCalledWith({
       where: { id: 5 },
-      data: { originalURL: 'enc:https://example.com/path' }
+      data: { originalURL: 'enc:https://example.com/path', safeVerdict: 'pending' }
     });
+  });
+});
+
+describe('dashboard links PATCH settings', () => {
+  const row = { id: 5, userId: 7, shortURL: 'Xy', clickCount: 2 };
+  const rules = [{ id: 'rule-aaa', when: { countries: ['SG'] }, destination: 'https://a.example.com/' }];
+  const saved = {
+    originalURL: 'enc:https://e.com',
+    rules,
+    expiresAt: null,
+    maxClicks: null,
+    passwordHash: '$2b$10$secret',
+    permanent: false
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    purgeEdge.mockResolvedValue(true);
+    findUnique.mockResolvedValue(row);
+    update.mockResolvedValue(saved);
+  });
+
+  it('saves rules and purges the slug once', async () => {
+    const r = await call(PATCH, { id: 5, rules });
+    expect(r.status).toBe(200);
+    expect(update.mock.calls[0][0].data.rules).toEqual(rules);
+    expect(purgeEdge).toHaveBeenCalledTimes(1);
+    expect(purgeEdge).toHaveBeenCalledWith(['Xy']);
+    expect(settleVerdictInBackground).not.toHaveBeenCalled();
+  });
+
+  it('never returns the password hash', async () => {
+    const r = await call(PATCH, { id: 5, rules });
+    const text = JSON.stringify(await r.json());
+    expect(text).not.toContain('passwordHash');
+    expect(text).not.toContain('secret');
+    expect(JSON.parse(text).settings.hasPassword).toBe(true);
+  });
+
+  it('re-checks a changed destination in the background without awaiting it', async () => {
+    const r = await call(PATCH, { id: 5, destination: 'example.com' });
+    expect(r.status).toBe(200);
+    expect(settleVerdictInBackground).toHaveBeenCalledWith('Xy', 'https://example.com');
+  });
+
+  it('rejects invalid settings with 400 and writes nothing', async () => {
+    const r = await call(PATCH, { id: 5, maxClicks: 2 });
+    expect(r.status).toBe(400);
+    expect(update).not.toHaveBeenCalled();
+    expect(purgeEdge).not.toHaveBeenCalled();
+  });
+
+  it("does not save or purge another user's link", async () => {
+    findUnique.mockResolvedValue({ ...row, userId: 99 });
+    const r = await call(PATCH, { id: 5, rules });
+    expect(r.status).toBe(404);
+    expect(update).not.toHaveBeenCalled();
+    expect(purgeEdge).not.toHaveBeenCalled();
+    expect(settleVerdictInBackground).not.toHaveBeenCalled();
   });
 });

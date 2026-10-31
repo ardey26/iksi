@@ -1,5 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { decodeURL } from '#lib/server/crypto.js';
+import { toLinkSettings } from '#lib/server/link-settings.js';
 
 // Cap the initial dashboard load. Fetching + decoding every link a user has
 // ever created scales linearly with account age; on top of that, any
@@ -34,6 +35,12 @@ export const load: PageServerLoad = async ({ parent, url }) => {
         clickCount: true,
         createdAt: true,
         safeVerdict: true,
+        rules: true,
+        expiresAt: true,
+        maxClicks: true,
+        expiredAt: true,
+        passwordHash: true,
+        permanent: true,
         profileRows: profileId
           ? {
               where: { profileId },
@@ -60,8 +67,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
         plain = '';
       }
       const row = (l as any).profileRows?.[0] ?? null;
-      const { profileRows: _drop, ...rest } = l as any;
-      return { ...rest, originalURL: plain, profileRow: row };
+      const { profileRows: _drop, rules, passwordHash, ...rest } = l as any;
+      const settings = toLinkSettings({ ...l, rules, passwordHash }, plain);
+      return { ...rest, originalURL: plain, profileRow: row, settings };
     })
   );
 

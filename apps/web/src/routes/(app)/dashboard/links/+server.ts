@@ -1,32 +1,43 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { verifyUserSession } from '#lib/server/user-auth.js';
-import { encodeURL } from '#lib/server/crypto.js';
+import { decodeURL } from '#lib/server/crypto.js';
+import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
+import { validateSettings, toLinkSettings, type SettingsInput } from '#lib/server/link-settings.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
-import { addPrefix, isValidURLServer } from '#lib/utils/urlValidation.js';
-
-const MAX_URL = 2048;
 
 export const PATCH: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
   if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
-  const { id, originalURL } = await request.json();
-  if (!Number.isInteger(id) || typeof originalURL !== 'string') return json({ error: 'Invalid input' }, { status: 400 });
-  // Same rules as /api/shorten: the edge serves this as a redirect without re-checking it.
-  const destination = addPrefix(originalURL);
-  if (destination.length > MAX_URL) {
-    return json({ error: `URL is too long (max ${MAX_URL} characters)` }, { status: 400 });
-  }
-  if (!isValidURLServer(destination)) return json({ error: 'Enter a valid URL' }, { status: 400 });
+  const body = await request.json();
+  const { id, originalURL, ...rest } = body ?? {};
+  if (!Number.isInteger(id)) return json({ error: 'Invalid input' }, { status: 400 });
+  const input: SettingsInput = { ...rest };
+  // { id, originalURL } is the older body shape for a destination change.
+  if (input.destination === undefined && originalURL !== undefined) input.destination = originalURL;
+  if (Object.keys(input).length === 0) return json({ error: 'Invalid input' }, { status: 400 });
 
   const { prisma } = await import('#lib/prisma.js');
   const link = await prisma.longURL.findUnique({ where: { id } });
   if (!link || link.userId !== uid) return json({ error: 'Not found' }, { status: 404 });
 
-  const encoded = encodeURL(destination);
-  await prisma.longURL.update({ where: { id }, data: { originalURL: encoded } });
+  const result = await validateSettings(input, { clickCount: link.clickCount ?? 0 }, Date.now());
+  if (!result.ok) return json({ error: result.error }, { status: 400 });
+
+  const saved = await prisma.longURL.update({ where: { id }, data: result.data });
   await purgeEdge([link.shortURL]);
-  return json({ ok: true });
+  // The verdict re-check purges again once it settles.
+  if (result.destinationChanged) settleVerdictInBackground(link.shortURL, result.destinationChanged);
+
+  let destination = result.destinationChanged;
+  if (destination === null) {
+    try {
+      destination = await decodeURL(saved?.originalURL ?? link.originalURL);
+    } catch {
+      destination = '';
+    }
+  }
+  return json({ ok: true, settings: toLinkSettings({ ...link, ...saved }, destination) });
 };
 
 export const DELETE: RequestHandler = async ({ request, cookies }) => {
