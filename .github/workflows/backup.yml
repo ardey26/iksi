@@ -1,0 +1,49 @@
+name: Backup
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 03:00 Singapore
+  workflow_dispatch:
+    inputs:
+      restore_check:
+        description: Restore the new dump into a scratch Postgres and verify row counts
+        type: boolean
+        default: true
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dump public schema and upload to R2
+        id: dump
+        run: |
+          out="$(bash infra/backup/pg-dump-to-r2.sh)"
+          echo "$out"
+          echo "path=$(echo "$out" | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore check from R2
+        # Weekly on Sundays, and on manual runs unless switched off.
+        if: github.event_name == 'schedule' || inputs.restore_check
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%u)" != "7" ]; then
+            echo "Not Sunday, skipping restore check"; exit 0
+          fi
+          key="pg/$(basename "${{ steps.dump.outputs.path }}")"
+          aws s3 cp "s3://iksi-backups/$key" "$RUNNER_TEMP/restore.dump" \
+            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" --region auto --only-show-errors
+          bash infra/backup/restore-check.sh "$RUNNER_TEMP/restore.dump"
