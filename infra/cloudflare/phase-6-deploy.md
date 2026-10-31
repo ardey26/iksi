@@ -49,34 +49,34 @@ npx -y pnpm@10.34.6 exec wrangler deploy --var VERSION:$(git rev-parse HEAD)
 
 ## 4. Verify
 
-Create one test link, `<slug>`, with a throwaway destination.
+Each check changes link state, so use a separate throwaway link per check (any destination you control, called "default" below). Do not reuse one link: a password on it would block the click-cap check.
 
 - [ ] Worker and origin share the secret:
   ```sh
   curl -s 'https://www.iksi.app/_health?deep=1'
   ```
   The JSON shows `"origin":"ok"`.
-- [ ] Device rule. Add a rule `devices: ['mobile']` with a different destination.
+- [ ] Device rule, link `<slug-device>`. Add a rule `devices: ['mobile']` with destination "mobile".
   ```sh
-  curl -sI -A "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" https://www.iksi.app/<slug> | grep -i "^location"   # rule destination
-  curl -sI https://www.iksi.app/<slug> | grep -i "^location"                                                              # default destination
+  curl -sI -A "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" https://www.iksi.app/<slug-device> | grep -i "^location"   # lands on "mobile"
+  curl -sI https://www.iksi.app/<slug-device> | grep -i "^location"                                                              # lands on "default"
   ```
-- [ ] Password. Set one on the link.
+- [ ] Password, link `<slug-password>`. Set a password on it.
   ```sh
-  curl -s -o /dev/null -w '%{http_code}\n' https://www.iksi.app/<slug>
+  curl -s -o /dev/null -w '%{http_code}\n' https://www.iksi.app/<slug-password>
   ```
-  Prints `200` (the password page, not a redirect).
-- [ ] Preview. `https://www.iksi.app/<slug>+` shows the preview page.
-- [ ] Click cap. Set `maxClicks` to the current click count + 1, click the link once, then wait up to a minute.
+  Prints `200` (the password page, not a redirect to the destination).
+- [ ] Preview. `https://www.iksi.app/<slug-device>+` shows the preview page for the "default" destination.
+- [ ] Click cap, link `<slug-cap>` (no password). Set `maxClicks` to its current click count + 1, then click it once in a browser (it lands on "default"). Wait up to 3 minutes: the Worker's cached record can last about 60 s and the click reaches the database through the queue.
   ```sh
-  curl -sI https://www.iksi.app/<slug> | head -1
+  curl -sI https://www.iksi.app/<slug-cap> | head -1
   ```
-  Returns `410`.
-- [ ] Flagged link. Flag a throwaway link (dashboard or database), then:
+  Returns `410`. If it still answers `302`, check `x-iksi-route` on the response (`curl -sI`), `curl -s 'https://www.iksi.app/_health?deep=1'`, and the `iksi-clicks-dlq` queue for stuck click batches.
+- [ ] Flagged link, `<slug-flagged>`. Flag it (dashboard or database), then:
   ```sh
-  curl -sI https://www.iksi.app/<slug>
+  curl -sI https://www.iksi.app/<slug-flagged>
   ```
-  Returns `403` from the origin (the Worker passes it through). Then open `https://www.iksi.app/<slug>+`: it shows the warning with no Continue button.
+  Returns `403` from the origin (the Worker passes it through). Then open `https://www.iksi.app/<slug-flagged>+`: it shows the warning with no Continue button.
 
 Any failing check blocks the rollout; see Rollback.
 
