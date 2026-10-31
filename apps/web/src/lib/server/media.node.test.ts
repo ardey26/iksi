@@ -80,6 +80,51 @@ describe('processImage', () => {
 	});
 });
 
+describe('format allowlist and formats', () => {
+	it('rejects SVG and TIFF', async () => {
+		const svg = new TextEncoder().encode(
+			'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
+		);
+		expect(await codeOf(processImage(svg, 'avatar'))).toBe('unsupported');
+		const tiff = await sharp({ create: { width: 20, height: 20, ...solid.create } })
+			.tiff()
+			.toBuffer();
+		expect(await codeOf(processImage(tiff, 'avatar'))).toBe('unsupported');
+	});
+
+	it('accepts WebP and AVIF', async () => {
+		const base = { create: { width: 300, height: 200, ...solid.create } };
+		for (const input of [
+			await sharp(base).webp().toBuffer(),
+			await sharp(base).avif().toBuffer()
+		]) {
+			const [v] = await processImage(input, 'avatar');
+			const m = await sharp(v.bytes).metadata();
+			expect([m.format, m.width, m.height]).toEqual(['webp', 400, 400]);
+		}
+	});
+
+	it('uses only the first frame of an animated GIF', async () => {
+		const frames = await Promise.all(
+			['#ff0000', '#00ff00', '#0000ff'].map((background) =>
+				sharp({ create: { width: 60, height: 40, channels: 3, background } })
+					.png()
+					.toBuffer()
+			)
+		);
+		const raw = await Promise.all(frames.map((f) => sharp(f).ensureAlpha().raw().toBuffer()));
+		const gif = await sharp(Buffer.concat(raw), {
+			raw: { width: 60, height: 120, channels: 4, pageHeight: 40 }
+		})
+			.gif()
+			.toBuffer();
+		expect((await sharp(gif, { animated: true }).metadata()).pages).toBe(3);
+		const [v] = await processImage(gif, 'background');
+		const m = await sharp(v.bytes, { animated: true }).metadata();
+		expect([m.pages ?? 1, m.width, m.height]).toEqual([1, 60, 40]);
+	});
+});
+
 describe('keys', () => {
 	it('builds base and variant keys', () => {
 		expect(mediaBaseKey(7, 'avatar', 'u1')).toBe('7/avatar/u1');

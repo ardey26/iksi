@@ -46,7 +46,13 @@ export async function processImage(input: Uint8Array, kind: MediaKind): Promise<
 
 	try {
 		const meta = await open(input).metadata();
-		if (!meta.width || !meta.height) throw new MediaError('unsupported');
+		const allowed =
+			meta.format === 'jpeg' ||
+			meta.format === 'png' ||
+			meta.format === 'webp' ||
+			meta.format === 'gif' ||
+			(meta.format === 'heif' && meta.compression === 'av1');
+		if (!allowed || !meta.width || !meta.height) throw new MediaError('unsupported');
 		if (meta.width > MAX_DIMENSION || meta.height > MAX_DIMENSION) {
 			throw new MediaError('too_many_pixels');
 		}
