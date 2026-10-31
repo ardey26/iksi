@@ -1,0 +1,17 @@
+{
+	"name": "@iksi/core",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"test": "vitest",
+		"lint": "tsc -p tsconfig.json"
+	},
+	"devDependencies": {
+		"typescript": "^5.6.0",
+		"vitest": "^2.1.0"
+	}
+}
