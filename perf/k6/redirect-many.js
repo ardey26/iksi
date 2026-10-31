@@ -7,10 +7,11 @@ import http from 'k6/http';
 import { check } from 'k6';
 
 const BASE = __ENV.BASE || 'https://www.iksi.app';
-const SLUGS = (__ENV.SLUGS || 'QdM2whH')
+const SLUGS = (__ENV.SLUGS !== undefined ? __ENV.SLUGS : 'QdM2whH')
 	.split(',')
 	.map((s) => s.trim())
 	.filter(Boolean);
+if (SLUGS.length === 0) throw new Error('SLUGS must list at least one slug');
 
 export const options = {
 	scenarios: {

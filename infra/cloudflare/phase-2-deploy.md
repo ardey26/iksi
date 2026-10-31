@@ -15,7 +15,7 @@ Turns the pass-through Worker into one that answers redirects from KV (origin fa
 
 ## 2. Put the KV namespace ID in `wrangler.toml`
 
-The one manual step. In `apps/redirect/wrangler.toml`, replace `REPLACE_WITH_KV_ID` with the ID from SETUP.md 2.4. The ID is not secret. Commit it.
+The one manual step. On this branch, before it merges to `main`, replace `REPLACE_WITH_KV_ID` in `apps/redirect/wrangler.toml` with the ID from SETUP.md 2.4 and commit it. The ID is not secret. The merge triggers the Worker deploy; a deploy with the placeholder fails at the Worker step, after the web app has already deployed.
 
 ```sh
 grep -n "id = " apps/redirect/wrangler.toml   # no REPLACE_WITH_KV_ID left
@@ -27,12 +27,23 @@ Merge to `main`. After CI passes, `.github/workflows/deploy.yml` runs in the rig
 
 Watch it under GitHub → Actions → Deploy.
 
-Fallback, only if the workflow is unavailable (deploy the web app first, then):
+Fallback, only when the workflow itself is broken. Run the same steps in the same order (migrations, web app, Worker). `DATABASE_SESSION_URL` is described in SETUP.md section 3.
 
 ```sh
-pnpm --filter @iksi/redirect exec wrangler login
-pnpm --filter @iksi/redirect exec wrangler deploy --var VERSION:$(git rev-parse HEAD)
-pnpm --filter @iksi/redirect exec wrangler secret put EDGE_SECRET
+# 1. Migrations (session pooler, port 5432)
+export DATABASE_URL='<DATABASE_SESSION_URL>' DIRECT_URL='<DATABASE_SESSION_URL>'
+pnpm --filter @iksi/web exec prisma migrate deploy
+
+# 2. Web app (needs VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID exported)
+npx --yes vercel@65.9.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+npx --yes vercel@65.9.0 build --prod --token="$VERCEL_TOKEN"
+npx --yes vercel@65.9.0 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+# 3. Worker
+cd apps/redirect
+npx -y pnpm@10.34.6 exec wrangler login
+npx -y pnpm@10.34.6 exec wrangler secret put EDGE_SECRET
+npx -y pnpm@10.34.6 exec wrangler deploy --var VERSION:$(git rev-parse HEAD)
 ```
 
 ## 4. Verify
@@ -43,7 +54,7 @@ curl -sI https://www.iksi.app/QdM2whH | grep -iE "^HTTP|x-iksi-route|x-vercel-id
 ```
 
 - [ ] `_health` shows `ok: true`, a `colo`, and `version` equal to the deployed commit SHA.
-- [ ] The slug request is `302` with `x-iksi-route: slug` and **no** `x-vercel-id`. (Run it twice; the first can be a cache miss that falls back to the origin.)
+- [ ] The slug request is `302` with `x-iksi-route: slug` and **no** `x-vercel-id`. On a KV miss the Worker resolves the link from the origin and still answers the redirect itself, so a failure on the first request is a real failure. Any failing check here blocks the rollout.
 - [ ] Open a short link in a browser. A new `Click` row appears within 30 seconds.
 - [ ] Shorten a URL through the homepage in production. Within a minute its Safe Browsing verdict is stored (dashboard links view). This proves background work survives the response on Vercel.
 - [ ] Edit that link's destination in the dashboard. The new destination is served within about 60 seconds (KV's per-location read cache is 60 s).
@@ -55,8 +66,11 @@ Once step 4 passes, produce the after-edge report per `perf/README.md`: run `per
 
 ## 6. Rollback
 
+Every push to `main` redeploys the Worker, so the previous version is not necessarily the Phase 0 one. List versions and pick the one to return to:
+
 ```sh
-pnpm --filter @iksi/redirect exec wrangler rollback
+npx -y pnpm@10.34.6 --filter @iksi/redirect exec wrangler deployments list
+npx -y pnpm@10.34.6 --filter @iksi/redirect exec wrangler rollback <version-id> -m "<reason>" -y
 ```
 
-Rolls the Worker back to its previous deployed version (pick the Phase 0 version if more than one deploy has happened; `wrangler deployments list` shows them). Redirects then fall back to the origin route, which still records clicks itself. A later push to `main` redeploys the Worker, so revert the offending commit as well.
+Redirects then fall back to the origin route, which still records clicks itself. Clicks already in `iksi-clicks` stay queued while no consumer runs and are delivered after redeploy (they expire after the queue's retention period). A later push to `main` redeploys the Worker, so revert the offending commit as well.
