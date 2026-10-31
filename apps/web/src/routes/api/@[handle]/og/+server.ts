@@ -101,6 +101,25 @@ function iksiMark(fillColor: string, strokeColor: string, size = 44) {
   };
 }
 
+const AVATAR_FETCH_TIMEOUT_MS = 10_000;
+const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
+
+// @vercel/og (satori + resvg-wasm) accepts WebP but draws nothing, and every
+// uploaded avatar is WebP. Re-encode CDN avatars to PNG as a data URL.
+async function cdnAvatarDataUrl(url: string): Promise<string | null> {
+  const base = (process.env.MEDIA_BASE_URL ?? 'https://cdn.iksi.app').replace(/\/+$/, '');
+  if (!url.startsWith(`${base}/`)) return null;
+  const res = await fetch(url, { signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`avatar fetch failed: HTTP ${res.status}`);
+  const declared = Number(res.headers.get('content-length'));
+  if (declared > AVATAR_MAX_BYTES) throw new Error('avatar too large');
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.byteLength > AVATAR_MAX_BYTES) throw new Error('avatar too large');
+  const { default: sharp } = await import('sharp');
+  const png = await sharp(bytes).png().toBuffer();
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+
 export const GET: RequestHandler = async ({ params }) => {
   const raw = params.handle;
   const handle = (raw.startsWith('@') ? raw.slice(1) : raw).toLowerCase();
@@ -120,11 +139,19 @@ export const GET: RequestHandler = async ({ params }) => {
   const bio = p.bio ? p.bio.trim().slice(0, 240) : '';
 
   // --- Avatar block ---
-  const avatar = p.avatarUrl
+  let avatarSrc: string | null = null;
+  if (p.avatarUrl) {
+    try {
+      avatarSrc = (await cdnAvatarDataUrl(p.avatarUrl)) ?? normalizeAvatarUrl(p.avatarUrl);
+    } catch (err) {
+      console.error('og: could not prepare CDN avatar, using initials', err);
+    }
+  }
+  const avatar = avatarSrc
     ? {
         type: 'img',
         props: {
-          src: normalizeAvatarUrl(p.avatarUrl),
+          src: avatarSrc,
           style: {
             width: 160,
             height: 160,
