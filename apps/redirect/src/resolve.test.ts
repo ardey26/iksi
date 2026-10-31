@@ -47,7 +47,8 @@ const deps = (upstream: Upstream) => ({
 	upstream,
 	origin: 'https://www.iksi.app',
 	secret: 's3cret',
-	now: NOW
+	now: NOW,
+	defer: (p: Promise<unknown>) => void p
 });
 
 const found = (storedAt: number): LinkLookup => ({
@@ -149,4 +150,80 @@ test('refreshLink leaves the entry alone when origin fails', async () => {
 	const { upstream } = origin(() => new Response('x', { status: 500 }));
 	await refreshLink('iksi.app', 'AbC', m.store, deps(upstream));
 	expect(m.writes).toEqual([]);
+});
+
+describe('store failures', () => {
+	const throwing = (which: 'get' | 'putFound' | 'putMissing'): LinkStore => {
+		const m = memoryStore().store;
+		return {
+			...m,
+			[which]: async () => {
+				throw new Error('kv 429');
+			}
+		};
+	};
+	const quietly = () => vi.spyOn(console, 'error').mockImplementation(() => {});
+
+	test('a throwing get reads as unknown and asks origin', async () => {
+		const log = quietly();
+		const { upstream, seen } = origin(() => Response.json({ found: true, record }));
+		const res = await resolveLink('iksi.app', 'AbC', throwing('get'), {
+			...deps(upstream),
+			defer: () => {}
+		});
+		expect(res).toMatchObject({ kind: 'found', record });
+		expect(seen).toHaveLength(1);
+		expect(log).toHaveBeenCalled();
+		log.mockRestore();
+	});
+
+	test('putFound is deferred and its failure is logged, not thrown', async () => {
+		const log = quietly();
+		const deferred: Promise<unknown>[] = [];
+		const { upstream } = origin(() => Response.json({ found: true, record }));
+		const res = await resolveLink('iksi.app', 'AbC', throwing('putFound'), {
+			...deps(upstream),
+			defer: (p) => deferred.push(p)
+		});
+		expect(res).toMatchObject({ kind: 'found' });
+		expect(deferred).toHaveLength(1);
+		await expect(Promise.all(deferred)).resolves.toBeDefined();
+		expect(log).toHaveBeenCalled();
+		log.mockRestore();
+	});
+
+	test('putMissing failure still answers missing', async () => {
+		const log = quietly();
+		const deferred: Promise<unknown>[] = [];
+		const { upstream } = origin(() => new Response('{}', { status: 404 }));
+		const res = await resolveLink('iksi.app', 'AbC', throwing('putMissing'), {
+			...deps(upstream),
+			defer: (p) => deferred.push(p)
+		});
+		expect(res).toEqual({ kind: 'missing' });
+		await Promise.all(deferred);
+		log.mockRestore();
+	});
+
+	test('origin trouble is logged with the slug', async () => {
+		const log = quietly();
+		const { upstream } = origin(() => {
+			throw new Error('down');
+		});
+		await resolveLink('iksi.app', 'AbC', memoryStore().store, {
+			...deps(upstream),
+			defer: () => {}
+		});
+		expect(log).toHaveBeenCalledWith(expect.stringContaining('AbC'), expect.anything());
+		log.mockRestore();
+	});
+
+	test('refreshLink write failure is logged, not thrown', async () => {
+		const log = quietly();
+		const { upstream } = origin(() => Response.json({ found: true, record }));
+		await expect(
+			refreshLink('iksi.app', 'AbC', throwing('putFound'), { ...deps(upstream), defer: () => {} })
+		).resolves.toBeUndefined();
+		log.mockRestore();
+	});
 });

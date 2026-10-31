@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 export type Surface = 'direct' | 'profile' | 'api';
 
 export interface ClickEvent {
@@ -15,21 +13,40 @@ export interface ClickEvent {
 }
 
 const MAX_STRING = 2048;
-const positiveInt = z.number().int().positive();
+const SURFACES: readonly string[] = ['direct', 'profile', 'api'];
 
-const clickEventSchema = z.object({
-	v: z.literal(1),
-	linkId: positiveInt,
-	ts: z.number().finite(),
-	country: z.string().length(2).nullable(),
-	userAgent: z.string().max(MAX_STRING).nullable(),
-	referer: z.string().max(MAX_STRING).nullable(),
-	surface: z.enum(['direct', 'profile', 'api']),
-	profileId: positiveInt.nullable(),
-	rowId: positiveInt.nullable()
-});
+const isPositiveInt = (v: unknown): v is number =>
+	typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
+const isNullable = (v: unknown, ok: (x: unknown) => boolean) => v === null || ok(v);
+const isShortString = (v: unknown) => typeof v === 'string' && v.length <= MAX_STRING;
 
+/** Hand-written (not zod) to keep the edge Worker bundle small. Unknown keys are dropped. */
 export function parseClickEvent(input: unknown): ClickEvent | null {
-	const result = clickEventSchema.safeParse(input);
-	return result.success ? result.data : null;
+	if (typeof input !== 'object' || input === null) return null;
+	const e = input as Record<string, unknown>;
+	if (
+		e.v !== 1 ||
+		!isPositiveInt(e.linkId) ||
+		!(typeof e.ts === 'number' && Number.isFinite(e.ts)) ||
+		!isNullable(e.country, (c) => typeof c === 'string' && c.length === 2) ||
+		!isNullable(e.userAgent, isShortString) ||
+		!isNullable(e.referer, isShortString) ||
+		typeof e.surface !== 'string' ||
+		!SURFACES.includes(e.surface) ||
+		!isNullable(e.profileId, isPositiveInt) ||
+		!isNullable(e.rowId, isPositiveInt)
+	) {
+		return null;
+	}
+	return {
+		v: 1,
+		linkId: e.linkId,
+		ts: e.ts,
+		country: e.country as string | null,
+		userAgent: e.userAgent as string | null,
+		referer: e.referer as string | null,
+		surface: e.surface as Surface,
+		profileId: e.profileId as number | null,
+		rowId: e.rowId as number | null
+	};
 }

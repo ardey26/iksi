@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 export const CANONICAL_HOST = 'iksi.app';
 
 const MAX_STRING = 2048;
@@ -29,27 +27,28 @@ export interface StoredLink {
 	storedAt: number;
 }
 
-const httpUrl = z
-	.string()
-	.max(MAX_STRING)
-	.refine((value) => {
-		try {
-			const { protocol } = new URL(value);
-			return protocol === 'http:' || protocol === 'https:';
-		} catch {
-			return false;
-		}
-	});
+function isHttpUrl(value: unknown): value is string {
+	if (typeof value !== 'string' || value.length > MAX_STRING) return false;
+	try {
+		const { protocol } = new URL(value);
+		return protocol === 'http:' || protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
 
-const linkRecordSchema = z.object({
-	v: z.literal(1),
-	id: z.number().int().positive(),
-	destination: httpUrl,
-	flagged: z.boolean(),
-	permanent: z.boolean()
-});
-
+/** Hand-written (not zod) to keep the edge Worker bundle small. Unknown keys are dropped. */
 export function parseLinkRecord(input: unknown): LinkRecord | null {
-	const result = linkRecordSchema.safeParse(input);
-	return result.success ? result.data : null;
+	if (typeof input !== 'object' || input === null) return null;
+	const r = input as Record<string, unknown>;
+	if (
+		r.v !== 1 ||
+		!(typeof r.id === 'number' && Number.isSafeInteger(r.id) && r.id > 0) ||
+		!isHttpUrl(r.destination) ||
+		typeof r.flagged !== 'boolean' ||
+		typeof r.permanent !== 'boolean'
+	) {
+		return null;
+	}
+	return { v: 1, id: r.id, destination: r.destination, flagged: r.flagged, permanent: r.permanent };
 }

@@ -402,6 +402,81 @@ describe('edge redirect', () => {
 	});
 });
 
+describe('resilience', () => {
+	const get = (path: string) => new Request(`https://www.iksi.app${path}`);
+	const quietly = () => vi.spyOn(console, 'error').mockImplementation(() => {});
+
+	test('a KV that throws on get and put still redirects via origin', async () => {
+		const log = quietly();
+		const { upstream } = recordingUpstream(() => Response.json({ found: true, record }));
+		const boom = async () => {
+			throw new Error('kv 429');
+		};
+		const store: LinkStore = { get: boom, putFound: boom, putMissing: boom, delete: boom };
+		const c = recordingCtx();
+		const res = await createHandler(deps(upstream, store))(get('/QdM2whH'), testEnv(), c.ctx);
+		expect(res.status).toBe(302);
+		await expect(c.settle()).resolves.toBeDefined();
+		log.mockRestore();
+	});
+
+	test('a failing putMissing still passes the miss through to origin', async () => {
+		const log = quietly();
+		const seen: string[] = [];
+		const upstream: Upstream = async (req) => {
+			seen.push(new URL(req.url).pathname);
+			return new URL(req.url).pathname === '/internal/resolve'
+				? new Response('{}', { status: 404 })
+				: new Response('branded 404', { status: 404 });
+		};
+		const m = memoryStore();
+		const store: LinkStore = {
+			...m.store,
+			putMissing: async () => {
+				throw new Error('kv 429');
+			}
+		};
+		const c = recordingCtx();
+		const res = await createHandler(deps(upstream, store))(get('/Nope123'), testEnv(), c.ctx);
+		expect(await res.text()).toBe('branded 404');
+		await expect(c.settle()).resolves.toBeDefined();
+		log.mockRestore();
+	});
+
+	test('two concurrent stale hits schedule exactly one origin refresh', async () => {
+		let calls = 0;
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		const upstream: Upstream = async () => {
+			calls++;
+			await gate;
+			return Response.json({ found: true, record });
+		};
+		const { store } = memoryStore({
+			Stale01: { kind: 'found', stored: { record, storedAt: NOW - 3_600_001 } }
+		});
+		const h = createHandler(deps(upstream, store));
+		const c = recordingCtx();
+		await h(get('/Stale01'), testEnv(), c.ctx);
+		await h(get('/Stale01'), testEnv(), c.ctx);
+		release();
+		await c.settle();
+		expect(calls).toBe(1);
+	});
+
+	test('a failing click emit is logged with the slug', async () => {
+		const log = quietly();
+		const { upstream } = recordingUpstream(() => new Response('x'));
+		const { store } = memoryStore({ QdM2whH: fresh() });
+		const sink: EventSink = { emit: () => Promise.reject(new Error('queue down')) };
+		const c = recordingCtx();
+		await createHandler(deps(upstream, store, sink))(get('/QdM2whH'), testEnv(), c.ctx);
+		await c.settle();
+		expect(log).toHaveBeenCalledWith(expect.stringContaining('QdM2whH'), expect.anything());
+		log.mockRestore();
+	});
+});
+
 describe('POST /_edge/purge', () => {
 	const purge = (secret: string | null, body: unknown, method = 'POST') =>
 		new Request('https://www.iksi.app/_edge/purge', {

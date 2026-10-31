@@ -91,7 +91,8 @@ export function createHandler(deps: HandlerDeps): Handler {
 			upstream,
 			origin: env.ORIGIN_URL ?? DEFAULT_ORIGIN,
 			secret: env.EDGE_SECRET,
-			now: deps.now()
+			now: deps.now(),
+			defer: (work: Promise<unknown>) => ctx.waitUntil(work)
 		};
 		const resolution = await resolveLink(CANONICAL_HOST, path.slug, store, resolveDeps);
 
@@ -111,7 +112,11 @@ export function createHandler(deps: HandlerDeps): Handler {
 
 		const { record } = resolution;
 		if (resolution.stale) {
-			ctx.waitUntil(refreshLink(CANONICAL_HOST, path.slug, store, resolveDeps).catch(() => {}));
+			scheduleRefresh(
+				path.slug,
+				() => refreshLink(CANONICAL_HOST, path.slug, store, resolveDeps),
+				ctx
+			);
 		}
 		if (request.method === 'GET') {
 			const cf = (request as Request & { cf?: { country?: string } }).cf;
@@ -128,7 +133,7 @@ export function createHandler(deps: HandlerDeps): Handler {
 				deps
 					.sink(env)
 					.emit(event)
-					.catch(() => {})
+					.catch((error) => console.error(`click emit failed for slug ${path.slug}`, error))
 			);
 		}
 
@@ -141,6 +146,19 @@ export function createHandler(deps: HandlerDeps): Handler {
 			}
 		});
 	};
+}
+
+/** Slugs with a refresh already running in this isolate, so a hot stale link refreshes once. */
+const refreshing = new Set<string>();
+
+function scheduleRefresh(slug: string, run: () => Promise<void>, ctx: ExecutionContext): void {
+	if (refreshing.has(slug)) return;
+	refreshing.add(slug);
+	ctx.waitUntil(
+		run()
+			.catch((error) => console.error(`refresh failed for slug ${slug}`, error))
+			.finally(() => refreshing.delete(slug))
+	);
 }
 
 async function purge(request: Request, env: Env, store: LinkStore): Promise<Response> {

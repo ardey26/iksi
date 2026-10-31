@@ -45,5 +45,11 @@ jobs:
       - name: Redirect Worker bundles
         run: pnpm --filter @iksi/redirect exec wrangler deploy --dry-run --outdir dist
 
+      - name: Redirect Worker size budget
+        run: |
+          size=$(wc -c < apps/redirect/dist/index.js)
+          echo "apps/redirect/dist/index.js is $size bytes (budget 102400)"
+          test "$size" -le 102400
+
       - name: Backup scripts
         run: bash infra/backup/restore-check.test.sh

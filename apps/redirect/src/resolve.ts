@@ -1,4 +1,4 @@
-import { parseLinkRecord, type LinkRecord, type LinkStore } from '@iksi/core';
+import { parseLinkRecord, type LinkLookup, type LinkRecord, type LinkStore } from '@iksi/core';
 import type { Upstream } from './handler';
 
 /** Found entries older than this are served, then re-checked against origin in the background. */
@@ -14,6 +14,8 @@ interface ResolveDeps {
 	origin: string;
 	secret: string | undefined;
 	now: number;
+	/** Hands best-effort work (store writes) to the caller; in the Worker, `ctx.waitUntil`. */
+	defer: (work: Promise<unknown>) => void;
 }
 
 type OriginAnswer =
@@ -36,9 +38,15 @@ async function askOrigin(slug: string, deps: ResolveDeps): Promise<OriginAnswer>
 		} | null;
 		const record = body?.found === true ? parseLinkRecord(body.record) : null;
 		return record ? { kind: 'found', record } : { kind: 'unavailable' };
-	} catch {
+	} catch (error) {
+		console.error(`origin resolve failed for slug ${slug}`, error);
 		return { kind: 'unavailable' };
 	}
+}
+
+/** Store writes must never break a redirect: log and move on. */
+function bestEffort(slug: string, what: string, write: () => Promise<void>): Promise<void> {
+	return write().catch((error) => console.error(`store ${what} failed for slug ${slug}`, error));
 }
 
 /** Store first; on a true unknown, ask origin and remember the answer. */
@@ -48,7 +56,13 @@ export async function resolveLink(
 	store: LinkStore,
 	deps: ResolveDeps
 ): Promise<Resolution> {
-	const lookup = await store.get(host, slug);
+	let lookup: LinkLookup;
+	try {
+		lookup = await store.get(host, slug);
+	} catch (error) {
+		console.error(`store get failed for slug ${slug}`, error);
+		lookup = { kind: 'unknown' };
+	}
 	if (lookup.kind === 'found') {
 		return {
 			kind: 'found',
@@ -60,10 +74,14 @@ export async function resolveLink(
 
 	const answer = await askOrigin(slug, deps);
 	if (answer.kind === 'found') {
-		await store.putFound(host, slug, answer.record, deps.now);
+		deps.defer(
+			bestEffort(slug, 'putFound', () => store.putFound(host, slug, answer.record, deps.now))
+		);
 		return { kind: 'found', record: answer.record, stale: false };
 	}
-	if (answer.kind === 'missing') await store.putMissing(host, slug);
+	if (answer.kind === 'missing') {
+		deps.defer(bestEffort(slug, 'putMissing', () => store.putMissing(host, slug)));
+	}
 	return answer;
 }
 
@@ -76,9 +94,11 @@ export async function refreshLink(
 ): Promise<void> {
 	const answer = await askOrigin(slug, deps);
 	if (answer.kind === 'found') {
-		await store.putFound(host, slug, answer.record, deps.now);
+		await bestEffort(slug, 'putFound', () => store.putFound(host, slug, answer.record, deps.now));
 	} else if (answer.kind === 'missing') {
-		await store.delete(host, slug);
-		await store.putMissing(host, slug);
+		await bestEffort(slug, 'refresh delete', async () => {
+			await store.delete(host, slug);
+			await store.putMissing(host, slug);
+		});
 	}
 }
