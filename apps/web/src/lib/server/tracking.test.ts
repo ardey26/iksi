@@ -10,6 +10,11 @@ vi.mock('#lib/prisma.js', () => {
   };
 });
 
+const purgeEdge = vi.hoisted(() => vi.fn());
+const waitUntil = vi.hoisted(() => vi.fn());
+vi.mock('#lib/server/edge-purge.js', () => ({ purgeEdge }));
+vi.mock('@vercel/functions', () => ({ waitUntil }));
+
 import { parseUA, normalizeReferrer, recordClick, recordProfileView } from './tracking';
 
 describe('parseUA', () => {
@@ -115,6 +120,46 @@ describe('recordClick', () => {
 
     const event = { request: { headers: new Headers() } } as any;
     await expect(recordClick(1, event)).resolves.toBeUndefined();
+  });
+});
+
+describe('recordClick at the click cap', () => {
+  const event = { request: { headers: new Headers() } } as any;
+
+  async function click(after: { shortURL: string; clickCount: number; maxClicks: number | null }) {
+    const { prisma } = await import('#lib/prisma.js');
+    (prisma.longURL.update as any).mockResolvedValueOnce(after);
+    purgeEdge.mockClear();
+    waitUntil.mockClear();
+    purgeEdge.mockResolvedValue(true);
+    await recordClick(42, event);
+    return (prisma.longURL.update as any).mock.calls.at(-1)[0];
+  }
+
+  it('purges the edge once, in the background, when the click reaches the cap', async () => {
+    const args = await click({ shortURL: 'Xy', clickCount: 4, maxClicks: 4 });
+    expect(args.select).toMatchObject({ shortURL: true, clickCount: true, maxClicks: true });
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    await waitUntil.mock.calls[0][0];
+    expect(purgeEdge).toHaveBeenCalledTimes(1);
+    expect(purgeEdge).toHaveBeenCalledWith(['Xy']);
+  });
+
+  it('does not purge below the cap, past it, or with no cap', async () => {
+    await click({ shortURL: 'Xy', clickCount: 3, maxClicks: 4 });
+    await click({ shortURL: 'Xy', clickCount: 5, maxClicks: 4 });
+    await click({ shortURL: 'Xy', clickCount: 9, maxClicks: null });
+    expect(purgeEdge).not.toHaveBeenCalled();
+    expect(waitUntil).not.toHaveBeenCalled();
+  });
+
+  it('a failing purge never fails the click', async () => {
+    const { prisma } = await import('#lib/prisma.js');
+    (prisma.longURL.update as any).mockResolvedValueOnce({ shortURL: 'Xy', clickCount: 4, maxClicks: 4 });
+    purgeEdge.mockRejectedValueOnce(new Error('down'));
+    waitUntil.mockClear();
+    await expect(recordClick(42, event)).resolves.toBeUndefined();
+    await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined();
   });
 });
 

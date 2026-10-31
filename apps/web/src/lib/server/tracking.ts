@@ -1,6 +1,8 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { parseUserAgent, referrerHost } from '@iksi/core';
+import { waitUntil } from '@vercel/functions';
 import { clientOf } from '#lib/server/client.js';
+import { purgeEdge } from '#lib/server/edge-purge.js';
 
 export type UAInfo = { browser: string; device: string };
 
@@ -32,7 +34,7 @@ export async function recordClick(
     // analytics, not billing. Skipping the transaction halves the round
     // trips to Postgres and removes lock contention between the Click
     // insert and the LongURL row update on hot links.
-    await Promise.all([
+    const [, link] = await Promise.all([
       prisma.click.create({
         data: {
           urlId,
@@ -47,9 +49,16 @@ export async function recordClick(
       }),
       prisma.longURL.update({
         where: { id: urlId },
-        data: { clickCount: { increment: 1 } }
+        data: { clickCount: { increment: 1 } },
+        select: { shortURL: true, clickCount: true, maxClicks: true }
       })
     ]);
+    // An origin click never reaches queue ingest, which is what purges a link
+    // at its cap, so the edge could keep redirecting from its cached record.
+    // Exactly equal: only the click that reaches the cap purges.
+    if (link?.maxClicks != null && link.clickCount === link.maxClicks) {
+      waitUntil(purgeEdge([link.shortURL]).catch(() => {}));
+    }
   } catch (err) {
     console.error('recordClick failed', err);
   }
