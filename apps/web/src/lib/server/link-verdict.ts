@@ -2,6 +2,7 @@ import { prisma } from '#lib/prisma.js';
 import { checkURLs } from '#lib/server/safe-browsing.js';
 import { waitUntil } from '@vercel/functions';
 import { purgeEdge } from '#lib/server/edge-purge.js';
+import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
 
 /**
  * Check every URL a link can send a visitor to (plaintext: the default and each
@@ -11,10 +12,22 @@ import { purgeEdge } from '#lib/server/edge-purge.js';
  */
 export async function settleVerdict(shortURL: string, urls: readonly string[]): Promise<void> {
   const verdict = await checkURLs(urls);
-  await prisma.longURL.update({
-    where: { shortURL },
-    data: { safeVerdict: verdict, safeCheckedAt: new Date() }
-  });
+  if (verdict === 'pending') {
+    // The check did not complete, so it cannot clear a flag. SQL NOT IN never
+    // matches NULL, hence the explicit null branch.
+    await prisma.longURL.updateMany({
+      where: {
+        shortURL,
+        OR: [{ safeVerdict: null }, { safeVerdict: { notIn: [...FLAGGED_VERDICTS] } }]
+      },
+      data: { safeVerdict: verdict, safeCheckedAt: new Date() }
+    });
+  } else {
+    await prisma.longURL.update({
+      where: { shortURL },
+      data: { safeVerdict: verdict, safeCheckedAt: new Date() }
+    });
+  }
   if (verdict !== 'safe' && verdict !== 'pending') {
     await prisma.profileRow.updateMany({
       where: { link: { shortURL } },

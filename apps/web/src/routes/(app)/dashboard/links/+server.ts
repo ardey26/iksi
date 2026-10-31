@@ -34,7 +34,8 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
       clickCount: link.clickCount ?? 0,
       destination: currentDestination,
       expiresAt: link.expiresAt,
-      maxClicks: link.maxClicks
+      maxClicks: link.maxClicks,
+      safeVerdict: link.safeVerdict
     },
     Date.now()
   );

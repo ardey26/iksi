@@ -7,7 +7,13 @@ import { validateSettings } from './link-settings';
 
 const NOW = Date.UTC(2026, 10, 1, 12, 0);
 const current = { clickCount: 5 };
-type Cur = { clickCount: number; destination?: string; expiresAt?: Date | null; maxClicks?: number | null };
+type Cur = {
+  clickCount: number;
+  destination?: string;
+  expiresAt?: Date | null;
+  maxClicks?: number | null;
+  safeVerdict?: string | null;
+};
 const run = (input: object, c: Cur = current) => validateSettings(input, c, NOW);
 const fail = async (input: object, c: Cur = current) => {
   const r = await run(input, c);
@@ -33,6 +39,16 @@ describe('validateSettings', () => {
     const r = await pass({ rules });
     expect(r.data.safeVerdict).toBe('pending');
     expect(r.rulesChanged).toBe(true);
+  });
+
+  it.each(['malware', 'phishing', 'unwanted'])('keeps a %s verdict on a rules or destination edit', async (safeVerdict) => {
+    const rules = [{ id: 'rule-aaa', when: {}, destination: 'https://ok.example.com/' }];
+    const a = await pass({ rules }, { clickCount: 0, safeVerdict });
+    expect(a.data).not.toHaveProperty('safeVerdict');
+    expect(a.rulesChanged).toBe(true);
+    const b = await pass({ destination: 'https://new.example.com/' }, { clickCount: 0, safeVerdict });
+    expect(b.data).not.toHaveProperty('safeVerdict');
+    expect(b.destinationChanged).toBe('https://new.example.com/');
   });
 
   it('leaves the verdict alone when the destination is absent', async () => {

@@ -2,6 +2,10 @@ import { LINK_RECORD_VERSION, parseRules, type LinkRecord } from '@iksi/core';
 
 export const FLAGGED_VERDICTS: readonly string[] = ['malware', 'phishing', 'unwanted'];
 
+export function isFlagged(verdict: string | null | undefined): boolean {
+  return verdict != null && FLAGGED_VERDICTS.includes(verdict);
+}
+
 export function toLinkRecord(
   row: {
     id: number;
@@ -26,7 +30,7 @@ export function toLinkRecord(
     v: LINK_RECORD_VERSION,
     id: row.id,
     destination,
-    flagged: row.safeVerdict !== null && FLAGGED_VERDICTS.includes(row.safeVerdict),
+    flagged: isFlagged(row.safeVerdict),
     permanent: row.permanent,
     rules,
     expiresAt: row.expiresAt ? row.expiresAt.getTime() : null,

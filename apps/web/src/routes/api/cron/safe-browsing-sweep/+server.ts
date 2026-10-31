@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { checkURLs } from '#lib/server/safe-browsing.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
-import { destinationsOf } from '#lib/server/link-record.js';
+import { destinationsOf, isFlagged } from '#lib/server/link-record.js';
 
 export const GET: RequestHandler = async ({ request }) => {
   const auth = request.headers.get('authorization');
@@ -36,13 +36,17 @@ export const GET: RequestHandler = async ({ request }) => {
       const raw = await decodeURL(l.originalURL);
       // Rule and split destinations redirect too; one lookup covers them all.
       const verdict = await checkURLs(destinationsOf(raw, l.rules));
-      await prisma.longURL.update({ where: { id: l.id }, data: { safeVerdict: verdict, safeCheckedAt: new Date() } });
-      await prisma.profileRow.updateMany({
-        where: { linkId: l.id },
-        data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }
-      });
-      if (verdict !== l.safeVerdict) changed.push(l.shortURL);
-      if (changed.length >= 50) await flush();
+      // An incomplete check keeps an existing flag and its quarantine; retried next run.
+      const keepFlag = verdict === 'pending' && isFlagged(l.safeVerdict);
+      if (!keepFlag) {
+        await prisma.longURL.update({ where: { id: l.id }, data: { safeVerdict: verdict, safeCheckedAt: new Date() } });
+        await prisma.profileRow.updateMany({
+          where: { linkId: l.id },
+          data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }
+        });
+        if (verdict !== l.safeVerdict) changed.push(l.shortURL);
+        if (changed.length >= 50) await flush();
+      }
       checked++;
       if (checked >= 500) break;
     }

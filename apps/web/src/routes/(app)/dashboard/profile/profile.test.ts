@@ -102,6 +102,15 @@ describe('dashboard profile verdict changes purge the edge', () => {
       expect(linkUpdate.mock.calls[0][0].data.safeVerdict).toBe('malware');
     });
 
+    it('a flagged link stays flagged and refused when Safe Browsing cannot complete the check', async () => {
+      linkFindUnique.mockResolvedValue(staleLink('phishing'));
+      checkURLs.mockResolvedValue('pending');
+      const r = await call(body);
+      expect(r.status).toBe(422);
+      expect(linkUpdate).not.toHaveBeenCalled();
+      expect(purgeEdge).not.toHaveBeenCalled();
+    });
+
     it('a fresh verdict is not re-checked or purged', async () => {
       linkFindUnique.mockResolvedValue({ ...staleLink('safe'), safeCheckedAt: new Date() });
       const r = await call(body);

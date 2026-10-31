@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { encodeURL } from '#lib/server/crypto.js';
 import { PASSWORD_MIN, PASSWORD_MAX } from '#lib/password-limits.js';
 import { addPrefix, isValidURLServer } from '#lib/utils/urlValidation.js';
+import { isFlagged } from '#lib/server/link-record.js';
 
 const MAX_URL = 2048;
 const MAX_CLICKS_CAP = 1_000_000_000;
@@ -49,10 +50,20 @@ function destinationError(url: string): string | null {
 
 export async function validateSettings(
   input: SettingsInput,
-  current: { clickCount: number; destination?: string; expiresAt?: Date | null; maxClicks?: number | null },
+  current: {
+    clickCount: number;
+    destination?: string;
+    expiresAt?: Date | null;
+    maxClicks?: number | null;
+    safeVerdict?: string | null;
+  },
   now: number
 ): Promise<Result> {
   const data: Prisma.LongURLUpdateInput = {};
+  // An edit never lowers a flag: only a completed check over every destination may clear it.
+  const markPending = () => {
+    if (!isFlagged(current.safeVerdict)) data.safeVerdict = 'pending';
+  };
   let destinationChanged: string | null = null;
   let rulesChanged = false;
 
@@ -63,7 +74,7 @@ export async function validateSettings(
     if (err) return bad(err);
     if (destination !== current.destination) {
       data.originalURL = encodeURL(destination);
-      data.safeVerdict = 'pending';
+      markPending();
       destinationChanged = destination;
     }
   }
@@ -80,7 +91,7 @@ export async function validateSettings(
       }
     }
     data.rules = parsed.rules as unknown as Prisma.InputJsonValue;
-    data.safeVerdict = 'pending';
+    markPending();
     rulesChanged = true;
   }
 

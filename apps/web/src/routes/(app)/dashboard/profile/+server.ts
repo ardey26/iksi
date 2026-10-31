@@ -6,7 +6,7 @@ import { decodeURL } from '#lib/server/crypto.js';
 import { verifyAvatarUrl } from '#lib/server/avatar-url.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
-import { destinationsOf } from '#lib/server/link-record.js';
+import { destinationsOf, isFlagged } from '#lib/server/link-record.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 
@@ -36,6 +36,8 @@ async function recheckVerdict(prisma: Db, link: CheckedLink): Promise<string> {
   const raw = await decodeURL(link.originalURL);
   // Rule destinations too: a clean default must not clear a bad rule's flag.
   const verdict = await checkURLs(destinationsOf(raw, link.rules));
+  // An incomplete check cannot clear a flag.
+  if (verdict === 'pending' && isFlagged(link.safeVerdict)) return link.safeVerdict as string;
   await prisma.longURL.update({
     where: { id: link.id },
     data: { safeVerdict: verdict, safeCheckedAt: new Date() }
