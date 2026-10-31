@@ -1,62 +1,14 @@
 {
 	"name": "iksi",
-	"version": "0.0.1",
 	"private": true,
+	"packageManager": "pnpm@10.34.6",
 	"engines": {
 		"node": ">=22.17"
 	},
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
-		"preview": "vite preview",
-		"test": "vitest",
-		"test:ui": "vitest --ui",
-		"test:coverage": "vitest --coverage",
-		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write .",
-		"postinstall": "prisma generate"
-	},
-	"devDependencies": {
-		"@eslint/js": "^9.39.5",
-		"@fontsource-variable/geist": "^5.3.0",
-		"@sveltejs/adapter-vercel": "^7.0.2",
-		"@sveltejs/kit": "^3.1.1",
-		"@sveltejs/vite-plugin-svelte": "^7.3.1",
-		"@tailwindcss/forms": "^0.5.11",
-		"@testing-library/jest-dom": "^6.10.0",
-		"@testing-library/svelte": "^5.4.2",
-		"@vitest/coverage-v8": "^4.1.12",
-		"@vitest/ui": "^4.1.12",
-		"autoprefixer": "^10.6.2",
-		"eslint": "^9.39.5",
-		"eslint-config-prettier": "^10.1.8",
-		"eslint-plugin-svelte": "^3.23.1",
-		"globals": "^17.13.0",
-		"jsdom": "^29.1.1",
-		"postcss": "^8.5.32",
-		"prettier": "^3.9.10",
-		"prettier-plugin-svelte": "^4.1.1",
-		"prisma": "^4.9.0",
-		"svelte": "^5.57.3",
-		"tailwindcss": "^3.4.17",
-		"vite": "^8.3.5",
-		"vitest": "^4.1.12"
-	},
-	"type": "module",
-	"dependencies": {
-		"@prisma/client": "^4.9.0",
-		"@vercel/og": "1.0.1",
-		"bcrypt": "^6.0.0",
-		"chart.js": "^4.5.0",
-		"dotenv": "^17.4.1",
-		"qrcode": "^1.5.4"
-	},
-	"overrides": {
-		"satori": {
-			"fflate": "^0.7.5"
-		}
-	},
-	"imports": {
-		"#lib/*": "./src/lib/*"
+		"build": "pnpm -r --if-present run build",
+		"test": "pnpm -r --if-present run test",
+		"lint": "pnpm -r --if-present run lint",
+		"format": "pnpm -r --if-present run format"
 	}
 }

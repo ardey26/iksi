@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+# npm "overrides" from apps/web (satori needs fflate 0.7 for the OG image route).
+overrides:
+  satori>fflate: ^0.7.5
+
+# pnpm 10 blocks dependency install scripts unless listed here.
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - esbuild
+  - workerd
+  - sharp
+  - bcrypt
