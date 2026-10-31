@@ -23,7 +23,7 @@ grep -n "id = " apps/redirect/wrangler.toml   # no REPLACE_WITH_KV_ID left
 
 ## 3. Deploy
 
-Merge to `main`. After CI passes, `.github/workflows/deploy.yml` runs in the right order: migrations, the Vercel production deploy, then the Worker (`EDGE_SECRET` uploaded as a Worker secret, `VERSION` set to the commit). The web endpoints (resolve, ingest, purge) are inert until the Worker calls them, so this order is safe.
+Merge to `main`. After CI passes, `.github/workflows/deploy.yml` runs in the right order: migrations, the Vercel production deploy, then the Worker (`EDGE_SECRET` uploaded as a Worker secret, `VERSION` set to the commit). The web endpoints (resolve, ingest, ping, purge) are inert until the Worker calls them, so this order is safe.
 
 Watch it under GitHub → Actions → Deploy.
 
@@ -48,16 +48,32 @@ npx -y pnpm@10.34.6 exec wrangler deploy --var VERSION:$(git rev-parse HEAD)
 
 ## 4. Verify
 
+Right after the deploy finishes, check that the Worker and the origin share `EDGE_SECRET`:
+
 ```sh
-curl -s https://www.iksi.app/_health
+curl -s 'https://www.iksi.app/_health?deep=1'
+```
+
+- [ ] The JSON shows `"origin":"ok"`, `ok: true`, a `colo`, and `version` equal to the deployed commit SHA.
+  - `"origin":"unauthorized"` means the GitHub and Vercel `EDGE_SECRET` values differ. Redirects still work (through the slower origin route), so nothing else will tell you. Fix: set the GitHub secret and the Vercel env var from the same value, then redeploy both (re-run the Deploy workflow).
+  - `"origin":"down"` means the Worker could not reach `/internal/ping` on the origin at all (origin outage, or a web deploy older than this branch).
+
+```sh
 curl -sI https://www.iksi.app/QdM2whH | grep -iE "^HTTP|x-iksi-route|x-vercel-id|location"
 ```
 
-- [ ] `_health` shows `ok: true`, a `colo`, and `version` equal to the deployed commit SHA.
-- [ ] The slug request is `302` with `x-iksi-route: slug` and **no** `x-vercel-id`. On a KV miss the Worker resolves the link from the origin and still answers the redirect itself, so a failure on the first request is a real failure. Any failing check here blocks the rollout.
+- [ ] The slug request is `302` with `x-iksi-route: slug` and **no** `x-vercel-id`. On a KV miss the Worker resolves the link from the origin and still answers the redirect itself. If the response carries `x-vercel-id`, the Worker could not resolve it and fell back to the origin route: re-check `_health?deep=1` above. Any failing check here blocks the rollout.
 - [ ] Open a short link in a browser. A new `Click` row appears within 30 seconds.
 - [ ] Shorten a URL through the homepage in production. Within a minute its Safe Browsing verdict is stored (dashboard links view). This proves background work survives the response on Vercel.
-- [ ] Edit that link's destination in the dashboard. The new destination is served within about 60 seconds (KV's per-location read cache is 60 s).
+- [ ] Purge works. A purge only proves something if the edge has the link cached first:
+  1. Open the link once through the edge: `curl -sI https://www.iksi.app/<slug>` shows `x-iksi-route: slug`, the old `location`, and no `x-vercel-id`. That request stores the record in KV.
+  2. Change its destination. The dashboard has no edit control yet, so send the request it would send: find the link's `id` (Supabase → Table Editor → `LongURL`, the row whose `shortURL` is `<slug>`), then, signed in on https://www.iksi.app/dashboard/links, run in the browser console:
+     ```js
+     await fetch('/dashboard/links', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: <id>, originalURL: 'https://example.org/' }) }).then((r) => r.status)
+     ```
+     It must print `200`.
+  3. Repeat the `curl -sI` from step 1 until `location` is the new destination. It must change within about 60 seconds (KV's per-location read cache is 60 s). Still old after 2 minutes means the purge did not reach the Worker.
+  4. In Vercel → Project → Logs, search for `edge purge failed`. There must be no match; a match includes the last status or error (`status 401` means the `EDGE_SECRET` values differ).
 - [ ] If any step fails, check the DLQ `iksi-clicks-dlq` and the Worker logs (Workers & Pages → iksi-redirect → Logs) before rolling back.
 
 ## 5. After-cutover load test
@@ -73,4 +89,8 @@ npx -y pnpm@10.34.6 --filter @iksi/redirect exec wrangler deployments list
 npx -y pnpm@10.34.6 --filter @iksi/redirect exec wrangler rollback <version-id> -m "<reason>" -y
 ```
 
-Redirects then fall back to the origin route, which still records clicks itself. Clicks already in `iksi-clicks` stay queued while no consumer runs and are delivered after redeploy (they expire after the queue's retention period). A later push to `main` redeploys the Worker, so revert the offending commit as well.
+Redirects then fall back to the origin route, which still records clicks itself.
+
+Rolling the Worker back does **not** unregister the queue consumer: `iksi-redirect` stays attached to `iksi-clicks`. While a version without a queue handler (such as Phase 0) is live, every batch the queue delivers to it fails, is retried (up to 10 times), and then lands in `iksi-clicks-dlq`. Clicks queued before or during the rollback are therefore lost to analytics unless you replay the DLQ by hand; nothing replays them automatically. Roll forward to a version with the queue handler as soon as you can.
+
+A later push to `main` redeploys the Worker, so revert the offending commit as well.
