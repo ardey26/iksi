@@ -102,6 +102,10 @@ Iksi includes environment-based configuration for optimal performance:
 - **Custom Aliases** - Create branded, memorable short links
 - **Collision-Free Generation** - Cryptographic randomness prevents duplicates
 - **URL Validation** - Comprehensive security checks and format validation
+- **Smart Routing** - Send visitors to different destinations by device, country or language
+- **Expiry** - Links can expire on a date or after a click cap
+- **Passwords** - Protect a link behind a password
+- **Preview** - Add `+` to any short link (`/abc+`) to see where it goes before you click
 
 ### **Performance & Reliability**
 - **Database Optimizations** - Efficient queries with selective field fetching
