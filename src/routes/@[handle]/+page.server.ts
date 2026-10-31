@@ -20,41 +20,40 @@ function extractSameAs(destinations: (string | null)[]): string[] {
   return Array.from(new Set(out));
 }
 
-export const load: PageServerLoad = async ({ params, request, platform }) => {
+// Edge cache: profiles are public and viewer-independent (the root layout
+// returns user: null for this route). 60s fresh, 10min stale-while-revalidate.
+const CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=600';
+
+export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
   const raw = params.handle;
   const handle = (raw.startsWith('@') ? raw.slice(1) : raw).toLowerCase();
 
   const { prisma } = await import('$lib/prisma.js');
-  const record = await prisma.handle.findUnique({
-    where: { handle },
+  // Start from Profile and filter through the relation. Prisma 4 issues one
+  // query per nested relation, so this is 3 round trips (profile, rows, link)
+  // instead of 5 (handle, user, profile, rows, link).
+  const p = await prisma.profile.findFirst({
+    where: { user: { handle: { handle } } },
     select: {
-      user: {
+      id: true,
+      displayName: true,
+      bio: true,
+      avatarUrl: true,
+      theme: true,
+      accent: true,
+      publicClicks: true,
+      rows: {
+        where: { enabled: true, quarantined: false },
+        orderBy: { position: 'asc' },
         select: {
-          profile: {
+          id: true,
+          title: true,
+          link: {
             select: {
               id: true,
-              displayName: true,
-              bio: true,
-              avatarUrl: true,
-              theme: true,
-              accent: true,
-              publicClicks: true,
-              rows: {
-                where: { enabled: true, quarantined: false },
-                orderBy: { position: 'asc' },
-                select: {
-                  id: true,
-                  title: true,
-                  link: {
-                    select: {
-                      id: true,
-                      shortURL: true,
-                      originalURL: true,
-                      clickCount: true
-                    }
-                  }
-                }
-              }
+              shortURL: true,
+              originalURL: true,
+              clickCount: true
             }
           }
         }
@@ -62,8 +61,7 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
     }
   });
 
-  if (!record?.user?.profile) throw error(404, 'not found');
-  const p = record.user.profile;
+  if (!p) throw error(404, 'not found');
 
   // Decode originalURL once per row so we can (a) compute the social sameAs
   // list for JSON-LD and (b) not send the encrypted ciphertext to the client.
@@ -84,11 +82,14 @@ export const load: PageServerLoad = async ({ params, request, platform }) => {
 
   const sameAs = extractSameAs(decoded);
 
-  // Fire-and-forget profile view (do not block)
+  // Record the view before responding. Vercel's Node runtime freezes the
+  // function once the response is sent, so a fire-and-forget write here was
+  // silently dropped. With the function co-located with the DB this is one
+  // short round trip, and with edge caching it only runs on cache misses.
   const { recordProfileView } = await import('$lib/server/tracking');
-  const event = { request } as any;
-  const view = recordProfileView(p.id, event);
-  if (platform?.context?.waitUntil) platform.context.waitUntil(view); else view.catch(() => {});
+  await recordProfileView(p.id, { request } as any);
+
+  setHeaders({ 'cache-control': CACHE_CONTROL });
 
   return {
     handle,

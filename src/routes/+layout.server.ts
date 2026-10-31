@@ -3,7 +3,13 @@ import { verifyUserSession } from '$lib/server/user-auth';
 import { normalizeAvatarUrl } from '$lib/server/avatar-url';
 import { getCachedUser, setCachedUser, type CachedUserPayload } from '$lib/server/user-cache';
 
-export const load: LayoutServerLoad = async ({ cookies }) => {
+// Public profile pages are edge-cached and identical for every viewer, so the
+// viewer's own user record must never be embedded in that HTML.
+const PUBLIC_CACHED_ROUTES = new Set(['/@[handle]']);
+
+export const load: LayoutServerLoad = async ({ cookies, route }) => {
+  if (route.id && PUBLIC_CACHED_ROUTES.has(route.id)) return { user: null };
+
   const uid = verifyUserSession(cookies.get('user_session'));
   if (uid === null) return { user: null };
 
