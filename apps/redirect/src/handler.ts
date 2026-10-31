@@ -9,7 +9,7 @@ import {
 import { kvLinkStore } from './store';
 import { queueEventSink } from './sink';
 import { refreshLink, resolveLink } from './resolve';
-import { EDGE_SECRET_HEADER, INTERNAL_HEADER, secretMatches } from './auth';
+import { EDGE_SECRET_HEADER, INTERNAL_HEADER, internalHeaders, secretMatches } from './auth';
 
 export interface Env {
 	VERSION?: string;
@@ -42,6 +42,13 @@ const DEFAULT_ORIGIN = 'https://www.iksi.app';
 export const originOf = (env: Env): string => env.ORIGIN_URL ?? DEFAULT_ORIGIN;
 
 const MAX_PURGE_SLUGS = 100;
+const PING_TIMEOUT_MS = 3000;
+
+const tag = (response: Response, route: string): Response => {
+	const tagged = new Response(response.body, response);
+	tagged.headers.set('x-iksi-route', route);
+	return tagged;
+};
 
 /**
  * Front door. Answers health, purge and short-link redirects itself; everything
@@ -51,27 +58,42 @@ const MAX_PURGE_SLUGS = 100;
 export function createHandler(deps: HandlerDeps): Handler {
 	const { upstream } = deps;
 
+	// On its own route, a same-URL fetch from a Worker goes to the zone's
+	// origin, not back into the Worker.
+	const forward = (request: Request, env: Env, internal = false) =>
+		upstream(withVisitorIdentity(request, env, internal));
+
 	const passThrough = async (
 		request: Request,
 		env: Env,
 		route: string,
 		internal = false
 	): Promise<Response> => {
-		let origin: Response;
 		try {
-			// On its own route, a same-URL fetch from a Worker goes to the zone's
-			// origin, not back into the Worker.
-			origin = await upstream(withVisitorIdentity(request, env, internal));
+			return tag(await forward(request, env, internal), route);
 		} catch {
 			return new Response('origin unavailable', {
 				status: 502,
 				headers: { 'retry-after': '5', 'x-iksi-route': route }
 			});
 		}
+	};
 
-		const tagged = new Response(origin.body, origin);
-		tagged.headers.set('x-iksi-route', route);
-		return tagged;
+	/** Proves the Worker and origin share EDGE_SECRET; see /internal/ping on the origin. */
+	const pingOrigin = async (env: Env): Promise<'ok' | 'unauthorized' | 'down'> => {
+		try {
+			const res = await upstream(
+				new Request(`${originOf(env)}/internal/ping`, {
+					headers: internalHeaders(env.EDGE_SECRET),
+					signal: AbortSignal.timeout(PING_TIMEOUT_MS)
+				})
+			);
+			await res.body?.cancel();
+			if (res.status === 204) return 'ok';
+			return res.status === 401 ? 'unauthorized' : 'down';
+		} catch {
+			return 'down';
+		}
 	};
 
 	return async (request, env, ctx) => {
@@ -79,10 +101,10 @@ export function createHandler(deps: HandlerDeps): Handler {
 
 		if (url.pathname === '/_health') {
 			const colo = (request as Request & { cf?: { colo?: string } }).cf?.colo ?? 'local';
-			return Response.json(
-				{ ok: true, colo, version: env.VERSION ?? 'dev' },
-				{ headers: { 'cache-control': 'no-store' } }
-			);
+			const health: Record<string, unknown> = { ok: true, colo, version: env.VERSION ?? 'dev' };
+			// Only on request: plain /_health must stay origin-independent.
+			if (url.searchParams.get('deep') === '1') health.origin = await pingOrigin(env);
+			return Response.json(health, { headers: { 'cache-control': 'no-store' } });
 		}
 
 		if (url.pathname === '/_edge/purge' && request.method === 'POST') {
@@ -118,6 +140,12 @@ export function createHandler(deps: HandlerDeps): Handler {
 		const resolution = await resolveLink(CANONICAL_HOST, path.slug, store, resolveDeps);
 
 		if (resolution.kind === 'unavailable') {
+			// Resolve trouble (a secret mismatch, a record the edge will not serve)
+			// must not take the link down: the origin route still redirects and
+			// records the click. Only when that fails too is iksi unavailable.
+			const origin = await forward(request, env).catch(() => null);
+			if (origin && origin.status < 500) return tag(origin, 'slug');
+			await origin?.body?.cancel();
 			return new Response('iksi is briefly unavailable. Try again in a few seconds.', {
 				status: 503,
 				headers: {

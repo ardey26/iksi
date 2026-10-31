@@ -107,6 +107,58 @@ test('health is answered locally, origin is not called', async () => {
 	expect(seen).toHaveLength(0);
 });
 
+describe('/_health?deep=1', () => {
+	const deep = () => new Request('https://www.iksi.app/_health?deep=1');
+
+	test('plain /_health reports no origin field and never calls origin', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response(null, { status: 204 }));
+		const res = await createHandler(deps(upstream))(
+			new Request('https://www.iksi.app/_health'),
+			testEnv({ EDGE_SECRET: 's3cret' }),
+			ctx
+		);
+		expect(await res.json()).not.toHaveProperty('origin');
+		expect(seen).toHaveLength(0);
+	});
+
+	test('pings the origin with the internal secret and reports ok on 204', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response(null, { status: 204 }));
+		const res = await createHandler(deps(upstream))(
+			deep(),
+			testEnv({ EDGE_SECRET: 's3cret' }),
+			ctx
+		);
+		expect(res.status).toBe(200);
+		expect(res.headers.get('cache-control')).toBe('no-store');
+		expect(await res.json()).toMatchObject({ ok: true, version: 'dev', origin: 'ok' });
+		expect(seen).toHaveLength(1);
+		expect(seen[0].url).toBe('https://www.iksi.app/internal/ping');
+		expect(seen[0].headers.get('x-iksi-internal')).toBe('s3cret');
+	});
+
+	test.each([
+		['401', 'unauthorized', () => new Response('unauthorized', { status: 401 })],
+		['500', 'down', () => new Response('boom', { status: 500 })],
+		['404 (origin without ping)', 'down', () => new Response('nf', { status: 404 })],
+		[
+			'a throw',
+			'down',
+			() => {
+				throw new Error('down');
+			}
+		]
+	])('origin %s reports %s', async (_name, expected, respond) => {
+		const { upstream } = recordingUpstream(respond);
+		const res = await createHandler(deps(upstream))(
+			deep(),
+			testEnv({ EDGE_SECRET: 's3cret' }),
+			ctx
+		);
+		expect(res.status).toBe(200);
+		expect(await res.json()).toMatchObject({ ok: true, origin: expected });
+	});
+});
+
 test('slug passes through and is tagged', async () => {
 	const { upstream, seen } = recordingUpstream(
 		() =>
@@ -420,6 +472,69 @@ describe('edge redirect', () => {
 		expect(res.headers.get('retry-after')).toBe('5');
 		expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
 		expect(await res.text()).toBe('iksi is briefly unavailable. Try again in a few seconds.');
+	});
+
+	describe('origin resolve unavailable falls back to the origin route', () => {
+		/** Answers /internal/resolve with `resolve`, the slug route with `route`. */
+		const split = (resolve: () => Response, route: () => Response) =>
+			recordingUpstream((req) =>
+				new URL(req.url).pathname === '/internal/resolve' ? resolve() : route()
+			);
+		const originRedirect = () =>
+			new Response(null, { status: 302, headers: { location: 'https://example.com/origin' } });
+
+		test.each([
+			['a secret mismatch (401)', () => new Response('unauthorized', { status: 401 })],
+			['a 500', () => new Response('boom', { status: 500 })],
+			[
+				'an invalid record',
+				() =>
+					Response.json({
+						found: true,
+						record: { ...record, destination: 'javascript:alert(1)' }
+					})
+			]
+		])('%s still redirects via the origin route', async (_name, resolve) => {
+			const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const { upstream, seen } = split(resolve, originRedirect);
+			const { sink, events } = recordingSink();
+			const c = recordingCtx();
+			const res = await createHandler(deps(upstream, memoryStore().store, sink))(
+				get('/QdM2whH', { cf: { country: 'SG' } }),
+				testEnv({ EDGE_SECRET: 's3cret' }),
+				c.ctx
+			);
+			await c.settle();
+			expect(res.status).toBe(302);
+			expect(res.headers.get('location')).toBe('https://example.com/origin');
+			expect(res.headers.get('x-iksi-route')).toBe('slug');
+			expect(seen.map((r) => new URL(r.url).pathname)).toEqual(['/internal/resolve', '/QdM2whH']);
+			// The origin route records the click itself; the edge must not double count.
+			expect(events).toHaveLength(0);
+			quiet.mockRestore();
+		});
+
+		test('a 404 from the origin route is returned as is', async () => {
+			const { upstream } = split(
+				() => new Response('x', { status: 500 }),
+				() => new Response('branded 404', { status: 404 })
+			);
+			const res = await createHandler(deps(upstream))(get('/QdM2whH'), testEnv(), ctx);
+			expect(res.status).toBe(404);
+			expect(await res.text()).toBe('branded 404');
+		});
+
+		test('a 5xx from the origin route too is the 503', async () => {
+			const { upstream } = split(
+				() => new Response('x', { status: 500 }),
+				() => new Response('bad gateway', { status: 502 })
+			);
+			const res = await createHandler(deps(upstream))(get('/QdM2whH'), testEnv(), ctx);
+			expect(res.status).toBe(503);
+			expect(res.headers.get('retry-after')).toBe('5');
+			expect(res.headers.get('x-iksi-route')).toBe('slug');
+			expect(await res.text()).toBe('iksi is briefly unavailable. Try again in a few seconds.');
+		});
 	});
 
 	test('stale record still redirects and schedules a refresh', async () => {
