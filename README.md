@@ -36,7 +36,7 @@ Ensure you have the following installed:
 - [Node.js](https://nodejs.org/)
 - [PostgreSQL](https://www.postgresql.org/) or another supported database
 - [Prisma](https://www.prisma.io/)
-- [npm](https://www.npmjs.com/)
+- [pnpm](https://pnpm.io/)
 
 ### **Clone the Repository**
 ```sh
@@ -45,12 +45,13 @@ cd iksi
 ```
 
 ### **Install Dependencies**
+The repo is a pnpm workspace (Node 22+, see `.nvmrc`):
 ```sh
-npm install
+pnpm install
 ```
 
 ### **Set Up Environment Variables**
-Create a `.env` file in the project root and add your database connection string and encryption key:
+Create `apps/web/.env` with your database connection string and encryption key:
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/iksi"
 SECRET_KEY="your-32-character-secret-encryption-key"
@@ -58,22 +59,18 @@ SECRET_KEY="your-32-character-secret-encryption-key"
 
 **Important:** The SECRET_KEY is used for encrypting URLs. Use a strong, unique 32+ character key in production.
 
-### **Generate Prisma Client**
+### **Set Up Database**
+`pnpm install` generates the Prisma client. Push the schema to your database:
 ```sh
-npx prisma generate
+pnpm --filter @iksi/web exec prisma db push
 ```
 
-### **Set Up Database** 
-Push the schema to your database:
+### **Run Locally**
 ```sh
-npx prisma db push
+pnpm --filter @iksi/web dev        # app at http://localhost:5173/
+pnpm --filter @iksi/redirect dev   # edge Worker via wrangler dev
+pnpm -r test -- --run              # every workspace's tests
 ```
-
-### **Start the Development Server**
-```sh
-npm run dev
-```
-The app should now be running at `http://localhost:5173/`
 
 ---
 
@@ -186,27 +183,39 @@ The API returns appropriate HTTP status codes:
 
 ## 🏗️ Architecture
 
-### **Tech Stack**
-- **Frontend**: SvelteKit + Tailwind CSS
-- **Backend**: SvelteKit API Routes
-- **Database**: PostgreSQL with Prisma ORM
-- **Security**: Built-in rate limiting and validation
-- **Performance**: Optimized bundling and caching
+iksi is moving to an edge-first design. The redirect is the only latency-critical path and it is read-mostly, so it belongs at the edge next to the person clicking; everything else (dashboard, profiles, API, jobs, database) is a control plane that tolerates one region.
 
-### **Key Components**
-- `/src/routes/+page.svelte` - Main URL shortening interface
-- `/src/routes/api/shorten/+server.js` - URL shortening API
-- `/src/routes/[slug]/+page.js` - URL redirect handler
-- `/src/lib/prisma.js` - Database connection singleton
-- `/src/lib/rateLimit.js` - Request rate limiting
-- `/src/lib/utils/` - Validation and utility functions
+### **Target (v2)**
+```
+  iksi.app/abc ──▶ Cloudflare Worker ──KV lookup──▶ 302 (≈10–30 ms at the nearest PoP)
+  go.acme.com/abc ─┘   │ miss                 │ click event
+                       ▼                      ▼
+                origin /internal/resolve   Queue ──▶ consumer ──batch──▶ /internal/ingest
+                       │
+                       ▼
+     SvelteKit app (Vercel, sin1) + Postgres (Supabase, ap-southeast-1)
+     R2: avatars, OG images, nightly database backups
+```
+
+### **Today (Phase 0)**
+A pass-through Worker sits in front of `iksi.app` and tags every response with `x-iksi-route` (`slug`, `reserved`, `root`, `unknown`) using the same classifier the edge redirect will use, so the routing split is observable in production before the Worker starts answering redirects itself. Latency before the cutover is recorded in [perf/](perf/README.md).
+
+### **Workspaces**
+| Path | What it is |
+|---|---|
+| `apps/web` | SvelteKit app: shortener UI, dashboard, `@handle` profiles, auth, API |
+| `apps/redirect` | Cloudflare Worker on `iksi.app/*` |
+| `packages/core` | Pure TypeScript shared by both: path classification, later the routing-rules engine |
+| `infra/cloudflare` | DNS cutover runbook with verification and rollback |
+| `infra/backup` | Nightly `pg_dump` to R2 and a restore check |
+| `perf` | k6 scripts and committed latency reports |
 
 ---
 
 ## 🚀 Performance Tips
 
 ### **Production Deployment**
-1. **Build Optimization**: Run `npm run build` for production builds
+1. **Build Optimization**: Run `pnpm -r build` for production builds
 2. **Database Indexes**: Consider adding indexes on frequently queried fields
 3. **Caching**: Implement Redis or similar for enhanced performance
 4. **CDN**: Use a CDN for static assets
@@ -222,28 +231,13 @@ The API returns appropriate HTTP status codes:
 
 ## 🔧 Development
 
-### **Project Structure**
-```
-src/
-├── lib/
-│   ├── components/     # Svelte components
-│   ├── utils/         # Utility functions
-│   ├── prisma.js      # Database singleton
-│   ├── rateLimit.js   # Rate limiting logic
-│   └── config.js      # Environment configuration
-├── routes/
-│   ├── api/shorten/   # URL shortening API
-│   ├── [slug]/        # Dynamic redirect routes
-│   └── +page.svelte   # Main interface
-└── app.html           # HTML template
-```
-
 ### **Available Scripts**
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run format` - Format code with Prettier
+Run from the repo root:
+- `pnpm -r test -- --run` - Run every workspace's tests
+- `pnpm -r build` - Build every workspace
+- `pnpm -r lint` - Lint every workspace
+- `pnpm --filter @iksi/web dev` - Start the app's dev server
+- `pnpm --filter @iksi/redirect deploy` - Deploy the edge Worker
 
 ---
 
