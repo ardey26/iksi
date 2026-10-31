@@ -17,3 +17,11 @@ test.each([
 	{ v: 1, id: 7, destination: 'https://e.com' },
 	{ v: 1, id: 7, destination: 'https://e.com/' + 'a'.repeat(2048), flagged: false, permanent: false }
 ])('rejects %o', (r) => expect(parseLinkRecord(r)).toBeNull());
+
+describe('id is Postgres INT4', () => {
+	const base = { v: 1, destination: 'https://e.com', flagged: false, permanent: false };
+	test('2147483647 is accepted', () =>
+		expect(parseLinkRecord({ ...base, id: 2147483647 })).toEqual({ ...base, id: 2147483647 }));
+	test('2147483648 is rejected', () =>
+		expect(parseLinkRecord({ ...base, id: 2147483648 })).toBeNull());
+});

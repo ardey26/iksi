@@ -1,3 +1,5 @@
+import { isDbId } from '../ids';
+
 export const CANONICAL_HOST = 'iksi.app';
 
 const MAX_STRING = 2048;
@@ -43,7 +45,7 @@ export function parseLinkRecord(input: unknown): LinkRecord | null {
 	const r = input as Record<string, unknown>;
 	if (
 		r.v !== 1 ||
-		!(typeof r.id === 'number' && Number.isSafeInteger(r.id) && r.id > 0) ||
+		!isDbId(r.id) ||
 		!isHttpUrl(r.destination) ||
 		typeof r.flagged !== 'boolean' ||
 		typeof r.permanent !== 'boolean'

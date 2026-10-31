@@ -88,6 +88,33 @@ describe('ingestClicks', () => {
     expect(db.writeBatch.mock.calls[0][0][0]).toMatchObject({ profileId: 7, rowId: 9 });
   });
 
+  it('drops an event whose ids exceed INT4 and still stores its batch-mates', async () => {
+    // Like Postgres: an INT4 column lookup with a larger value throws for the whole query.
+    const int4 = (ids: number[]) => {
+      if (ids.some((i) => i > 2147483647)) throw new Error('value out of range for type integer');
+    };
+    const db = fakeDb([3, 4], [7], [9]);
+    db.existingLinkIds.mockImplementation(async (ids) => (int4(ids), new Set(ids.filter((i) => [3, 4].includes(i)))));
+    db.existingProfileIds.mockImplementation(async (ids) => (int4(ids), new Set(ids.filter((i) => i === 7))));
+    db.existingRowIds.mockImplementation(async (ids) => (int4(ids), new Set(ids.filter((i) => i === 9))));
+    const res = await ingestClicks(
+      [
+        ev(3),
+        ev(3, { surface: 'profile', profileId: 3000000000, rowId: 9 }),
+        ev(2147483648),
+        ev(4, { surface: 'profile', profileId: 7, rowId: 2147483648 }),
+        ev(4, { surface: 'profile', profileId: 7, rowId: 9 })
+      ],
+      db
+    );
+    expect(res).toEqual({ accepted: 2, dropped: 3 });
+    const rows = db.writeBatch.mock.calls[0][0];
+    expect(rows.map((r) => [r.urlId, r.profileId, r.rowId])).toEqual([
+      [3, null, null],
+      [4, 7, 9]
+    ]);
+  });
+
   it('rejects when writeBatch rejects so the batch is retried', async () => {
     const db = fakeDb([3]);
     db.writeBatch.mockRejectedValue(new Error('db down'));

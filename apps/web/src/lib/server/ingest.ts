@@ -1,4 +1,4 @@
-import { parseClickEvent } from '@iksi/core';
+import { isDbId, parseClickEvent, type ClickEvent } from '@iksi/core';
 import type { PrismaClient } from '@prisma/client';
 import { parseUA, normalizeReferrer } from '#lib/server/tracking.js';
 
@@ -27,10 +27,19 @@ export interface IngestDb {
   writeBatch(rows: ClickRow[], counts: Map<number, number>): Promise<void>;
 }
 
+/**
+ * Every id must fit INT4: one larger value makes the whole lookup throw, which
+ * would fail the batch and send its real clicks to the dead-letter queue.
+ * parseClickEvent already enforces this; checked again here so ingest never
+ * depends on it.
+ */
+const idsFit = (e: ClickEvent) =>
+  isDbId(e.linkId) && (e.profileId == null || isDbId(e.profileId)) && (e.rowId == null || isDbId(e.rowId));
+
 export async function ingestClicks(raw: unknown[], db: IngestDb): Promise<IngestResult> {
   const events = raw.flatMap((r) => {
     const e = parseClickEvent(r);
-    return e ? [e] : [];
+    return e && idsFit(e) ? [e] : [];
   });
   if (events.length === 0) return { accepted: 0, dropped: raw.length };
 

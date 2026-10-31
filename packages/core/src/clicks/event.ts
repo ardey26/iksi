@@ -12,11 +12,11 @@ export interface ClickEvent {
 	rowId: number | null;
 }
 
+import { isDbId } from '../ids';
+
 const MAX_STRING = 2048;
 const SURFACES: readonly string[] = ['direct', 'profile', 'api'];
 
-const isPositiveInt = (v: unknown): v is number =>
-	typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
 const isNullable = (v: unknown, ok: (x: unknown) => boolean) => v === null || ok(v);
 const isShortString = (v: unknown) => typeof v === 'string' && v.length <= MAX_STRING;
 
@@ -26,15 +26,15 @@ export function parseClickEvent(input: unknown): ClickEvent | null {
 	const e = input as Record<string, unknown>;
 	if (
 		e.v !== 1 ||
-		!isPositiveInt(e.linkId) ||
+		!isDbId(e.linkId) ||
 		!(typeof e.ts === 'number' && Number.isFinite(e.ts)) ||
 		!isNullable(e.country, (c) => typeof c === 'string' && c.length === 2) ||
 		!isNullable(e.userAgent, isShortString) ||
 		!isNullable(e.referer, isShortString) ||
 		typeof e.surface !== 'string' ||
 		!SURFACES.includes(e.surface) ||
-		!isNullable(e.profileId, isPositiveInt) ||
-		!isNullable(e.rowId, isPositiveInt)
+		!isNullable(e.profileId, isDbId) ||
+		!isNullable(e.rowId, isDbId)
 	) {
 		return null;
 	}
