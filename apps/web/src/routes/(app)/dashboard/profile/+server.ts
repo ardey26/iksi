@@ -5,6 +5,7 @@ import { checkURL } from '#lib/server/safe-browsing.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { verifyAvatarUrl } from '#lib/server/avatar-url.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
+import { purgeEdge } from '#lib/server/edge-purge.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
 
@@ -16,6 +17,24 @@ function validTheme(v: unknown): v is string {
   return Number.isFinite(n) && n >= 0 && n <= 100 && String(n) === v;
 }
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+type Db = Awaited<ReturnType<typeof requireProfile>>['prisma'];
+type CheckedLink = { id: number; shortURL: string; originalURL: string; safeVerdict: string | null };
+
+/**
+ * Re-run Safe Browsing and store the verdict. A changed verdict can flip the
+ * edge's `flagged` bit, so the cached record is purged after the write.
+ */
+async function recheckVerdict(prisma: Db, link: CheckedLink): Promise<string> {
+  const raw = await decodeURL(link.originalURL);
+  const verdict = await checkURL(raw);
+  await prisma.longURL.update({
+    where: { id: link.id },
+    data: { safeVerdict: verdict, safeCheckedAt: new Date() }
+  });
+  if (verdict !== link.safeVerdict) await purgeEdge([link.shortURL]);
+  return verdict;
+}
 
 async function requireProfile(uid: number) {
   const { prisma } = await import('#lib/prisma.js');
@@ -58,12 +77,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       if (!link || link.userId !== uid) return json({ error: 'Link not owned' }, { status: 403 });
       const stale = !link.safeCheckedAt || (Date.now() - link.safeCheckedAt.getTime()) > 86400000;
       if (stale) {
-        const raw = await decodeURL(link.originalURL);
-        const verdict = await checkURL(raw);
-        await prisma.longURL.update({
-          where: { id: link.id },
-          data: { safeVerdict: verdict, safeCheckedAt: new Date() }
-        });
+        const verdict = await recheckVerdict(prisma, link);
         if (verdict !== 'safe' && verdict !== 'pending') {
           return json({ error: 'This link failed a safety check and cannot be added' }, { status: 422 });
         }
@@ -93,12 +107,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       if (enabled) {
         const stale = !link.safeCheckedAt || (Date.now() - link.safeCheckedAt.getTime()) > 86400000;
         if (stale) {
-          const raw = await decodeURL(link.originalURL);
-          const verdict = await checkURL(raw);
-          await prisma.longURL.update({
-            where: { id: link.id },
-            data: { safeVerdict: verdict, safeCheckedAt: new Date() }
-          });
+          const verdict = await recheckVerdict(prisma, link);
           if (verdict !== 'safe' && verdict !== 'pending') {
             return json({ error: 'This link failed a safety check' }, { status: 422 });
           }
