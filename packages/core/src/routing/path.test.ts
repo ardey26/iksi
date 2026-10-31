@@ -15,7 +15,10 @@ test.each([
 	'/fonts/geist.woff2',
 	'/manifest.json',
 	'/_health',
-	'/admin'
+	'/admin',
+	'/internal',
+	'/internal/resolve',
+	'/_edge/purge'
 ])('reserved %s', (p) => expect(classifyPath(p)).toEqual({ kind: 'reserved' }));
 
 test('reserved prefixes match on segment boundaries', () => {
