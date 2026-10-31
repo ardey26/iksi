@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Placeholders so server modules that validate env at load time can build.
+      SECRET_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      ADMIN_PASSWORD_HASH: x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # apps/web has never passed Prettier/ESLint; its lint joins CI once the
+      # framework upgrade (which replaces the lint setup) has landed.
+      - name: Lint
+        run: pnpm -r --filter '!@iksi/web' lint
+
+      - name: Test
+        run: pnpm -r test -- --run
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: Redirect Worker bundles
+        run: pnpm --filter @iksi/redirect exec wrangler deploy --dry-run --outdir dist
+
+      - name: Backup scripts
+        run: bash infra/backup/restore-check.test.sh
