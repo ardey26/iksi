@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import type { S3Client } from '@aws-sdk/client-s3';
-import { r2MediaStore } from '#lib/server/media-store.js';
+import { createR2Client, r2MediaStore } from '#lib/server/media-store.js';
 
 function fakeClient(respond: (cmd: unknown) => unknown = () => ({})) {
 	const sent: unknown[] = [];
@@ -42,9 +42,9 @@ describe('r2MediaStore', () => {
 				? { Contents: [{ Key: '7/avatar/u1.400.webp' }, { Key: '7/avatar/u1.800.webp' }] }
 				: {}
 		);
-		await r2MediaStore(client).deletePrefix('7/avatar/u1');
+		await r2MediaStore(client).deletePrefix('7/avatar/u1.');
 		expect(sent).toHaveLength(2);
-		expect((sent[0] as ListObjectsV2Command).input.Prefix).toBe('7/avatar/u1');
+		expect((sent[0] as ListObjectsV2Command).input.Prefix).toBe('7/avatar/u1.');
 		expect(sent[1]).toBeInstanceOf(DeleteObjectsCommand);
 		expect((sent[1] as DeleteObjectsCommand).input.Delete?.Objects).toEqual([
 			{ Key: '7/avatar/u1.400.webp' },
@@ -89,5 +89,46 @@ describe('r2MediaStore', () => {
 		process.env.R2_MEDIA_BUCKET = 'other';
 		await store.put('k', new Uint8Array(), 'image/webp');
 		expect((sent[0] as PutObjectCommand).input.Bucket).toBe('other');
+	});
+
+	it('deletePrefix throws when R2 reports per-key failures', async () => {
+		const { client } = fakeClient((cmd) =>
+			cmd instanceof ListObjectsV2Command
+				? { Contents: [{ Key: 'k' }] }
+				: { Errors: [{ Key: 'k', Code: 'AccessDenied' }] }
+		);
+		await expect(r2MediaStore(client).deletePrefix('p.')).rejects.toThrow(/k.*AccessDenied/);
+	});
+
+	it('deletePrefix batches deletes at 1000 keys', async () => {
+		const all = Array.from({ length: 2500 }, (_, i) => ({ Key: `p.${i}` }));
+		let page = 0;
+		const { client, sent } = fakeClient((cmd) => {
+			if (!(cmd instanceof ListObjectsV2Command)) return {};
+			const start = page * 1000;
+			page++;
+			return {
+				Contents: all.slice(start, start + 1000),
+				IsTruncated: start + 1000 < all.length,
+				NextContinuationToken: 't' + page
+			};
+		});
+		await r2MediaStore(client).deletePrefix('p.');
+		const sizes = sent
+			.filter((c): c is DeleteObjectsCommand => c instanceof DeleteObjectsCommand)
+			.map((c) => c.input.Delete?.Objects?.length);
+		expect(sizes).toEqual([1000, 1000, 500]);
+	});
+
+	it.each(['', '   '])('deletePrefix rejects empty prefix %j', async (prefix) => {
+		const { client, sent } = fakeClient();
+		await expect(r2MediaStore(client).deletePrefix(prefix)).rejects.toThrow(/prefix/i);
+		expect(sent).toHaveLength(0);
+	});
+
+	it('real client uses R2-safe checksum settings', async () => {
+		const c = createR2Client();
+		expect(await c.config.requestChecksumCalculation()).toBe('WHEN_REQUIRED');
+		expect(await c.config.responseChecksumValidation()).toBe('WHEN_REQUIRED');
 	});
 });
