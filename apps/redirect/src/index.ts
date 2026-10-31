@@ -1,7 +1,7 @@
-import { handleQueue } from "./consumer";
-import { handleRequest, type Env } from "./handler";
+import { handleQueue } from './consumer';
+import { handleRequest, type Env } from './handler';
 
 export default {
-  fetch: handleRequest,
-  queue: handleQueue,
+	fetch: handleRequest,
+	queue: handleQueue
 } satisfies ExportedHandler<Env>;

@@ -37,6 +37,10 @@ export interface HandlerDeps {
 }
 
 const DEFAULT_ORIGIN = 'https://www.iksi.app';
+
+/** The app origin the Worker forwards to and delivers click events to. */
+export const originOf = (env: Env): string => env.ORIGIN_URL ?? DEFAULT_ORIGIN;
+
 const MAX_PURGE_SLUGS = 100;
 
 /**
@@ -89,7 +93,7 @@ export function createHandler(deps: HandlerDeps): Handler {
 		const store = deps.store(env);
 		const resolveDeps = {
 			upstream,
-			origin: env.ORIGIN_URL ?? DEFAULT_ORIGIN,
+			origin: originOf(env),
 			secret: env.EDGE_SECRET,
 			now: deps.now(),
 			defer: (work: Promise<unknown>) => ctx.waitUntil(work)
