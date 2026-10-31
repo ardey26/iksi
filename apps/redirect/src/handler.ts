@@ -1,4 +1,14 @@
-import { classifyPath, type ClickEvent } from '@iksi/core';
+import {
+	CANONICAL_HOST,
+	classifyPath,
+	surfaceFromQuery,
+	type ClickEvent,
+	type EventSink,
+	type LinkStore
+} from '@iksi/core';
+import { kvLinkStore } from './store';
+import { queueEventSink } from './sink';
+import { refreshLink, resolveLink } from './resolve';
 
 export interface Env {
 	VERSION?: string;
@@ -19,25 +29,25 @@ export type Upstream = (request: Request) => Promise<Response>;
 
 export type Handler = (request: Request, env: Env, ctx: ExecutionContext) => Promise<Response>;
 
+export interface HandlerDeps {
+	upstream: Upstream;
+	store: (env: Env) => LinkStore;
+	sink: (env: Env) => EventSink;
+	now: () => number;
+}
+
+const DEFAULT_ORIGIN = 'https://www.iksi.app';
+const MAX_PURGE_SLUGS = 100;
+
 /**
- * Phase 0 front door: forwards every request to origin unchanged and tags the
- * response with `x-iksi-route` so the routing split can be observed in
- * production before the Worker starts answering redirects itself.
+ * Front door. Answers health, purge and short-link redirects itself; everything
+ * else goes to origin unchanged. Responses are tagged with `x-iksi-route` so the
+ * routing split can be observed in production.
  */
-export function createHandler(upstream: Upstream): Handler {
-	return async (request, env) => {
-		const url = new URL(request.url);
+export function createHandler(deps: HandlerDeps): Handler {
+	const { upstream } = deps;
 
-		if (url.pathname === '/_health') {
-			const colo = (request as Request & { cf?: { colo?: string } }).cf?.colo ?? 'local';
-			return Response.json(
-				{ ok: true, colo, version: env.VERSION ?? 'dev' },
-				{ headers: { 'cache-control': 'no-store' } }
-			);
-		}
-
-		const route = classifyPath(url.pathname).kind;
-
+	const passThrough = async (request: Request, env: Env, route: string): Promise<Response> => {
 		let origin: Response;
 		try {
 			// On its own route, a same-URL fetch from a Worker goes to the zone's
@@ -54,6 +64,109 @@ export function createHandler(upstream: Upstream): Handler {
 		tagged.headers.set('x-iksi-route', route);
 		return tagged;
 	};
+
+	return async (request, env, ctx) => {
+		const url = new URL(request.url);
+
+		if (url.pathname === '/_health') {
+			const colo = (request as Request & { cf?: { colo?: string } }).cf?.colo ?? 'local';
+			return Response.json(
+				{ ok: true, colo, version: env.VERSION ?? 'dev' },
+				{ headers: { 'cache-control': 'no-store' } }
+			);
+		}
+
+		if (url.pathname === '/_edge/purge' && request.method === 'POST') {
+			return purge(request, env, deps.store(env));
+		}
+
+		const path = classifyPath(url.pathname);
+		const isRead = request.method === 'GET' || request.method === 'HEAD';
+		if (path.kind !== 'slug' || path.mode !== 'redirect' || !isRead) {
+			return passThrough(request, env, path.kind);
+		}
+
+		const store = deps.store(env);
+		const resolveDeps = {
+			upstream,
+			origin: env.ORIGIN_URL ?? DEFAULT_ORIGIN,
+			secret: env.EDGE_SECRET,
+			now: deps.now()
+		};
+		const resolution = await resolveLink(CANONICAL_HOST, path.slug, store, resolveDeps);
+
+		if (resolution.kind === 'unavailable') {
+			return new Response('iksi is briefly unavailable. Try again in a few seconds.', {
+				status: 503,
+				headers: {
+					'retry-after': '5',
+					'content-type': 'text/plain; charset=utf-8',
+					'x-iksi-route': 'slug'
+				}
+			});
+		}
+		if (resolution.kind === 'missing' || resolution.record.flagged) {
+			return passThrough(request, env, 'slug');
+		}
+
+		const { record } = resolution;
+		if (resolution.stale) {
+			ctx.waitUntil(refreshLink(CANONICAL_HOST, path.slug, store, resolveDeps).catch(() => {}));
+		}
+		if (request.method === 'GET') {
+			const cf = (request as Request & { cf?: { country?: string } }).cf;
+			const event: ClickEvent = {
+				v: 1,
+				linkId: record.id,
+				ts: deps.now(),
+				country: cf?.country ?? null,
+				userAgent: request.headers.get('user-agent'),
+				referer: request.headers.get('referer'),
+				...surfaceFromQuery(url.searchParams)
+			};
+			ctx.waitUntil(
+				deps
+					.sink(env)
+					.emit(event)
+					.catch(() => {})
+			);
+		}
+
+		return new Response(null, {
+			status: record.permanent ? 301 : 302,
+			headers: {
+				location: record.destination,
+				'cache-control': 'private, no-store',
+				'x-iksi-route': 'slug'
+			}
+		});
+	};
+}
+
+async function purge(request: Request, env: Env, store: LinkStore): Promise<Response> {
+	if (!(await secretMatches(request.headers.get(EDGE_SECRET_HEADER), env.EDGE_SECRET))) {
+		return new Response(null, { status: 401 });
+	}
+	const body = await request.json().catch(() => null);
+	const slugs = (body as { slugs?: unknown } | null)?.slugs;
+	if (
+		!Array.isArray(slugs) ||
+		slugs.length > MAX_PURGE_SLUGS ||
+		!slugs.every((s): s is string => typeof s === 'string' && s.length > 0)
+	) {
+		return new Response(null, { status: 400 });
+	}
+	await Promise.all(slugs.map((slug) => store.delete(CANONICAL_HOST, slug)));
+	return new Response(null, { status: 204 });
+}
+
+/** Constant-time: both sides are hashed to equal length, then compared with timingSafeEqual. */
+async function secretMatches(given: string | null, expected: string | undefined): Promise<boolean> {
+	if (!expected || !given) return false;
+	const digest = async (value: string) =>
+		new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+	const [a, b] = await Promise.all([digest(given), digest(expected)]);
+	return crypto.subtle.timingSafeEqual(a, b);
 }
 
 /**
@@ -77,4 +190,9 @@ function withVisitorIdentity(request: Request, env: Env): Request {
 	return new Request(request, { headers });
 }
 
-export const handleRequest: Handler = createHandler((request) => fetch(request));
+export const handleRequest: Handler = createHandler({
+	upstream: (request) => fetch(request),
+	store: (env) => kvLinkStore(env.LINKS),
+	sink: (env) => queueEventSink(env.CLICKS),
+	now: () => Date.now()
+});
