@@ -22,6 +22,10 @@ done
 [ "$ready" = 1 ] || { echo "restore-check: postgres did not start" >&2; exit 1; }
 
 docker cp "$dump" "$name:/tmp/restore.dump" >/dev/null
+# Dumps taken with --schema=public contain CREATE SCHEMA public, which collides
+# with the empty default schema in a fresh database. Drop it so the restore
+# recreates it exactly as dumped. The same applies to a real disaster restore.
+docker exec "$name" psql -v ON_ERROR_STOP=1 -U postgres -h 127.0.0.1 -qc 'drop schema public cascade' postgres
 docker exec "$name" pg_restore --no-owner --no-privileges --exit-on-error \
 	-U postgres -h 127.0.0.1 -d postgres /tmp/restore.dump
 

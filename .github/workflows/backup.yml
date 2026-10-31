@@ -26,6 +26,9 @@ jobs:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      # healthchecks.io (or similar) URL: alerts when no successful ping arrives,
+      # which also catches GitHub silently disabling this schedule.
+      BACKUP_HEARTBEAT_URL: ${{ secrets.BACKUP_HEARTBEAT_URL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,3 +50,7 @@ jobs:
           aws s3 cp "s3://iksi-backups/$key" "$RUNNER_TEMP/restore.dump" \
             --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" --region auto --only-show-errors
           bash infra/backup/restore-check.sh "$RUNNER_TEMP/restore.dump"
+
+      - name: Heartbeat
+        if: success() && env.BACKUP_HEARTBEAT_URL != ''
+        run: curl -fsS -m 10 --retry 3 "$BACKUP_HEARTBEAT_URL" > /dev/null
