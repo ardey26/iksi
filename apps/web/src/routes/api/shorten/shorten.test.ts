@@ -86,6 +86,21 @@ describe('anonymous dedupe', () => {
     expect(create.mock.calls[0][0].select).toMatchObject({ settingsVersion: true });
   });
 
+  it.each(['malware', 'phishing', 'unwanted'])(
+    'a new slug for a URL already flagged %s starts flagged instead of redirecting until checked',
+    async (safeVerdict) => {
+      withHashRow({ ...EXISTING, safeVerdict });
+      await shorten();
+      expect(create.mock.calls[0][0].data.safeVerdict).toBe(safeVerdict);
+    }
+  );
+
+  it('a new slug made only because of settings carries no verdict', async () => {
+    withHashRow({ ...EXISTING, passwordHash: '$2b$10$x' });
+    await shorten();
+    expect(create.mock.calls[0][0].data.safeVerdict ?? null).toBeNull();
+  });
+
   it('stores the hash on a first anonymous shorten', async () => {
     withHashRow(null);
     await shorten();

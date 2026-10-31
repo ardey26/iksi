@@ -130,6 +130,12 @@ export const POST = async (event) => {
 		// Custom aliases intentionally store NULL so the user can have multiple
 		// custom shorts pointing at the same long URL without tripping the unique constraint.
 		let urlHashForStore = null;
+		// A new slug for a URL whose existing row is flagged starts flagged, so it
+		// never redirects before its own check runs. Only a completed check clears it.
+		let inheritedVerdict = null;
+		const inheritFlag = (row) => {
+			if (row?.safeVerdict != null && FLAGGED_VERDICTS.includes(row.safeVerdict)) inheritedVerdict = row.safeVerdict;
+		};
 
 		const prefixedURL = addPrefix(longURL.trim());
 
@@ -210,6 +216,7 @@ export const POST = async (event) => {
 				shortURL = await generateShortURL();
 				// urlHash is unique: a row that cannot be reused keeps it, so this one stores none.
 				urlHashForStore = isShortened ? null : urlHash;
+				inheritFlag(isShortened);
 			}
 		}
 
@@ -220,7 +227,8 @@ export const POST = async (event) => {
 					originalURL: encodedURL,
 					urlHash,
 					shortURL: shortURL,
-					userId: uid
+					userId: uid,
+					...(inheritedVerdict ? { safeVerdict: inheritedVerdict } : {})
 				},
 				select: {
 					id: true,
@@ -248,6 +256,7 @@ export const POST = async (event) => {
 					headers: { 'Content-Type': 'application/json' }
 				});
 			}
+			inheritFlag(existing);
 			url = await insert(null);
 		}
 
