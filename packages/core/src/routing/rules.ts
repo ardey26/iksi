@@ -43,25 +43,32 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 	typeof v === 'object' && v !== null && !Array.isArray(v);
 
 // Filled lazily so importing the module has no side effects. Constructing a formatter is the slow part.
-const formatters = new Map<string, Intl.DateTimeFormat | null>();
+// Only valid zones are kept, and the cache is cleared at the bound, so user-supplied strings cannot grow it.
+const MAX_FORMATTERS = 256;
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/** For tests only; not exported from the package index. */
+export function formatterCacheSize(): number {
+	return formatters.size;
+}
 
 function formatterFor(tz: string): Intl.DateTimeFormat | null {
-	let f = formatters.get(tz);
-	if (f === undefined) {
-		try {
-			f = new Intl.DateTimeFormat('en-US', {
-				timeZone: tz,
-				hour: '2-digit',
-				minute: '2-digit',
-				weekday: 'short',
-				hourCycle: 'h23'
-			});
-		} catch {
-			f = null;
-		}
+	const cached = formatters.get(tz);
+	if (cached) return cached;
+	try {
+		const f = new Intl.DateTimeFormat('en-US', {
+			timeZone: tz,
+			hour: '2-digit',
+			minute: '2-digit',
+			weekday: 'short',
+			hourCycle: 'h23'
+		});
+		if (formatters.size >= MAX_FORMATTERS) formatters.clear();
 		formatters.set(tz, f);
+		return f;
+	} catch {
+		return null;
 	}
-	return f;
 }
 
 function stringList(value: unknown, allowed: (s: string) => boolean): string[] | null {

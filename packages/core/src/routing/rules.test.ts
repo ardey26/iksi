@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_RULES, matches, parseRules, resolveDestination, type Rule } from './rules';
+import { MAX_RULES, formatterCacheSize, matches, parseRules, resolveDestination, type Rule } from './rules';
 import type { RequestContext } from './rules';
 
 const DEF = 'https://default.example/';
@@ -278,5 +278,29 @@ describe('parseRules', () => {
 	});
 	it('requires a when object', () => {
 		expect(err([{ id: 'rule-aaa', destination: 'https://a.example/' }])).toMatch(/^Rule 1: when/);
+	});
+});
+
+describe('time zone formatter cache', () => {
+	const timeRule = (tz: string) => [
+		{
+			id: 'rule-zzz',
+			when: { time: { start: '09:00', end: '17:00', tz } },
+			destination: 'https://a.example/'
+		}
+	];
+	it('does not retain invalid zones', () => {
+		const before = formatterCacheSize();
+		for (let i = 0; i < 50; i++) expect(parseRules(timeRule(`Mars/Base${i}`)).ok).toBe(false);
+		expect(formatterCacheSize()).toBe(before);
+	});
+	it('stays bounded at 256 entries', () => {
+		const zones = Intl.supportedValuesOf('timeZone');
+		expect(zones.length).toBeGreaterThan(256);
+		for (const z of zones) {
+			parseRules(timeRule(z));
+			expect(formatterCacheSize()).toBeLessThanOrEqual(256);
+		}
+		expect(parseRules(timeRule('Asia/Manila')).ok).toBe(true);
 	});
 });
