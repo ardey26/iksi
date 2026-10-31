@@ -86,3 +86,33 @@ test('unknown paths still reach origin and are tagged unknown', async () => {
 	expect(res.headers.get('x-iksi-route')).toBe('unknown');
 	expect(seen).toHaveLength(1);
 });
+
+describe('visitor identity forwarded to origin', () => {
+	const visitor = () =>
+		new Request('https://www.iksi.app/QdM2whH', {
+			headers: { 'cf-connecting-ip': '198.51.100.7' },
+			cf: { country: 'SG' }
+		} as RequestInit);
+
+	test('sends visitor ip, country and the edge secret', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response(null, { status: 302 }));
+		await createHandler(upstream)(visitor(), { EDGE_SECRET: 's3cret' }, ctx);
+		expect(seen[0].headers.get('x-iksi-edge')).toBe('s3cret');
+		expect(seen[0].headers.get('x-iksi-client-ip')).toBe('198.51.100.7');
+		expect(seen[0].headers.get('x-iksi-client-country')).toBe('SG');
+	});
+
+	test('drops client-supplied x-iksi headers so they cannot be spoofed', async () => {
+		const { upstream, seen } = recordingUpstream(() => new Response('ok'));
+		const spoofed = new Request('https://www.iksi.app/api/shorten', {
+			method: 'POST',
+			body: 'x',
+			headers: { 'x-iksi-edge': 'guess', 'x-iksi-client-ip': '6.6.6.6', 'x-iksi-client-country': 'KP' }
+		});
+		await createHandler(upstream)(spoofed, {}, ctx);
+		expect(seen[0].headers.get('x-iksi-edge')).toBeNull();
+		expect(seen[0].headers.get('x-iksi-client-ip')).toBeNull();
+		expect(seen[0].headers.get('x-iksi-client-country')).toBeNull();
+		expect(await seen[0].text()).toBe('x');
+	});
+});

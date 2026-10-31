@@ -166,3 +166,29 @@ describe('recordProfileView', () => {
     await expect(recordProfileView(1, event)).resolves.toBeUndefined();
   });
 });
+
+describe('country behind the Cloudflare edge', () => {
+  const edge = {
+    'x-iksi-edge': 'test-edge-secret',
+    'x-iksi-client-country': 'SG',
+    'x-vercel-ip-country': 'US' // Cloudflare's egress location, as Vercel sees it
+  };
+
+  it('recordClick stores the edge-reported country', async () => {
+    process.env.EDGE_SECRET = 'test-edge-secret';
+    const { prisma } = await import('#lib/prisma.js');
+    (prisma.click.create as any).mockClear();
+    await recordClick(7, { request: { headers: new Headers(edge) } } as any);
+    expect((prisma.click.create as any).mock.calls[0][0].data.country).toBe('SG');
+    delete process.env.EDGE_SECRET;
+  });
+
+  it('recordProfileView stores the edge-reported country', async () => {
+    process.env.EDGE_SECRET = 'test-edge-secret';
+    const { prisma } = await import('#lib/prisma.js');
+    (prisma.profileView.create as any).mockClear();
+    await recordProfileView(9, { request: { headers: new Headers(edge) } } as any);
+    expect((prisma.profileView.create as any).mock.calls[0][0].data.country).toBe('SG');
+    delete process.env.EDGE_SECRET;
+  });
+});

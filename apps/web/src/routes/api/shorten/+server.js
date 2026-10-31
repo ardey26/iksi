@@ -7,6 +7,7 @@ import { encodeURL } from '#lib/server/crypto.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
 import { checkURL } from '#lib/server/safe-browsing.js';
+import { clientOf } from '#lib/server/client.js';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -45,10 +46,11 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 };
 
 
-export const POST = async ({ request, getClientAddress, cookies }) => {
+export const POST = async (event) => {
+	const { request, cookies } = event;
 	try {
 		// Rate limiting
-		const clientIP = getClientAddress();
+		const clientIP = clientOf(event).ip;
 		const rateLimitResult = await rateLimit(clientIP, RATE_LIMIT.requests, RATE_LIMIT.windowMs);
 		
 		if (!rateLimitResult.allowed) {

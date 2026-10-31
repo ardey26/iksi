@@ -25,7 +25,19 @@ Cloudflare dashboard → Add a site → `iksi.app` → Free. Then make the DNS r
 
 Cloudflare must never cache HTML; Vercel's edge still does that per its own headers.
 
-## 3. Switch nameservers
+## 3. Shared edge secret (before any traffic moves)
+
+Behind Cloudflare, Vercel sees Cloudflare's IP and country instead of the visitor's. That would merge everyone into one rate-limit bucket and record the wrong country on every click. The Worker forwards the real values signed with a shared secret, and the app only trusts them when the secret matches.
+
+```sh
+openssl rand -hex 32   # keep this value for step 6 as well
+```
+
+Vercel → Project → Settings → Environment Variables: add `EDGE_SECRET` with that value for Production and Preview, then redeploy. Until the Worker sends it, the app keeps using Vercel's own headers, so this is safe to do first.
+
+Between step 4 (nameservers switch) and step 6 (Worker deployed), traffic is proxied without the Worker, so countries and rate-limit buckets are wrong. Do steps 4 to 6 back to back.
+
+## 4. Switch nameservers
 
 At the registrar for `iksi.app`, replace `ns1.vercel-dns.com` and `ns2.vercel-dns.com` with the two nameservers Cloudflare assigned. Wait until the zone shows **Active**.
 
@@ -35,17 +47,18 @@ curl -sI https://www.iksi.app/ | grep -i cf-ray          # present
 curl -sI https://www.iksi.app/@andre | grep -iE "^HTTP|x-vercel-id"   # 200 and a Vercel id
 ```
 
-## 4. Re-verify domains in Vercel
+## 5. Re-verify domains in Vercel
 
 Vercel → Project → Settings → Domains: `iksi.app`, `www.iksi.app`, `admin.iksi.app` must all show valid configuration. If Vercel asks for a `_vercel` TXT record, add it in Cloudflare as **DNS only** and wait for the check.
 
-## 5. Enable Workers Paid and deploy the Worker
+## 6. Enable Workers Paid and deploy the Worker
 
 Cloudflare → Workers & Pages → Plans → **Workers Paid** ($5/month).
 
 ```sh
 pnpm --filter @iksi/redirect exec wrangler login
 pnpm --filter @iksi/redirect exec wrangler deploy
+pnpm --filter @iksi/redirect exec wrangler secret put EDGE_SECRET   # paste the value from step 3
 ```
 
 Verify:
@@ -58,7 +71,7 @@ curl -sI https://www.iksi.app/@andre  | grep -i x-iksi-route                    
 
 Then sign in once with Google and once with Twitter in a browser. Both must complete.
 
-## 6. Latency sanity check
+## 7. Latency sanity check
 
 ```sh
 for i in 1 2 3 4 5; do curl -s -o /dev/null -w '%{time_starttransfer}\n' -I https://www.iksi.app/QdM2whH; done

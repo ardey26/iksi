@@ -1,4 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
+import { clientOf } from '#lib/server/client.js';
 
 export type UAInfo = { browser: string; device: string };
 
@@ -49,7 +50,7 @@ export async function recordClick(
     const h = event.request.headers;
     const { browser, device } = parseUA(h.get('user-agent'));
     const referrer = normalizeReferrer(h.get('referer'));
-    const country = h.get('x-vercel-ip-country') || null;
+    const { country } = clientOf(event);
 
     // Two independent writes, no transaction wrapper. Losing a click row
     // or a count increment on an isolated failure is fine — these are
@@ -84,7 +85,7 @@ export async function recordProfileView(profileId: number, event: RequestEvent):
     const { prisma } = await import('#lib/prisma.js');
     const h = event.request.headers;
     const referrer = normalizeReferrer(h.get('referer'));
-    const country = h.get('x-vercel-ip-country') || null;
+    const { country } = clientOf(event);
     await prisma.profileView.create({ data: { profileId, referrer, country } });
   } catch (err) {
     console.error('recordProfileView failed', err);

@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { validateHandle } from '#lib/server/handles.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
+import { clientOf } from '#lib/server/client.js';
 
 const CLAIM_LIMIT_PER_HOUR_IP = 3;
 const CLAIM_LIMIT_PER_HOUR_USER = 1;
@@ -27,7 +28,8 @@ async function checkAndBump(key: string, max: number): Promise<boolean> {
   return true;
 }
 
-export const POST: RequestHandler = async ({ request, cookies, getClientAddress }) => {
+export const POST: RequestHandler = async (event) => {
+  const { request, cookies } = event;
   const uid = verifyUserSession(cookies.get('user_session'));
   if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
 
@@ -36,7 +38,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
   const v = validateHandle(normalized);
   if (!v.ok) return json({ error: v.error }, { status: 400 });
 
-  const ipOk = await checkAndBump(`handle_claim:ip:${getClientAddress()}`, CLAIM_LIMIT_PER_HOUR_IP);
+  const ipOk = await checkAndBump(`handle_claim:ip:${clientOf(event).ip}`, CLAIM_LIMIT_PER_HOUR_IP);
   const userOk = await checkAndBump(`handle_claim:user:${uid}`, CLAIM_LIMIT_PER_HOUR_USER);
   if (!ipOk || !userOk) return json({ error: 'Too many attempts, wait an hour' }, { status: 429 });
 
