@@ -11,6 +11,8 @@ export function toLinkRecord(
     expiredAt: Date | null;
     passwordHash: string | null;
     permanent: boolean;
+    clickCount: number;
+    maxClicks: number | null;
   },
   destination: string
 ): LinkRecord {
@@ -28,7 +30,9 @@ export function toLinkRecord(
     permanent: row.permanent,
     rules,
     expiresAt: row.expiresAt ? row.expiresAt.getTime() : null,
-    expired: row.expiredAt !== null,
+    // Origin clicks (every unlock) bump clickCount without going through ingest,
+    // which is the only place that sets expiredAt, so the cap is checked here too.
+    expired: row.expiredAt !== null || (row.maxClicks !== null && row.clickCount >= row.maxClicks),
     protected: row.passwordHash !== null
   };
 }

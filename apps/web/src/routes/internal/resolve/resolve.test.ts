@@ -20,7 +20,9 @@ const ROW = {
   expiresAt: null,
   expiredAt: null,
   passwordHash: null,
-  permanent: false
+  permanent: false,
+  clickCount: 0,
+  maxClicks: null
 };
 
 beforeEach(() => {
@@ -82,6 +84,13 @@ describe('GET /internal/resolve', () => {
     expect(findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { shortURL: 'AbC' } })
     );
+  });
+
+  it('selects the click cap and marks a link at its cap expired before ingest does', async () => {
+    findUnique.mockResolvedValue({ ...ROW, clickCount: 4, maxClicks: 4 });
+    const res = await call('AbC', { 'x-iksi-internal': 'edge' });
+    expect((await res.json()).record.expired).toBe(true);
+    expect(findUnique.mock.calls[0][0].select).toMatchObject({ clickCount: true, maxClicks: true });
   });
 
   it('400s for a 65-char slug', async () => {

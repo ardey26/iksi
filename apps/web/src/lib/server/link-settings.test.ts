@@ -151,6 +151,10 @@ describe('validateSettings', () => {
       const r = await pass({ expiresAt: new Date(NOW + 5000).toISOString() }, { clickCount: 5, maxClicks: 5 });
       expect(r.data).not.toHaveProperty('expiredAt');
     });
+    it('raising maxClicks on a click-expired link revives it', async () => {
+      const r = await pass({ maxClicks: 10 }, { clickCount: 5, maxClicks: 5 });
+      expect(r.data).toMatchObject({ maxClicks: 10, expiredAt: null });
+    });
     it('clears expiredAt when both limits are cleared', async () => {
       const r = await pass({ expiresAt: null, maxClicks: null }, { clickCount: 5, expiresAt: past, maxClicks: 5 });
       expect(r.data.expiredAt).toBeNull();

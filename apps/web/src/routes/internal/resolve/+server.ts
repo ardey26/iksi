@@ -34,7 +34,9 @@ export const GET: RequestHandler = async ({ url, request }) => {
       expiresAt: true,
       expiredAt: true,
       passwordHash: true,
-      permanent: true
+      permanent: true,
+      clickCount: true,
+      maxClicks: true
     }
   });
   if (!row) return json({ found: false }, 404);

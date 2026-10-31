@@ -10,6 +10,8 @@ const row = (over: Record<string, unknown> = {}) => ({
   expiredAt: null,
   passwordHash: null,
   permanent: false,
+  clickCount: 0,
+  maxClicks: null,
   ...over
 });
 
@@ -57,6 +59,23 @@ describe('toLinkRecord', () => {
       expired: false,
       protected: false
     });
+  });
+
+  it.each([
+    [5, 5],
+    [6, 5]
+  ])('%i clicks against a cap of %i is expired before ingest marks expiredAt', (clickCount, maxClicks) => {
+    expect(toLinkRecord(row({ clickCount, maxClicks }), 'https://e.com').expired).toBe(true);
+  });
+
+  it('clicks under the cap, or no cap, is not expired', () => {
+    expect(toLinkRecord(row({ clickCount: 4, maxClicks: 5 }), 'https://e.com').expired).toBe(false);
+    expect(toLinkRecord(row({ clickCount: 99, maxClicks: null }), 'https://e.com').expired).toBe(false);
+  });
+
+  it('a cap raised past the click count revives a click-expired link', () => {
+    // validateSettings clears expiredAt when the cap is raised; the record must follow.
+    expect(toLinkRecord(row({ clickCount: 5, maxClicks: 10 }), 'https://e.com').expired).toBe(false);
   });
 
   it('invalid rules JSON becomes [] and is logged', () => {

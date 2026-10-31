@@ -22,7 +22,9 @@ const SELECT = {
   expiresAt: true,
   expiredAt: true,
   passwordHash: true,
-  permanent: true
+  permanent: true,
+  clickCount: true,
+  maxClicks: true
 } as const;
 
 function slugOf(event: RequestEvent, mode: 'redirect' | 'preview'): string {

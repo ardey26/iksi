@@ -24,7 +24,9 @@ const ROW = {
   expiresAt: null as Date | null,
   expiredAt: null as Date | null,
   passwordHash: null as string | null,
-  permanent: false
+  permanent: false,
+  clickCount: 0,
+  maxClicks: null as number | null
 };
 
 function makeEvent(path: string, init: { headers?: Record<string, string>; method?: string; body?: FormData } = {}) {
@@ -275,6 +277,27 @@ describe('unlock', () => {
     expect(result.status).toBe(429);
     expect(result.data).toEqual({ error: 'Too many attempts. Try again in a few minutes.' });
     expect(recordClick).not.toHaveBeenCalled();
+  });
+
+  it('a protected link one click from its cap expires after the unlock that reaches it', async () => {
+    // The origin records the click itself; ingest's exhaust never sees it.
+    const row = { ...ROW, passwordHash: HASH, clickCount: 3, maxClicks: 4 };
+    findUnique.mockImplementation(async () => ({ ...row }));
+    recordClick.mockImplementation(async () => {
+      row.clickCount++;
+    });
+    const first = await unlock('/AbC', 'hunter2');
+    expect(first.redirect).toEqual({ status: 303, location: 'https://example.com/' });
+    expect(recordClick).toHaveBeenCalledTimes(1);
+
+    const next = await run('/AbC');
+    expect(next.error?.status).toBe(410);
+    expect(next.error?.body).toMatchObject({ view: 'expired' });
+
+    expect(findUnique.mock.calls[0][0].select).toMatchObject({ clickCount: true, maxClicks: true });
+    const again = await unlock('/AbC', 'hunter2');
+    expect(again.redirect).toEqual({ status: 303, location: '/AbC' });
+    expect(recordClick).toHaveBeenCalledTimes(1);
   });
 
   it('sends a link that is no longer protected back to the plain route', async () => {
