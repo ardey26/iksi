@@ -1,0 +1,25 @@
+# DNS for iksi.app as served by Vercel DNS, captured 2026-10-31T15:38Z
+# Nameservers
+ns2.vercel-dns.com.
+ns1.vercel-dns.com.
+# iksi.app A
+216.198.79.65
+64.29.17.65
+# iksi.app AAAA
+# iksi.app CNAME
+# www.iksi.app A
+216.198.79.65
+64.29.17.1
+# www.iksi.app AAAA
+# www.iksi.app CNAME
+# admin.iksi.app A
+216.198.79.1
+64.29.17.65
+# admin.iksi.app AAAA
+# admin.iksi.app CNAME
+# iksi.app TXT
+# iksi.app MX
+# _vercel TXT
+# wildcard probe (random label)
+216.198.79.65
+64.29.17.65
