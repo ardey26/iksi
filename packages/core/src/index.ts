@@ -3,6 +3,7 @@ export {
 	CANONICAL_HOST,
 	normalizeHost,
 	linkKey,
+	LINK_RECORD_VERSION,
 	parseLinkRecord,
 	decideLink,
 	type LinkDecision,

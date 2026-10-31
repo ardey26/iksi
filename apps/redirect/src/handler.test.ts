@@ -3,7 +3,7 @@ import type { ClickEvent, EventSink, LinkLookup, LinkRecord, LinkStore } from '@
 import { createHandler, type Env, type HandlerDeps, type Upstream } from './handler';
 
 const record: LinkRecord = {
-	v: 1,
+	v: 2,
 	id: 7,
 	destination: 'https://example.com/a?x=1',
 	flagged: false,

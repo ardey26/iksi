@@ -1,4 +1,4 @@
-import { parseRules, type LinkRecord } from '@iksi/core';
+import { LINK_RECORD_VERSION, parseRules, type LinkRecord } from '@iksi/core';
 
 export const FLAGGED_VERDICTS: readonly string[] = ['malware', 'phishing', 'unwanted'];
 
@@ -21,7 +21,7 @@ export function toLinkRecord(
     else console.error(`link ${row.id}: ignoring invalid stored rules: ${parsed.error}`);
   }
   return {
-    v: 1,
+    v: LINK_RECORD_VERSION,
     id: row.id,
     destination,
     flagged: row.safeVerdict !== null && FLAGGED_VERDICTS.includes(row.safeVerdict),

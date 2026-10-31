@@ -3,7 +3,7 @@ import { linkKey, type LinkRecord } from '@iksi/core';
 import { kvLinkStore } from './store';
 
 const record: LinkRecord = {
-	v: 1,
+	v: 2,
 	id: 7,
 	destination: 'https://example.com/a',
 	flagged: false,
@@ -43,6 +43,15 @@ test('slugs are case-sensitive', async () => {
 	expect(await store().get('iksi.app', 'ABC')).toMatchObject({ stored: { record: other } });
 });
 
+test('a legacy v1 entry with no settings still reads as found', async () => {
+	const legacy = { v: 1, id: 7, destination: 'https://example.com/a', flagged: false, permanent: false };
+	await env.LINKS.put(linkKey('iksi.app', 'legacy'), JSON.stringify({ record: legacy, storedAt: 1 }));
+	expect(await store().get('iksi.app', 'legacy')).toEqual({
+		kind: 'found',
+		stored: { record: legacy, storedAt: 1 }
+	});
+});
+
 test('www and apex hosts share a key', async () => {
 	await store().putFound('www.iksi.app', 'alias', record, 1);
 	expect((await store().get('iksi.app', 'alias')).kind).toBe('found');
@@ -52,6 +61,7 @@ test.each([
 	['not json', '{nope'],
 	['wrong shape', JSON.stringify({ record: { v: 1 }, storedAt: 1 })],
 	['bad storedAt', JSON.stringify({ record, storedAt: 'x' })],
+	['future record version', JSON.stringify({ record: { ...record, v: 3 }, storedAt: 1 })],
 	['json null', 'null']
 ])('corrupt value (%s) reads as unknown', async (_name, value) => {
 	await env.LINKS.put(linkKey('iksi.app', 'corrupt'), value);

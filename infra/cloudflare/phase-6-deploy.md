@@ -26,7 +26,14 @@ On the first preview:
 
 ## 3. Deploy
 
-Merge to `main`. After CI passes, `.github/workflows/deploy.yml` applies the migration, deploys the web app, then deploys the Worker, in that order. Order matters: the Worker reads the new record fields, so the origin must already serve them. Watch it under GitHub → Actions → Deploy.
+Merge to `main`. After CI passes, `.github/workflows/deploy.yml` applies the migration, deploys the web app, then deploys the Worker, in that order. Watch it under GitHub → Actions → Deploy.
+
+Why either order is safe. The new origin writes records as `v: 2`; a Worker only reads the versions it knows.
+
+- New Worker before new origin is the safe direction. The new Worker still reads the old origin's `v: 1` records, and the old origin has no settings to lose.
+- New origin before new Worker (the workflow's order) is safe only because of the version bump. The old Worker rejects a `v: 2` record and forwards the request to the origin, which applies the password, expiry and rules itself. Those links are slower until the new Worker is live, not wrong. Had the record stayed `v: 1`, the old Worker would drop the fields it does not know and cache a plain redirect.
+
+Do not deploy an origin that writes settings with a record version an older Worker accepts.
 
 Fallback, only when the workflow itself is broken. Same steps, same order:
 
@@ -82,6 +89,8 @@ Any failing check blocks the rollout; see Rollback.
 
 ## 5. Rollback
 
+**Rolling back the web app disables passwords, expiry and rules.** The previous origin ignores the new columns: a protected link redirects straight to its destination, an expired link works again, and every rule is skipped. While it runs, the Worker caches those links as plain `v: 1` records. Roll back the web app only when the alternative is worse, and run the purge in section 6 once the new web app is back.
+
 Worker first, then the web app.
 
 ```sh
@@ -92,3 +101,25 @@ npx -y pnpm@10.34.6 --filter @iksi/redirect exec wrangler rollback <version-id> 
 Then redeploy the previous web deployment (Vercel → Deployments → previous production deploy → Promote, or revert on `main`). The new columns stay in the database; old code ignores them, so do not drop them.
 
 A later push to `main` redeploys the Worker, so revert the offending commit as well.
+
+## 6. Purge after any roll-forward
+
+Run this once after every deploy that brings the new web app back after a rollback (and once after the first deploy, to be sure). A `v: 1` record cached while the old origin ran says "no settings", and the Worker keeps serving it for up to an hour, then once more while it refreshes. Purging every link that has a setting makes the next request ask the origin again.
+
+```sh
+export DATABASE_URL='<DATABASE_SESSION_URL>' EDGE_SECRET='<EDGE_SECRET>'
+psql "$DATABASE_URL" -At -c 'SELECT "shortURL" FROM "LongURL"
+  WHERE rules IS NOT NULL OR "passwordHash" IS NOT NULL OR "expiresAt" IS NOT NULL
+     OR "maxClicks" IS NOT NULL OR "expiredAt" IS NOT NULL OR permanent' > /tmp/iksi-settings-slugs.txt
+wc -l < /tmp/iksi-settings-slugs.txt
+# The purge endpoint takes at most 100 slugs per call.
+split -l 100 /tmp/iksi-settings-slugs.txt /tmp/iksi-purge-
+for f in /tmp/iksi-purge-*; do
+  jq -Rn '{slugs: [inputs]}' < "$f" \
+    | curl -s -o /dev/null -w '%{http_code}\n' -X POST https://www.iksi.app/_edge/purge \
+        -H 'content-type: application/json' -H "x-iksi-edge: $EDGE_SECRET" --data-binary @-
+done
+rm /tmp/iksi-settings-slugs.txt /tmp/iksi-purge-*
+```
+
+Every call prints `204`. `401` means `EDGE_SECRET` does not match the Worker's secret. Then repeat the password check from section 4 on `<slug-password>`.

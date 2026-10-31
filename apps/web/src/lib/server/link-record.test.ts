@@ -20,7 +20,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('toLinkRecord', () => {
   it('flags malicious verdicts', () => {
     expect(toLinkRecord(row({ safeVerdict: 'phishing' }), 'https://e.com')).toMatchObject({
-      v: 1,
+      v: 2,
       id: 3,
       destination: 'https://e.com',
       flagged: true,

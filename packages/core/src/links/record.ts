@@ -15,8 +15,20 @@ export function linkKey(host: string, slug: string): string {
 	return `link:${normalizeHost(host)}:${slug}`;
 }
 
+/**
+ * Version every new record is written with. v2 added rules, expiry and
+ * passwords: a Worker that only knows v1 rejects a v2 record and forwards to
+ * the origin, instead of dropping the settings it cannot read and serving a
+ * plain redirect.
+ */
+export const LINK_RECORD_VERSION = 2;
+
+/** Keys a v1 record never had. A v1 record carrying one is rejected, not stripped. */
+const SETTINGS_KEYS = ['rules', 'expiresAt', 'expired', 'protected'] as const;
+
 export interface LinkRecord {
-	v: 1;
+	/** 1 is a legacy record with no settings; 2 is current. */
+	v: 1 | 2;
 	id: number;
 	destination: string;
 	flagged: boolean;
@@ -43,12 +55,20 @@ export interface StoredLink {
 	storedAt: number;
 }
 
-/** Hand-written (not zod) to keep the edge Worker bundle small. Unknown keys are dropped. */
+/**
+ * Hand-written (not zod) to keep the edge Worker bundle small. Unknown keys are
+ * dropped. Accepts v1 (legacy, no settings) and v2; any other version is null.
+ */
 export function parseLinkRecord(input: unknown): LinkRecord | null {
 	if (typeof input !== 'object' || input === null) return null;
 	const r = input as Record<string, unknown>;
+	if (r.v === 1) {
+		// Settings on a v1 record cannot be trusted to be complete; let the origin decide.
+		if (SETTINGS_KEYS.some((k) => r[k] !== undefined)) return null;
+	} else if (r.v !== LINK_RECORD_VERSION) {
+		return null;
+	}
 	if (
-		r.v !== 1 ||
 		!isDbId(r.id) ||
 		!isHttpUrl(r.destination) ||
 		typeof r.flagged !== 'boolean' ||
@@ -67,7 +87,7 @@ export function parseLinkRecord(input: unknown): LinkRecord | null {
 		return null;
 	}
 	const record: LinkRecord = {
-		v: 1,
+		v: r.v,
 		id: r.id,
 		destination: r.destination,
 		flagged: r.flagged,

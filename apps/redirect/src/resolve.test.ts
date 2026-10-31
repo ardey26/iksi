@@ -3,7 +3,7 @@ import { refreshLink, resolveLink, STALE_AFTER_MS } from './resolve';
 import type { Upstream } from './handler';
 
 const record: LinkRecord = {
-	v: 1,
+	v: 2,
 	id: 7,
 	destination: 'https://example.com/a',
 	flagged: false,
@@ -117,6 +117,11 @@ test.each([
 		}
 	],
 	['invalid record', () => Response.json({ found: true, record: { v: 1 } })],
+	['future record version', () => Response.json({ found: true, record: { ...record, v: 3 } })],
+	[
+		'v1 record carrying settings',
+		() => Response.json({ found: true, record: { ...record, v: 1, protected: true } })
+	],
 	['non-json', () => new Response('<html>', { status: 200 })]
 ])('unknown + origin %s is unavailable and store unchanged', async (_name, respond) => {
 	const m = memoryStore();

@@ -68,7 +68,7 @@ describe('GET /internal/resolve', () => {
     expect(await res.json()).toEqual({
       found: true,
       record: {
-        v: 1,
+        v: 2,
         id: 9,
         destination: 'https://example.com',
         flagged: false,
