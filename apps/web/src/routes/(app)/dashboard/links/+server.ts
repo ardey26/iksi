@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { encodeURL } from '#lib/server/crypto.js';
+import { purgeEdge } from '#lib/server/edge-purge.js';
 
 export const PATCH: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
@@ -15,6 +16,7 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
 
   const encoded = encodeURL(originalURL);
   await prisma.longURL.update({ where: { id }, data: { originalURL: encoded } });
+  await purgeEdge([link.shortURL]);
   return json({ ok: true });
 };
 
@@ -35,5 +37,6 @@ export const DELETE: RequestHandler = async ({ request, cookies }) => {
     prisma.profileRow.deleteMany({ where: { linkId: id } }),
     prisma.longURL.delete({ where: { id } })
   ]);
+  await purgeEdge([link.shortURL]);
   return json({ ok: true });
 };

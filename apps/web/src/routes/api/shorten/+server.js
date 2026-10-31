@@ -8,6 +8,7 @@ import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
 import { checkURL } from '#lib/server/safe-browsing.js';
 import { clientOf } from '#lib/server/client.js';
+import { purgeEdge } from '#lib/server/edge-purge.js';
 
 const generateShortURL = async (retries = SHORT_URL.retries) => {
 	if (!retries) {
@@ -203,6 +204,7 @@ export const POST = async (event) => {
 					where: { shortURL: url.shortURL },
 					data: { safeVerdict: verdict, safeCheckedAt: new Date() }
 				});
+				await purgeEdge([url.shortURL]);
 				if (verdict !== 'safe' && verdict !== 'pending') {
 					await prisma.profileRow.updateMany({
 						where: { link: { shortURL: url.shortURL } },

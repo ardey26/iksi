@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { checkURL } from '#lib/server/safe-browsing.js';
+import { purgeEdge } from '#lib/server/edge-purge.js';
 
 export const GET: RequestHandler = async ({ request }) => {
   const auth = request.headers.get('authorization');
@@ -18,10 +19,11 @@ export const GET: RequestHandler = async ({ request }) => {
       ],
       profileRows: { some: { enabled: true } }
     },
-    select: { id: true, originalURL: true }
+    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true }
   });
 
   let checked = 0;
+  const changed: string[] = [];
   for (const l of links) {
     const raw = await decodeURL(l.originalURL);
     const verdict = await checkURL(raw);
@@ -30,9 +32,12 @@ export const GET: RequestHandler = async ({ request }) => {
       where: { linkId: l.id },
       data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }
     });
+    if (verdict !== l.safeVerdict) changed.push(l.shortURL);
     checked++;
     if (checked >= 500) break;
   }
+
+  await purgeEdge(changed);
 
   return json({ checked });
 };
