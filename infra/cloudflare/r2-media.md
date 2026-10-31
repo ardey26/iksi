@@ -10,25 +10,31 @@ Avatars are uploaded to the `iksi-media` bucket and served from `https://cdn.iks
 - Section 3: the two `prisma migrate resolve` commands were run. If skipped, the deploy workflow's "Database migrations" step fails trying to re-run them; run section 3, then re-run the workflow.
 - Section 5: the GitHub `production` environment and its secrets exist, including `DATABASE_SESSION_URL`. Without them the migration step cannot connect.
 
-## 2. Migration
+## 2. Migration (do this before the preview)
 
-Nothing to do by hand. `.github/workflows/deploy.yml` runs `prisma migrate deploy` before each production web deploy, after CI passes on `main`. The new columns are nullable.
+Vercel previews use the production database (there is no other), and `.github/workflows/deploy.yml` only runs `prisma migrate deploy` from `main`. A preview of this branch therefore errors on every route that selects the new `Profile` columns until the migration is applied. Apply it by hand first. This is safe: the columns are nullable and the code currently in production ignores them.
 
-Fallback, only if the workflow cannot run (session-pooler URL from `infra/SETUP.md` section 3):
+Session-pooler URL from `infra/SETUP.md` section 3:
 
 ```sh
 export DATABASE_URL='<DATABASE_SESSION_URL>' DIRECT_URL='<DATABASE_SESSION_URL>'
 npx -y pnpm@10.34.6 --filter @iksi/web exec prisma migrate deploy
 ```
 
-## 3. Visual check on the first preview deploy
+After merge the workflow's migration step finds nothing left to apply.
+
+## 3. Visual check on the preview deploy
+
+The preview talks to the production database and the production R2 bucket. Uploads and removals made in a preview change real data: they write real objects and rows. Use your own account.
 
 Light and dark themes, at 375 px and 1280 px:
 
 1. Upload an avatar. The layout must not shift while it uploads.
-2. Trigger an upload error: upload a file over 4 MB, or a text file renamed to `.png`. The error line's space is reserved, so nothing jumps.
+2. Trigger an upload error: upload a file over 4 MB, or a text file renamed to `.png`. The message wraps inside its reserved space, so nothing jumps.
 
-## 4. Verify after deploy
+Then merge.
+
+## 4. Verify after merge
 
 1. In the dashboard, upload an avatar and copy the returned image URL.
 2. Request it twice:
@@ -40,7 +46,7 @@ Light and dark themes, at 375 px and 1280 px:
 
 3. Both must show `200`, `content-type: image/webp` and `cache-control: public, max-age=31536000, immutable`. The second must also show `cf-cache-status: HIT`.
 
-## 5. Mirror existing avatars
+## 5. Mirror existing avatars (after verifying)
 
 Copies avatars hosted elsewhere into R2. Set these in your shell first (placeholders below; `DATABASE_SESSION_URL` is the session-pooler URL from `infra/SETUP.md` section 3). Do not paste the real values anywhere else.
 
@@ -70,5 +76,7 @@ export R2_SECRET_ACCESS_KEY='<secret access key>'
 ## Rollback
 
 - The app still renders old `avatarUrl` values that point elsewhere.
-- The new columns are nullable.
+- The new columns are nullable. Migrations are not rolled back.
 - Reverting the deploy is safe.
+- After mirroring, `profile.avatarUrl` points at `cdn.iksi.app`. Keep the `iksi-media` bucket and `cdn.iksi.app` live, or those avatars break.
+- Objects are immutable and cached for a year. A deleted or replaced image can stay reachable at its old URL from the CDN cache.
