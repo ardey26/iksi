@@ -1,9 +1,11 @@
-<div class="hero h-[93.5vh]">
-	<div class="hero-content text-center border border-4 p-40">
-		<div class="max-w-md">
-			<h1 class="text-5xl font-bold">ERROR 404 NOT FOUND</h1>
-			<p class="py-6">your short url isn't pointing anywhere, claim it if you want.</p>
-			<a href="/"><button class="btn btn-outline lowercase">go back</button></a>
-		</div>
-	</div>
+<div class="flex-1 flex items-center justify-center">
+  <div class="w-full max-w-[500px] text-center">
+    <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">Nothing here</h1>
+    <p class="mt-2 text-sm" style="color: var(--text-muted);">
+      This short link isn't pointing anywhere yet. Claim it if you want.
+    </p>
+    <a href="/" class="inline-block mt-6 text-sm hover:opacity-70 transition-opacity" style="color: var(--accent);">
+      Back to iksi
+    </a>
+  </div>
 </div>
