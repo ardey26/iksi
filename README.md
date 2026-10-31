@@ -197,8 +197,8 @@ iksi is moving to an edge-first design. The redirect is the only latency-critica
      R2: avatars, OG images, nightly database backups
 ```
 
-### **Today (Phase 0)**
-A pass-through Worker sits in front of `iksi.app` and tags every response with `x-iksi-route` (`slug`, `reserved`, `root`, `unknown`) using the same classifier the edge redirect will use, so the routing split is observable in production before the Worker starts answering redirects itself. Latency before the cutover is recorded in [perf/](perf/README.md).
+### **Today**
+The Worker answers redirects itself: it reads the link from KV, falls back to the origin on a miss and caches the result, and ships click events through a queue to the origin in batches. Other paths pass through to the origin, tagged with `x-iksi-route` (`slug`, `reserved`, `root`, `unknown`). Editing or flagging a link purges its edge entry. Latency before the cutover is recorded in [perf/](perf/README.md).
 
 ### **Workspaces**
 | Path | What it is |
