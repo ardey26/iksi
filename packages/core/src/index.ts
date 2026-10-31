@@ -19,3 +19,12 @@ export {
 	type Os
 } from './routing/agent';
 export { continentOf, type Continent } from './routing/continent';
+export {
+	MAX_RULES,
+	parseRules,
+	matches,
+	resolveDestination,
+	type Conditions,
+	type Rule,
+	type RequestContext
+} from './routing/rules';
