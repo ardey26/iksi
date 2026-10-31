@@ -53,7 +53,9 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
               id: true,
               shortURL: true,
               originalURL: true,
-              clickCount: true
+              clickCount: true,
+              // Read only to keep a protected destination out of sameAs; never returned.
+              passwordHash: true
             }
           }
         }
@@ -68,8 +70,11 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
   // The decoded destination is deliberately NOT returned to the client — the
   // profile page renders titles + short URLs only. Keeping the destination
   // server-side avoids leaking anything the redirect endpoint doesn't already.
+  // A password-protected link's destination is secret, so it is never decoded here.
   const decoded = await Promise.all(
-    p.rows.map((r) => (r.link ? decodeURL(r.link.originalURL) : Promise.resolve(null)))
+    p.rows.map((r) =>
+      r.link && r.link.passwordHash === null ? decodeURL(r.link.originalURL) : Promise.resolve(null)
+    )
   );
 
   const rows = p.rows.map((r, i) => ({
