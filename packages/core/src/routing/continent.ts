@@ -1,7 +1,7 @@
 export type Continent = 'AF' | 'AN' | 'AS' | 'EU' | 'NA' | 'OC' | 'SA';
 
 // ISO 3166-1 alpha-2 codes per continent, as space-separated strings to keep the bundle small.
-const TABLE: Record<Continent, string> = {
+export const CONTINENT_CODES: Record<Continent, string> = {
 	AF: 'DZ AO BJ BW BF BI CM CV CF TD KM CG CD CI DJ EG GQ ER SZ ET GA GM GH GN GW KE LS LR LY MG MW ML MR MU YT MA MZ NA NE NG RE RW SH ST SN SC SL SO ZA SS SD TZ TG TN UG EH ZM ZW',
 	AN: 'AQ BV GS HM TF',
 	AS: 'AF AM AZ BH BD BT IO BN KH CN CX CC CY GE HK IN ID IR IQ IL JP JO KZ KW KG LA LB MO MY MV MN MM NP KP OM PK PS PH QA SA SG KR LK SY TW TJ TH TL TR TM AE UZ VN YE',
@@ -11,13 +11,19 @@ const TABLE: Record<Continent, string> = {
 	SA: 'AR BO BR CL CO EC FK GF GY PY PE SR UY VE'
 };
 
-const BY_COUNTRY = new Map<string, Continent>();
-for (const [continent, codes] of Object.entries(TABLE)) {
-	for (const code of codes.split(' ')) BY_COUNTRY.set(code, continent as Continent);
+let byCountry: Map<string, Continent> | undefined;
+
+// Built on first use, not at import, so the module stays free of load-time side effects and tree-shakeable.
+function table(): Map<string, Continent> {
+	if (!byCountry) {
+		byCountry = new Map();
+		for (const [continent, codes] of Object.entries(CONTINENT_CODES)) {
+			for (const code of codes.split(' ')) byCountry.set(code, continent as Continent);
+		}
+	}
+	return byCountry;
 }
 
-export const COUNTRY_COUNT = BY_COUNTRY.size;
-
 export function continentOf(country: string | null): Continent | null {
-	return country ? (BY_COUNTRY.get(country.toUpperCase()) ?? null) : null;
+	return country ? (table().get(country.toUpperCase()) ?? null) : null;
 }

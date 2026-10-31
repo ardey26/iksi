@@ -1,5 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { parseUserAgent } from '@iksi/core';
+import { parseUserAgent, referrerHost } from '@iksi/core';
 import { clientOf } from '#lib/server/client.js';
 
 export type UAInfo = { browser: string; device: string };
@@ -10,14 +10,7 @@ export function parseUA(ua: string | null | undefined): UAInfo {
 }
 
 export function normalizeReferrer(referer: string | null | undefined): string | null {
-  if (!referer) return null;
-  try {
-    const u = new URL(referer);
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-    return u.hostname.replace(/^www\./i, '') || null;
-  } catch {
-    return null;
-  }
+  return referrerHost(referer ?? null);
 }
 
 export async function recordClick(
