@@ -66,6 +66,45 @@ describe('purgeEdge', () => {
     expect(f).not.toHaveBeenCalled();
   });
 
+  it('bounds every attempt with a 2 s timeout signal', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const f = vi.fn().mockResolvedValueOnce(res(503)).mockResolvedValueOnce(res(204));
+    expect(await run(purgeEdge(['a'], f as never))).toBe(true);
+    expect(f).toHaveBeenCalledTimes(2);
+    for (const [, init] of f.mock.calls) expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledTimes(2);
+    expect(timeout).toHaveBeenCalledWith(2000);
+  });
+
+  it('treats a timed-out attempt as retryable', async () => {
+    const timedOut = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const f = vi.fn().mockRejectedValueOnce(timedOut).mockResolvedValueOnce(res(204));
+    expect(await run(purgeEdge(['a'], f as never))).toBe(true);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  const warned = () => JSON.stringify((console.warn as unknown as ReturnType<typeof vi.fn>).mock.calls);
+
+  it('warns with the last status after giving up', async () => {
+    const f = vi.fn().mockResolvedValue(res(503));
+    await run(purgeEdge(['a'], f as never));
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(warned()).toContain('edge purge failed');
+    expect(warned()).toContain('503');
+  });
+
+  it('warns with the status of a non-retried 4xx', async () => {
+    const f = vi.fn().mockResolvedValue(res(401));
+    await run(purgeEdge(['a'], f as never));
+    expect(warned()).toContain('401');
+  });
+
+  it('warns with the last error message when fetch throws', async () => {
+    const f = vi.fn().mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+    await run(purgeEdge(['a'], f as never));
+    expect(warned()).toContain('getaddrinfo ENOTFOUND');
+  });
+
   it('returns false when fetch throws', async () => {
     const f = vi.fn().mockRejectedValue(new Error('down'));
     expect(await run(purgeEdge(['a'], f as never))).toBe(false);
