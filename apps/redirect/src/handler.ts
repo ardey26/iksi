@@ -1,8 +1,10 @@
-import { classifyPath } from '@iksi/core';
+import { classifyPath, type ClickEvent } from '@iksi/core';
 
-/** Phase 2 adds KV, QUEUE and ANALYTICS bindings. */
 export interface Env {
 	VERSION?: string;
+	ORIGIN_URL?: string;
+	LINKS: KVNamespace;
+	CLICKS: Queue<ClickEvent>;
 	/** Shared with the app (EDGE_SECRET there) so it trusts the visitor headers below. */
 	EDGE_SECRET?: string;
 }

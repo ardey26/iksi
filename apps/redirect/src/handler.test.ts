@@ -1,4 +1,4 @@
-import { createHandler, type Upstream } from './handler';
+import { createHandler, type Env, type Upstream } from './handler';
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
@@ -14,7 +14,7 @@ function recordingUpstream(respond: (req: Request) => Response | Promise<Respons
 
 test('health is answered locally, origin is not called', async () => {
 	const { upstream, seen } = recordingUpstream(() => new Response('origin'));
-	const res = await createHandler(upstream)(new Request('https://www.iksi.app/_health'), {}, ctx);
+	const res = await createHandler(upstream)(new Request('https://www.iksi.app/_health'), {} as Env, ctx);
 	expect(res.status).toBe(200);
 	expect(res.headers.get('cache-control')).toBe('no-store');
 	expect(await res.json()).toMatchObject({ ok: true, version: 'dev' });
@@ -25,7 +25,7 @@ test('slug passes through and is tagged', async () => {
 	const { upstream, seen } = recordingUpstream(
 		() => new Response(null, { status: 302, headers: { location: 'https://example.com' } })
 	);
-	const res = await createHandler(upstream)(new Request('https://www.iksi.app/QdM2whH'), {}, ctx);
+	const res = await createHandler(upstream)(new Request('https://www.iksi.app/QdM2whH'), {} as Env, ctx);
 	expect(res.status).toBe(302);
 	expect(res.headers.get('x-iksi-route')).toBe('slug');
 	expect(res.headers.get('location')).toBe('https://example.com');
@@ -40,7 +40,7 @@ test('POST with body and query passes through intact', async () => {
 			body: '{"longURL":"https://a.b"}',
 			headers: { 'content-type': 'application/json' }
 		}),
-		{},
+		{} as Env,
 		ctx
 	);
 	expect(res.status).toBe(200);
@@ -55,7 +55,7 @@ test('HEAD passes through', async () => {
 	const { upstream, seen } = recordingUpstream(() => new Response(null, { status: 302 }));
 	const res = await createHandler(upstream)(
 		new Request('https://www.iksi.app/QdM2whH', { method: 'HEAD' }),
-		{},
+		{} as Env,
 		ctx
 	);
 	expect(res.status).toBe(302);
@@ -66,7 +66,7 @@ test('origin failure yields 502, not an exception', async () => {
 	const { upstream } = recordingUpstream(() => {
 		throw new Error('ECONNRESET');
 	});
-	const res = await createHandler(upstream)(new Request('https://www.iksi.app/abc'), {}, ctx);
+	const res = await createHandler(upstream)(new Request('https://www.iksi.app/abc'), {} as Env, ctx);
 	expect(res.status).toBe(502);
 	expect(res.headers.get('retry-after')).toBe('5');
 	expect(res.headers.get('x-iksi-route')).toBe('slug');
@@ -74,14 +74,14 @@ test('origin failure yields 502, not an exception', async () => {
 
 test('root is tagged root', async () => {
 	const { upstream } = recordingUpstream(() => new Response('<html>'));
-	const res = await createHandler(upstream)(new Request('https://www.iksi.app/'), {}, ctx);
+	const res = await createHandler(upstream)(new Request('https://www.iksi.app/'), {} as Env, ctx);
 	expect(res.headers.get('x-iksi-route')).toBe('root');
 	expect(await res.text()).toBe('<html>');
 });
 
 test('unknown paths still reach origin and are tagged unknown', async () => {
 	const { upstream, seen } = recordingUpstream(() => new Response('nf', { status: 404 }));
-	const res = await createHandler(upstream)(new Request('https://www.iksi.app/abc/def'), {}, ctx);
+	const res = await createHandler(upstream)(new Request('https://www.iksi.app/abc/def'), {} as Env, ctx);
 	expect(res.status).toBe(404);
 	expect(res.headers.get('x-iksi-route')).toBe('unknown');
 	expect(seen).toHaveLength(1);
@@ -96,7 +96,7 @@ describe('visitor identity forwarded to origin', () => {
 
 	test('sends visitor ip, country and the edge secret', async () => {
 		const { upstream, seen } = recordingUpstream(() => new Response(null, { status: 302 }));
-		await createHandler(upstream)(visitor(), { EDGE_SECRET: 's3cret' }, ctx);
+		await createHandler(upstream)(visitor(), { EDGE_SECRET: 's3cret' } as Env, ctx);
 		expect(seen[0].headers.get('x-iksi-edge')).toBe('s3cret');
 		expect(seen[0].headers.get('x-iksi-client-ip')).toBe('198.51.100.7');
 		expect(seen[0].headers.get('x-iksi-client-country')).toBe('SG');
@@ -109,7 +109,7 @@ describe('visitor identity forwarded to origin', () => {
 			body: 'x',
 			headers: { 'x-iksi-edge': 'guess', 'x-iksi-client-ip': '6.6.6.6', 'x-iksi-client-country': 'KP' }
 		});
-		await createHandler(upstream)(spoofed, {}, ctx);
+		await createHandler(upstream)(spoofed, {} as Env, ctx);
 		expect(seen[0].headers.get('x-iksi-edge')).toBeNull();
 		expect(seen[0].headers.get('x-iksi-client-ip')).toBeNull();
 		expect(seen[0].headers.get('x-iksi-client-country')).toBeNull();
