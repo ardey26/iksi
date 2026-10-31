@@ -4,6 +4,7 @@
   export let data;
 
   let copied = false;
+  let avatarBroken = false;
   async function copyProfileUrl() {
     try {
       await navigator.clipboard.writeText(`https://iksi.app/@${data.handle}`);
@@ -165,9 +166,12 @@
 
     <!-- Header -->
     <div class="p-7 sm:p-8 flex items-start gap-4">
-      {#if data.avatarUrl}
+      {#if data.avatarUrl && !avatarBroken}
+        <!-- Hot-linked avatars (LinkedIn, Twitter CDNs) expire; fall back to initials instead of a broken image. -->
         <img src={data.avatarUrl} alt="" class="w-14 h-14 rounded-full object-cover shrink-0"
-             style="border: 1px solid var(--border);" />
+             width="56" height="56"
+             style="border: 1px solid var(--border);"
+             on:error={() => (avatarBroken = true)} />
       {:else}
         <div class="w-14 h-14 rounded-full shrink-0 flex items-center justify-center text-lg font-semibold"
              style="background: oklch(from var(--accent) 0.90 max(c, 0.08) h); color: var(--accent-text);">
