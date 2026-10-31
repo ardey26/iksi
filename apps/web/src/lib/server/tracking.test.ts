@@ -145,10 +145,12 @@ describe('recordClick at the click cap', () => {
     expect(purgeEdge).toHaveBeenCalledWith(['Xy']);
   });
 
-  it('does not purge below the cap, past it, or with no cap', async () => {
-    await click({ shortURL: 'Xy', clickCount: 3, maxClicks: 4 });
-    await click({ shortURL: 'Xy', clickCount: 5, maxClicks: 4 });
-    await click({ shortURL: 'Xy', clickCount: 9, maxClicks: null });
+  it.each([
+    ['below the cap', { shortURL: 'Xy', clickCount: 3, maxClicks: 4 }],
+    ['past the cap', { shortURL: 'Xy', clickCount: 5, maxClicks: 4 }],
+    ['with no cap', { shortURL: 'Xy', clickCount: 9, maxClicks: null }]
+  ])('does not purge %s', async (_n, after) => {
+    await click(after);
     expect(purgeEdge).not.toHaveBeenCalled();
     expect(waitUntil).not.toHaveBeenCalled();
   });
