@@ -23,6 +23,8 @@ vi.mock('#lib/server/safe-browsing.js', () => ({ checkURLs }));
 vi.mock('#lib/server/edge-purge.js', () => ({ purgeEdge }));
 vi.mock('#lib/server/avatar-url.js', () => ({ verifyAvatarUrl: vi.fn() }));
 vi.mock('#lib/server/user-cache.js', () => ({ invalidateUserCache: vi.fn() }));
+vi.mock('#lib/server/media-store.js', () => ({ r2MediaStore: vi.fn() }));
+vi.mock('#lib/server/profile-media.js', () => ({ deleteMediaQuietly: vi.fn() }));
 
 import { POST } from './+server';
 

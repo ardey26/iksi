@@ -27,9 +27,31 @@ export default defineConfig({
 		}
 	},
 	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}'],
-		environment: 'jsdom',
 		globals: true,
-		setupFiles: ['./src/test/setup.js']
+		setupFiles: ['./src/test/setup.js'],
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: 'dom',
+					include: ['src/**/*.{test,spec}.{js,ts}'],
+					exclude: ['src/**/*.node.test.{js,ts}'],
+					environment: 'jsdom'
+				}
+			},
+			{
+				// svelteTesting adds the `browser` resolve condition, which makes the AWS SDK
+				// load its ESM browser build (extensionless imports that break under Node).
+				// Tests that touch the SDK run here, with Node resolution.
+				extends: true,
+				plugins: [],
+				resolve: { conditions: ['node'] },
+				test: {
+					name: 'node',
+					include: ['src/**/*.node.test.{js,ts}'],
+					environment: 'node'
+				}
+			}
+		]
 	}
 });

@@ -103,6 +103,20 @@
      --text-primary: oklch(from ${data.accent} ${tL} 0.008 h);
      --text-muted: oklch(from ${data.accent} ${mL} 0.018 h);`;
 
+  // backgroundUrl lands in an inline style: accept only https URLs with none
+  // of the characters that could end the quoted url() string or the declaration.
+  function safeBackground(u) {
+    if (typeof u !== 'string' || /["'\\()\s;{}<>]/.test(u)) return null;
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'https:' ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  }
+  $: bgUrl = safeBackground(data.backgroundUrl);
+  $: bgStyle = bgUrl ? ` background: var(--bg) url("${bgUrl}") center / cover no-repeat fixed;` : ' background: var(--bg);';
+
   // Canonical URL and derived SEO strings for the head.
   $: profileUrl = `https://www.iksi.app/@${data.handle}`;
   $: ogImageUrl = `https://www.iksi.app/api/@${data.handle}/og`;
@@ -159,7 +173,13 @@
 </svelte:head>
 
 <div class="iksi-profile min-h-screen flex items-center justify-center p-4 sm:p-8"
-     style="{paletteStyle} background: var(--bg); color: var(--text-primary);">
+     style="{paletteStyle}{bgStyle} color: var(--text-primary);">
+
+  {#if bgUrl}
+    <!-- Solid scrim (no gradient) so the photo never fights the palette. -->
+    <div class="profile-scrim" aria-hidden="true"
+         style="background: color-mix(in srgb, var(--bg) 72%, transparent);"></div>
+  {/if}
 
   <div class="w-full max-w-lg rounded-[2rem] overflow-visible profile-card"
        style="background: var(--surface); border: 1px solid var(--border);">
@@ -287,6 +307,10 @@
 </div>
 
 <style>
+  .iksi-profile { position: relative; isolation: isolate; }
+  .profile-scrim { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .profile-card { position: relative; z-index: 1; }
+
   /* Soft, accent-tinted drop shadow — layered for depth */
   .profile-card {
     box-shadow:
