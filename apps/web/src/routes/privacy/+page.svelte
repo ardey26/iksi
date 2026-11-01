@@ -54,7 +54,7 @@
     <Section id="summary" title={title('summary')}>
       <ul>
         <li>You can shorten links without an account. If you sign in, iksi keeps a few details from Google or X, your links and your profile.</li>
-        <li>The address a short link points to is stored encrypted. Clicks are counted by country, device, browser and the site they came from. IP addresses are not stored with clicks.</li>
+        <li>The address a short link points to is stored encrypted. Clicks are counted by country, device, browser and the site they came from. IP addresses are never stored as they are: clicks have none, and rate limits and reports keep only a keyed hash.</li>
         <li>Your profile page is public, and so is everything you put on it, including payment QR codes.</li>
         <li>iksi does not sell personal data. Google shows ads on iksi through AdSense, which uses its own cookies.</li>
         <li>Email <a href="mailto:{CONTACT}">{CONTACT}</a> to get a copy of your data, fix it or delete it.</li>
@@ -69,7 +69,9 @@
         <li>On your first sign-in, your name and the link to your profile picture are copied into your iksi profile. After that they are yours to change, and iksi does not refresh them.</li>
       </ul>
       <p>
-        iksi uses the access Google or X gives it once, to read those details, and does not keep it. iksi does not read
+        iksi uses the access Google or X gives it once, to read those details, and does not keep it. From Google it asks
+        for your basic profile and email address. From X it asks only to read your account (users.read, plus tweet.read,
+        which X requires for that) and not for offline access, so X never gives it a refresh token. iksi does not read
         your posts or email, and never posts for you.
       </p>
       <p>
@@ -192,7 +194,7 @@
       <p>Every request to iksi carries your IP address. This is what iksi does with it:</p>
       <ul>
         <li><strong>Country.</strong> iksi's host works out your country from it. Only the country code is stored, with clicks and profile visits.</li>
-        <li><strong>Rate limits.</strong> To stop abuse, iksi counts requests per IP address for some actions: shortening a link, password and one-time link attempts (counted per link), claiming a handle, opening a Pay sheet and the public profile data. Each counter is a database record holding the IP address, the action (for password attempts, the link's name), a count and when the count resets. These records are not deleted automatically at the moment.</li>
+        <li><strong>Rate limits.</strong> To stop abuse, iksi counts requests per visitor for some actions: shortening a link, password and one-time link attempts (counted per link), claiming a handle, opening a Pay sheet, the public profile data and sending a report. Each counter is a database record holding the action (for password attempts, the link's name), a keyed hash (HMAC-SHA256) of the IP address, a count and when the count resets. The address itself is never stored. Counter windows last an hour at most, and a daily job deletes each counter once its window has been over for a day, so none is kept more than about two days after its window ends. Counters made before this change held the address itself; they have been deleted, and copies in backups age out within 30 days.</li>
         <li><strong>Reports.</strong> iksi stores a keyed hash (HMAC-SHA256) of the reporter's IP address instead of the address, so it can tell whether several reports came from different people.</li>
         <li><strong>Hosting.</strong> Vercel, iksi's host, sees IP addresses as part of serving every request and handles them under its own privacy policy.</li>
       </ul>
@@ -257,7 +259,7 @@
         <li><strong>One-time link content:</strong> erased when the link is opened, or about a day after it expires unopened.</li>
         <li><strong>Reports:</strong> until the reported link is deleted.</li>
         <li><strong>API keys:</strong> until your account is deleted, revoked ones included.</li>
-        <li><strong>Rate-limit counters:</strong> not deleted automatically at the moment.</li>
+        <li><strong>Rate-limit counters:</strong> deleted by a daily job once their window has been over for a day, so within about two days.</li>
         <li><strong>Backups:</strong> 30 days. Deleted data can stay in a backup until it ages out.</li>
         <li><strong>Cookies:</strong> 30 days for the session, 10 minutes for the sign-in cookies.</li>
       </ul>
