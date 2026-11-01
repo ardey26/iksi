@@ -52,6 +52,14 @@ describe('methodFromImage', () => {
 		});
 	});
 
+	it("turns Venmo's own app QR (a /code link) into a link method", async () => {
+		expect(await methodFromImage(await qrPng('https://venmo.com/code?user_id=123'), newId)).toMatchObject({
+			kind: 'link',
+			provider: 'venmo',
+			url: 'https://venmo.com/code?user_id=123'
+		});
+	});
+
 	it('refuses a QR holding a link that is not on the allow-list', async () => {
 		const err = methodFromImage(await qrPng('https://example.com/menu'), newId);
 		await expect(err).rejects.toThrow("That QR isn't a payment QR or a supported payment link.");

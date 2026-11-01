@@ -12,18 +12,27 @@ export const PAY_LINK_ERROR_TEXT: Record<PayLinkErrorCode, string> = {
 
 const MAX_LENGTH = 500;
 
-/** Exact hostnames (no subdomain wildcards) and the path that names an account. */
-const RULES: { provider: PayProvider; hosts: string[]; path: RegExp }[] = [
-	{ provider: 'paypal', hosts: ['paypal.me', 'www.paypal.me'], path: /^\/[^/]+/ },
-	{ provider: 'paypal', hosts: ['paypal.com', 'www.paypal.com'], path: /^\/paypalme\/[^/]+/i },
-	{ provider: 'venmo', hosts: ['venmo.com', 'www.venmo.com', 'account.venmo.com'], path: /^\/u\/[^/]+/ },
-	{ provider: 'cashapp', hosts: ['cash.app'], path: /^\/\$[^/]+/ },
-	{ provider: 'wise', hosts: ['wise.com'], path: /^\/pay\/[^/]+/ },
-	{ provider: 'revolut', hosts: ['revolut.me'], path: /^\/[^/]+/ },
-	{ provider: 'kofi', hosts: ['ko-fi.com', 'www.ko-fi.com'], path: /^\/[^/]+/ },
-	{ provider: 'bmc', hosts: ['buymeacoffee.com', 'www.buymeacoffee.com'], path: /^\/[^/]+/ },
-	{ provider: 'stripe', hosts: ['buy.stripe.com'], path: /^\/[^/]+/ }
-];
+/**
+ * Exact hostnames only: no subdomain wildcards, so paypal.me.evil.com and
+ * evil.paypal.me are refused. Any path is allowed, which covers what the apps'
+ * own QR codes hold (venmo.com/code?user_id=…, paypal.com/qrcodes/…).
+ */
+const HOSTS = new Map<string, PayProvider>(Object.entries({
+	'paypal.me': 'paypal',
+	'www.paypal.me': 'paypal',
+	'paypal.com': 'paypal',
+	'www.paypal.com': 'paypal',
+	'venmo.com': 'venmo',
+	'www.venmo.com': 'venmo',
+	'account.venmo.com': 'venmo',
+	'cash.app': 'cashapp',
+	'wise.com': 'wise',
+	'revolut.me': 'revolut',
+	'ko-fi.com': 'kofi',
+	'buymeacoffee.com': 'bmc',
+	'www.buymeacoffee.com': 'bmc',
+	'buy.stripe.com': 'stripe'
+}) as [string, PayProvider][]);
 
 export function parsePayLink(input: string): PayLinkResult {
 	const text = input.trim();
@@ -36,6 +45,6 @@ export function parsePayLink(input: string): PayLinkResult {
 	if (u.protocol !== 'https:') return { ok: false, code: 'not_https' };
 	if (text.length > MAX_LENGTH || u.username || u.password || u.port) return { ok: false, code: 'unsupported' };
 
-	const rule = RULES.find((r) => r.hosts.includes(u.hostname) && r.path.test(u.pathname));
-	return rule ? { ok: true, provider: rule.provider, url: u.href } : { ok: false, code: 'unsupported' };
+	const provider = HOSTS.get(u.hostname);
+	return provider ? { ok: true, provider, url: u.href } : { ok: false, code: 'unsupported' };
 }
