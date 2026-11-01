@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, fireEvent } from '@testing-library/svelte';
 import Input from './Input.svelte';
 
 describe('Input Component', () => {
@@ -82,5 +82,22 @@ describe('Input Component', () => {
     render(Input, { props });
 
     expect(screen.getByLabelText('Clear input')).toBeInTheDocument();
+  });
+
+  it('offers a one-time link when the page supports it', async () => {
+    const onOneTime = vi.fn();
+    render(Input, { props: { ...defaultProps, onOneTime } });
+    await fireEvent.click(screen.getByRole('button', { name: 'One-time link' }));
+    expect(onOneTime).toHaveBeenCalled();
+  });
+
+  it('has no one-time option without a handler, or while a custom alias is open', () => {
+    render(Input, { props: defaultProps });
+    expect(screen.queryByRole('button', { name: 'One-time link' })).not.toBeInTheDocument();
+  });
+
+  it('hides the one-time option while the custom alias field is open', () => {
+    render(Input, { props: { ...defaultProps, showCustomAlias: true, onOneTime: vi.fn() } });
+    expect(screen.queryByRole('button', { name: 'One-time link' })).not.toBeInTheDocument();
   });
 });

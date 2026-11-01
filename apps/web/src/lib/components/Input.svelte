@@ -12,6 +12,9 @@
   // Compact variant: dashboard-embedded (no reserved error space, alias always shown, tighter type).
   export let compact = false;
 
+  /** When set, the alias row also offers a switch to a one-time link. */
+  export let onOneTime = null;
+
   let shakeInput = false;
   let shakeAlias = false;
 
@@ -204,7 +207,7 @@
     {/if}
   {:else}
     <div
-      class="flex items-center justify-start"
+      class="flex items-center justify-between gap-4"
       style="min-height: 44px;"
     >
       {#if !showCustomAlias}
@@ -216,6 +219,16 @@
         >
           Want a custom link?
         </button>
+        {#if onOneTime}
+          <button
+            type="button"
+            class="text-sm transition-colors hover:underline"
+            style="color: var(--text-muted);"
+            on:click={onOneTime}
+          >
+            One-time link
+          </button>
+        {/if}
       {:else}
         <div
           class="alias-chip flex items-center rounded-lg"

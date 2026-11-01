@@ -4,6 +4,8 @@
   import { copyToClipboard } from '../utils/clipboard.js';
 
   export let shortURL;
+  /** Shown in the reserved line above the result, e.g. for a one-time link. */
+  export let note = '';
 
   const dispatch = createEventDispatcher();
 
@@ -129,7 +131,11 @@
 
 <div class="space-y-4 fade-in">
   <!-- Reserved error space (matching Input) -->
-  <div class="h-5"></div>
+  <div class="h-5">
+    {#if note}
+      <p class="text-sm" style="color: var(--text-muted);">{note}</p>
+    {/if}
+  </div>
 
   <!-- Result display with inline actions (same dimensions as input) -->
   <div

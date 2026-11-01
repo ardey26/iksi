@@ -1,6 +1,7 @@
 <script>
   import { Input, ShortenedURL } from '#lib/components//index.js';
-  import { onMount } from 'svelte';
+  import OneTimeForm from '#lib/components/OneTimeForm.svelte';
+  import { onMount, tick } from 'svelte';
 
   const FEATURES = [
     { title: 'Custom aliases', body: 'Pick the slug yourself: iksi.app/your-name instead of a random string.' },
@@ -18,6 +19,31 @@
   let error = '';
   let showCustomAlias = false;
   let inputRef;
+  // 'link' is the regular shortener; 'oneTime' creates a burn-after-reading link.
+  let mode = 'link';
+  let oneTimeRef;
+  let createdOneTime = false;
+
+  const focusLater = async (get) => {
+    await tick();
+    get()?.focus();
+  };
+
+  const startOneTime = () => {
+    mode = 'oneTime';
+    error = '';
+    focusLater(() => oneTimeRef);
+  };
+
+  const stopOneTime = () => {
+    mode = 'link';
+    focusLater(() => inputRef);
+  };
+
+  const oneTimeCreated = (e) => {
+    createdOneTime = true;
+    shortURL = e.detail.shortURL;
+  };
 
   onMount(() => {
     // Auto-focus input on mount
@@ -63,6 +89,8 @@
     showCustomAlias = false;
     error = '';
     isLoading = false;
+    mode = 'link';
+    createdOneTime = false;
     // Refocus input after reset
     setTimeout(() => {
       if (inputRef) inputRef.focus();
@@ -91,7 +119,9 @@
   <div class="w-full max-w-[500px] min-h-[100svh] flex flex-col justify-center">
     <h1 class="sr-only">iksi — free URL shortener</h1>
     {#if shortURL}
-      <ShortenedURL {shortURL} on:reset={reset} />
+      <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
+    {:else if mode === 'oneTime'}
+      <OneTimeForm bind:inputRef={oneTimeRef} on:created={oneTimeCreated} on:cancel={stopOneTime} />
     {:else}
       <Input
         bind:longURL
@@ -101,6 +131,7 @@
         {isLoading}
         {error}
         {handleSubmit}
+        onOneTime={startOneTime}
       />
     {/if}
   </div>
