@@ -58,12 +58,12 @@ What iksi does with it on the server (see https://www.iksi.app/privacy):
 
 - The URL becomes the destination of a short link owned by the user's account. It is stored encrypted (AES-256-GCM), and it is sent to Google Safe Browsing to be checked for malware and phishing, like every iksi link.
 - The key is checked against its stored SHA-256 hash, and the key's last-used time is recorded (to the minute).
-- Like any web request, the shorten request reveals the user's IP address. iksi counts shorten requests per IP address for rate limiting, in a database counter that holds the IP address and is not deleted automatically at the moment. No IP address is stored with the link or its clicks.
+- Like any web request, the shorten request reveals the user's IP address. iksi counts shorten requests per visitor for rate limiting, in a database counter that holds a keyed hash (HMAC-SHA256) of the IP address, never the address itself; a daily job deletes the counter within about two days. No IP address is stored with the link or its clicks.
 
 Privacy tab answers:
 
 - Data collected: Authentication information (the iksi API key), and Web history only in the narrow sense that the URL the user chooses to shorten is sent to iksi to make the short link.
-- Location: the store counts IP address as location data. The extension does not read it, but iksi's server keeps the request's IP address in a rate-limit counter (see above), so declare Location too rather than risk an inaccurate disclosure.
+- Location: the store counts IP address as location data. The extension does not read it, but iksi's server uses the request's IP address for rate limiting (storing only a keyed hash of it, see above), so declare Location too rather than risk an inaccurate disclosure.
 - Not collected: personally identifiable information, health, financial, personal communications, user activity, website content.
 - Certifications: the data is not sold to third parties; not used or transferred for purposes unrelated to the single purpose; not used or transferred to determine creditworthiness or for lending.
 - Privacy policy: https://www.iksi.app/privacy (its "API keys and the browser extension" section covers the extension). Required for an extension that handles authentication information.
