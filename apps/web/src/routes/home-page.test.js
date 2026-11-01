@@ -17,17 +17,19 @@ afterEach(() => vi.unstubAllGlobals());
 describe('home page one-time option', () => {
   it('switches to the one-time form and back', async () => {
     render(Home);
-    await fireEvent.click(screen.getByRole('button', { name: 'One-time link' }));
+    expect(screen.getByRole('radio', { name: 'Short link' })).toBeChecked();
+    await fireEvent.click(screen.getByRole('radio', { name: 'One-time link' }));
     expect(screen.getByRole('button', { name: 'Create one-time link' })).toBeInTheDocument();
     expect(screen.queryByLabelText('URL to shorten')).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole('button', { name: 'Back to a regular link' }));
+    await fireEvent.click(screen.getByRole('radio', { name: 'Short link' }));
     expect(screen.getByLabelText('URL to shorten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create one-time link' })).not.toBeInTheDocument();
   });
 
   it('shows the new one-time link with a note that it opens once', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ shortURL: 'AbCdEfGhJk' }))));
     render(Home);
-    await fireEvent.click(screen.getByRole('button', { name: 'One-time link' }));
+    await fireEvent.click(screen.getByRole('radio', { name: 'One-time link' }));
     await fireEvent.input(screen.getByLabelText('URL to share once'), { target: { value: 'example.com/doc' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Create one-time link' }));
     await waitFor(() => expect(screen.getByText(/AbCdEfGhJk/)).toBeInTheDocument());
@@ -42,8 +44,8 @@ describe('home page scoped suggestion', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(Home);
     await fireEvent.input(screen.getByLabelText('URL to shorten'), { target: { value: 'example.com/sale' } });
-    await fireEvent.click(screen.getByText('Want a custom link?'));
-    await fireEvent.input(screen.getByLabelText('Custom alias'), { target: { value: 'sale' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Custom name' }));
+    await fireEvent.input(screen.getByLabelText('Custom name'), { target: { value: 'sale' } });
     await fireEvent.click(screen.getByLabelText('Shorten link'));
   }
 
@@ -66,12 +68,12 @@ describe('home page scoped suggestion', () => {
   it('drops the offer once the name is edited', async () => {
     await submitTaken(vi.fn().mockResolvedValue(reply(409, { error: 'taken', suggestion: '@andre/sale' })));
     await screen.findByRole('button', { name: 'Use iksi.app/@andre/sale?' });
-    await fireEvent.input(screen.getByLabelText('Custom alias'), { target: { value: 'sale2' } });
+    await fireEvent.input(screen.getByLabelText('Custom name'), { target: { value: 'sale2' } });
     expect(screen.queryByRole('button', { name: 'Use iksi.app/@andre/sale?' })).not.toBeInTheDocument();
   });
 
   it('shows the plain error when there is no offer', async () => {
     await submitTaken(vi.fn().mockResolvedValue(reply(409, { error: 'custom link alias already exists, pick another one' })));
-    expect(await screen.findByText('custom link alias already exists, pick another one')).toBeInTheDocument();
+    expect(await screen.findByText('Custom link alias already exists, pick another one')).toBeInTheDocument();
   });
 });

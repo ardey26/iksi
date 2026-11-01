@@ -10,6 +10,6 @@ describe('ShortenedURL', () => {
 
   it('keeps the reserved line empty by default', () => {
     const { container } = render(ShortenedURL, { props: { shortURL: 'AbC' } });
-    expect(container.querySelector('.h-5')?.textContent?.trim()).toBe('');
+    expect(container.querySelector('.note')?.textContent?.trim()).toBe('');
   });
 });
