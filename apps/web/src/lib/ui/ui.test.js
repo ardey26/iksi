@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { get } from 'svelte/store';
 
@@ -12,6 +12,7 @@ import Switch from './Switch.svelte';
 import Segmented from './Segmented.svelte';
 import ChipGroup from './ChipGroup.svelte';
 import Logo from './Logo.svelte';
+import RowHarness from './tests/RowHarness.svelte';
 import SheetHarness from './tests/SheetHarness.svelte';
 import ToastHarness from './tests/ToastHarness.svelte';
 import { toast, toasts, dismiss } from './toast.js';
@@ -294,5 +295,29 @@ describe('Logo', () => {
     const img = screen.getByAltText('Maya');
     expect(img).toHaveAttribute('width', w.replace('px', ''));
     expect(img).toHaveAttribute('height', h.replace('px', ''));
+  });
+});
+
+describe('Row', () => {
+  it('puts media after the leading slot, in a fixed-width box when mediaWidth is set', () => {
+    const { container } = render(RowHarness, { props: { mediaWidth: 64 } });
+    const rows = [...container.querySelectorAll('li.row')];
+    expect(rows.map((r) => r.querySelector('.media').style.width)).toEqual(['64px', '64px', '64px']);
+    const lead = rows[0].querySelector('.leading');
+    expect(lead.firstElementChild).toHaveAttribute('data-handle');
+    expect(lead.lastElementChild).toHaveClass('media');
+  });
+
+  it('lets the media size itself without mediaWidth', () => {
+    const { container } = render(RowHarness);
+    expect(container.querySelector('.media').style.width).toBe('');
+  });
+
+  it('can let the secondary line wrap instead of truncating', () => {
+    const { container } = render(RowHarness, { props: { wrapSubtitle: true } });
+    expect(container.querySelector('.subtitle')).toHaveClass('wrap');
+    cleanup();
+    const plain = render(RowHarness);
+    expect(plain.container.querySelector('.subtitle')).not.toHaveClass('wrap');
   });
 });

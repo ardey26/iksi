@@ -108,11 +108,11 @@
         </EmptyState>
       {:else}
         <SortableList label="Payment methods" name={(m) => m.name} bind:items={methods} on:reorder={saved} let:item={m} let:handle>
-          <Row subtitle={confirming === m.id ? 'Remove it from your Pay button?' : m.detail}>
+          <Row subtitle={confirming === m.id ? 'Remove it from your Pay button?' : m.detail} mediaWidth={64} wrapSubtitle>
             <!-- A wordmark already spells the name: kept for screen readers only. -->
             <span class:sr-only={m.wordmark}>{m.name}</span>
-            <svelte:fragment slot="leading">
-              <DragHandle {handle} />
+            <DragHandle slot="leading" {handle} />
+            <svelte:fragment slot="media">
               {#if m.logo}
                 <Logo src={m.logo} wordmark={m.wordmark} />
               {:else}

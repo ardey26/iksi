@@ -241,9 +241,10 @@
         {:else}
           <SortableList label="Payment methods" items={methods} name={methodTitle} disabled={busy || editing !== null} on:reorder={saveOrder} let:item={m} let:handle>
             {@const logo = logoOf(m)}
-            <Row muted={busy && confirming === m.id}>
-              <svelte:fragment slot="leading">
-                <DragHandle {handle} />
+            <!-- One media width for logos, wordmarks and monograms, so the text lines up. -->
+            <Row muted={busy && confirming === m.id} mediaWidth={64} wrapSubtitle={m.kind === 'qr'}>
+              <DragHandle slot="leading" {handle} />
+              <svelte:fragment slot="media">
                 {#if logo}
                   <Logo src={logo.logo} wordmark={!!logo.wordmark} />
                 {:else}

@@ -64,6 +64,15 @@ describe('PaymentMethods', () => {
       expect(within(second).getByText('GCash')).not.toHaveClass('sr-only');
     });
 
+    it('gives every row the same media width, so the text lines up', () => {
+      const maya = { ...qr, id: 'q3', institution: 'maya', label: 'Maya' };
+      const { container } = render(PaymentMethods, { props: { methods: [gcash, maya, qr, paypal], label: 'pay' } });
+      const rows = [...container.querySelectorAll('li.row')];
+      expect(rows.map((r) => r.querySelector('.media')?.style.width)).toEqual(['64px', '64px', '64px', '64px']);
+      // A QR's who-and-where lines wrap rather than truncate on a phone.
+      expect(rows[1].querySelector('.subtitle')).toHaveClass('wrap');
+    });
+
     it('lists no banks to choose from', () => {
       render(PaymentMethods, { props: { methods: [], label: 'pay' } });
       expect(screen.queryByRole('button', { name: /GCash|Maya|MariBank/ })).toBeNull();
