@@ -130,8 +130,8 @@
 
 <svelte:head><title>Profile — iksi</title></svelte:head>
 
-<section class="w-full max-w-2xl mx-auto space-y-12">
-  <header>
+<section class="w-full max-w-2xl mx-auto d-scope">
+  <header class="mb-12">
     <p class="text-sm mb-8" style="color: var(--text-muted);">
       <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
     </p>
@@ -139,200 +139,246 @@
   </header>
 
   <!-- Identity -->
-  <div class="space-y-4">
-    <div>
-      <h2 class="text-base font-medium" style="color: var(--text-primary);">Identity</h2>
-      <p class="text-sm mt-1" style="color: var(--text-muted);">How you show up on your public page.</p>
-    </div>
-    <div class="rounded-xl p-6 space-y-5" style="background: var(--surface); border: 1px solid var(--border);">
-      <label class="block space-y-2">
-        <span class="text-sm" style="color: var(--text-muted);">Display name</span>
-        <input type="text" bind:value={displayName} maxlength="80" placeholder={data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name'}
-               class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
-               style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
-      </label>
+  <section class="d-section" aria-labelledby="p-identity">
+    <h2 class="d-title" id="p-identity">Identity</h2>
+    <p class="d-desc">How you show up on your public page.</p>
+    <div class="d-spec">
+      <div class="d-row">
+        <span class="d-label">Avatar</span>
+        <div class="d-control">
+          <ImageUpload kind="avatar" value={avatarUrl || null} savedUrl={savedAvatarUrl || null} on:change={onAvatarChange}>
+            <button type="button" on:click={() => (showUrlInput = !showUrlInput)}
+                    class="d-btn d-btn-text" aria-expanded={showUrlInput} aria-controls="p-avatar-url">
+              Paste a URL instead
+            </button>
+          </ImageUpload>
+          {#if showUrlInput}
+            <input id="p-avatar-url" type="url" bind:value={avatarUrl} placeholder="https://..." aria-label="Avatar URL" class="d-field" />
+          {/if}
+        </div>
+      </div>
 
-      <label class="block space-y-2">
-        <span class="text-sm flex items-baseline justify-between" style="color: var(--text-muted);">
-          <span>Bio</span>
-          <span class="text-xs tabular-nums">{bio.length}/200</span>
-        </span>
-        <textarea bind:value={bio} maxlength="200" rows="3" placeholder="A line or two about you."
-                  class="w-full px-3 py-2.5 rounded-md text-base outline-none resize-none transition-colors"
-                  style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);"></textarea>
-      </label>
+      <div class="d-row">
+        <label class="d-label" for="p-name">Display name</label>
+        <div class="d-control">
+          <input id="p-name" type="text" bind:value={displayName} maxlength="80"
+                 placeholder={data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name'}
+                 class="d-field" />
+        </div>
+      </div>
 
-      <div class="space-y-2">
-        <span class="text-sm" style="color: var(--text-muted);">Avatar</span>
-        <ImageUpload kind="avatar" value={avatarUrl || null} savedUrl={savedAvatarUrl || null} on:change={onAvatarChange} />
-        <button type="button" on:click={() => (showUrlInput = !showUrlInput)}
-                class="text-xs transition-opacity hover:opacity-70"
-                style="background: none; border: none; padding: 0; color: var(--text-muted); cursor: pointer;"
-                aria-expanded={showUrlInput}>
-          Paste a URL instead
-        </button>
-        {#if showUrlInput}
-          <input type="url" bind:value={avatarUrl} placeholder="https://..." aria-label="Avatar URL"
-                 class="w-full px-3 py-2.5 rounded-md text-base outline-none transition-colors"
-                 style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary);" />
-        {/if}
+      <div class="d-row">
+        <label class="d-label" for="p-bio">Bio</label>
+        <div class="d-control">
+          <textarea id="p-bio" bind:value={bio} maxlength="200" rows="3" placeholder="A line or two about you."
+                    aria-describedby="p-bio-count" class="d-field"></textarea>
+          <p class="d-hint text-right tabular-nums" id="p-bio-count">{bio.length} of 200</p>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
   <!-- Appearance -->
-  <div class="space-y-4">
-    <div>
-      <h2 class="text-base font-medium" style="color: var(--text-primary);">Appearance</h2>
-      <p class="text-sm mt-1" style="color: var(--text-muted);">Pick a color and a brightness. The full palette is derived from both.</p>
-    </div>
-
-    <div class="rounded-xl p-6 space-y-6" style="background: var(--surface); border: 1px solid var(--border);">
-      <!-- Accent -->
-      <div class="flex items-center gap-4">
-        <label class="relative w-12 h-12 rounded-full overflow-hidden cursor-pointer shrink-0" style="background: {accent}; box-shadow: 0 0 0 4px color-mix(in srgb, {accent} 20%, transparent);">
-          <input type="color" bind:value={accent} class="absolute inset-0 opacity-0 cursor-pointer" />
-        </label>
-        <div class="flex flex-col">
-          <span class="text-sm font-medium tabular-nums" style="color: var(--text-primary);">{accent.toUpperCase()}</span>
-          <span class="text-xs" style="color: var(--text-muted);">Click swatch to change</span>
+  <section class="d-section" aria-labelledby="p-appearance">
+    <h2 class="d-title" id="p-appearance">Appearance</h2>
+    <p class="d-desc">Pick a color and a brightness. The full palette is derived from both.</p>
+    <div class="d-spec">
+      <div class="d-row">
+        <span class="d-label">Accent</span>
+        <div class="d-control d-inline">
+          <label class="swatch" style="background-color: {accent};">
+            <input type="color" bind:value={accent} aria-label="Accent color" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          </label>
+          <span class="d-readout">{accent.toUpperCase()}</span>
         </div>
       </div>
 
-      <!-- Brightness slider -->
-      <div class="space-y-2">
-        <div class="flex items-baseline justify-between">
-          <span class="text-sm" style="color: var(--text-muted);">Brightness</span>
-          <span class="text-xs tabular-nums" style="color: var(--text-muted);">{Math.round(brightness)}</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          bind:value={brightness}
-          class="w-full brightness-slider"
-          aria-label="Palette brightness"
-        />
-        <div class="flex justify-between text-xs" style="color: var(--text-muted); opacity: 0.7;">
-          <span>Dark</span>
-          <span>Light</span>
-        </div>
-      </div>
-
-      <!-- Background -->
-      <div class="space-y-2">
-        <span class="text-sm" style="color: var(--text-muted);">Background</span>
-        <ImageUpload kind="background" value={backgroundUrl} on:change={onBackgroundChange} />
-      </div>
-
-      <!-- Live preview — mirrors the /@handle card layout -->
-      <div class="space-y-2">
-        <span class="text-xs uppercase tracking-wide" style="color: var(--text-muted);">Preview</span>
-        <div class="rounded-2xl p-6 transition-colors"
-             style="{paletteStyle} background: var(--p-bg);{backgroundUrl ? ` background-image: url('${backgroundUrl}'); background-size: cover; background-position: center;` : ''}">
-          <div class="w-full rounded-2xl overflow-hidden preview-card"
-               style="background: var(--p-surface); border: 1px solid var(--p-border); color: var(--p-text);">
-
-            <!-- Header: avatar + identity + copy pill -->
-            <div class="p-4 flex items-start gap-3">
-              {#if avatarUrl}
-                <img src={avatarUrl} alt="" class="w-10 h-10 rounded-full object-cover shrink-0"
-                     style="border: 1px solid var(--p-border);" />
-              {:else}
-                <div class="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold"
-                     style="background: oklch(from {accent} 0.90 max(c, 0.08) h); color: var(--p-accent-text);">
-                  {initials(previewName)}
-                </div>
-              {/if}
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-semibold tracking-tight leading-tight truncate" style="color: var(--p-text);">{previewName}</div>
-                <div class="text-xs mt-0.5 truncate" style="color: var(--p-accent-text);">iksi.app/@{previewHandle}</div>
-              </div>
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
-                    style="background: var(--p-text); color: var(--p-bg);">Copy</span>
-            </div>
-
-            <!-- Bio -->
-            {#if bio}
-              <div class="px-4 pb-4">
-                <p class="text-sm leading-tight font-medium" style="color: var(--p-text);">{bio}</p>
-              </div>
-            {/if}
-
-            <!-- Sample rows (kebab shown as visual cue) -->
-            <div>
-              {#each sampleRows as row, i}
-                <div class="px-4 py-3 flex items-center gap-3" style="border-top: 1px solid var(--p-border);">
-                  <span class="text-xs tabular-nums" style="color: var(--p-muted); opacity: 0.6;">{i + 1}.</span>
-                  <div class="flex-1 min-w-0 text-sm font-semibold tracking-tight truncate" style="color: var(--p-text);">{row.title}</div>
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" style="color: var(--p-muted);" aria-hidden="true">
-                    <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
-                  </svg>
-                </div>
-              {/each}
-            </div>
-
-            <!-- Footer -->
-            <div class="px-4 pb-3 pt-2 text-center">
-              <span class="text-xs" style="color: var(--p-muted);">
-                {previewHandle} shortens links with <span class="underline decoration-1 underline-offset-2" style="color: var(--p-text);">iksi</span>
-              </span>
-            </div>
+      <div class="d-row">
+        <span class="d-label">Brightness</span>
+        <div class="d-control">
+          <div class="d-inline flex-nowrap">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              bind:value={brightness}
+              class="brightness-slider"
+              aria-label="Palette brightness"
+            />
+            <span class="d-readout readout">{Math.round(brightness)}</span>
           </div>
+          <div class="ends" aria-hidden="true"><span>Dark</span><span>Light</span></div>
+        </div>
+      </div>
+
+      <div class="d-row">
+        <span class="d-label">Background</span>
+        <div class="d-control">
+          <ImageUpload kind="background" value={backgroundUrl} on:change={onBackgroundChange} />
         </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- Live preview — mirrors the /@handle card layout -->
+  <section class="d-section" aria-labelledby="p-preview">
+    <h2 class="d-title" id="p-preview">Preview</h2>
+    <p class="d-desc">Your public page with these settings.</p>
+    <div class="stage mt-4 transition-colors"
+         style="{paletteStyle} background-color: var(--p-bg);{backgroundUrl ? ` background-image: url('${backgroundUrl}'); background-size: cover; background-position: center;` : ''}">
+      <div class="w-full rounded-2xl overflow-hidden preview-card"
+           style="background: var(--p-surface); border: 1px solid var(--p-border); color: var(--p-text);">
+        <!-- Header: avatar + identity + copy pill -->
+        <div class="p-4 flex items-start gap-3">
+          {#if avatarUrl}
+            <img src={avatarUrl} alt="" class="w-10 h-10 rounded-full object-cover shrink-0"
+                 style="border: 1px solid var(--p-border);" />
+          {:else}
+            <div class="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold"
+                 style="background: oklch(from {accent} 0.90 max(c, 0.08) h); color: var(--p-accent-text);">
+              {initials(previewName)}
+            </div>
+          {/if}
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold tracking-tight leading-tight truncate" style="color: var(--p-text);">{previewName}</div>
+            <div class="text-xs mt-0.5 truncate" style="color: var(--p-accent-text);">iksi.app/@{previewHandle}</div>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
+                style="background: var(--p-text); color: var(--p-bg);">Copy</span>
+        </div>
+
+        <!-- Bio -->
+        {#if bio}
+          <div class="px-4 pb-4">
+            <p class="text-sm leading-tight font-medium" style="color: var(--p-text);">{bio}</p>
+          </div>
+        {/if}
+
+        <!-- Sample rows (kebab shown as visual cue) -->
+        <div>
+          {#each sampleRows as row, i}
+            <div class="px-4 py-3 flex items-center gap-3" style="border-top: 1px solid var(--p-border);">
+              <span class="text-xs tabular-nums" style="color: var(--p-muted); opacity: 0.6;">{i + 1}.</span>
+              <div class="flex-1 min-w-0 text-sm font-semibold tracking-tight truncate" style="color: var(--p-text);">{row.title}</div>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" style="color: var(--p-muted);" aria-hidden="true">
+                <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+              </svg>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Footer -->
+        <div class="px-4 pb-3 pt-2 text-center">
+          <span class="text-xs" style="color: var(--p-muted);">
+            {previewHandle} shortens links with <span class="underline decoration-1 underline-offset-2" style="color: var(--p-text);">iksi</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Save profile changes: last thing on the page -->
-  <div class="flex items-center gap-3 pt-4" style="border-top: 1px solid var(--border);">
-    <button
-      on:click={saveProfile}
-      disabled={!dirty || saving}
-      class="px-5 py-2.5 rounded-md text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-      style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
-    >
+  <div class="save-bar">
+    <button on:click={saveProfile} disabled={!dirty || saving} class="d-btn d-btn-primary">
       {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
     </button>
-    {#if dirty && !saving}
-      <span class="text-xs" style="color: var(--text-muted);">Unsaved changes</span>
-    {/if}
+    <span class="text-[13px]" style="color: var(--text-muted); visibility: {dirty && !saving ? 'visible' : 'hidden'};">Unsaved changes</span>
   </div>
 </section>
 
 <style>
+  .swatch {
+    position: relative;
+    display: block;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .swatch:focus-within {
+    outline: 1px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+
+  /* Flat hardware fader: hairline track, square cap. */
   .brightness-slider {
     -webkit-appearance: none;
     appearance: none;
-    height: 8px;
-    background: linear-gradient(to right, #0a0a0b, #fafafa);
-    border-radius: 999px;
-    outline: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 24px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .brightness-slider::-webkit-slider-runnable-track {
+    height: 2px;
+    background-color: var(--border);
+    border-radius: 1px;
+  }
+  .brightness-slider::-moz-range-track {
+    height: 2px;
+    background-color: var(--border);
+    border-radius: 1px;
   }
   .brightness-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    background: #fff;
-    border: 2px solid var(--accent);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    width: 14px;
+    height: 20px;
+    margin-top: -9px;
+    background-color: var(--text-primary);
+    border: none;
+    border-radius: 3px;
   }
   .brightness-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: #fff;
-    border: 2px solid var(--accent);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    width: 14px;
+    height: 20px;
+    background-color: var(--text-primary);
+    border: none;
+    border-radius: 3px;
+  }
+  .brightness-slider:focus {
+    outline: none;
+  }
+  .brightness-slider:focus-visible::-webkit-slider-thumb {
+    outline: 1px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+  .brightness-slider:focus-visible::-moz-range-thumb {
+    outline: 1px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+  .readout {
+    width: 32px;
+    text-align: right;
+  }
+  .ends {
+    display: flex;
+    justify-content: space-between;
+    margin-right: 48px;
+    font-size: 12px;
+    color: var(--text-muted);
   }
 
+  .stage {
+    padding: 24px;
+    border-radius: 6px;
+  }
   .preview-card {
     box-shadow:
       0 16px 40px -14px oklch(from var(--accent) 0.15 0.08 h / 0.35),
       0 4px 14px -4px oklch(from var(--accent) 0.15 0.04 h / 0.18);
+  }
+
+  .save-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
   }
 </style>

@@ -74,33 +74,55 @@
   }
 </script>
 
-<div class="space-y-2">
+<div class="upload">
   <div class="flex items-center gap-4">
-    <div class="shrink-0 overflow-hidden flex items-center justify-center {isAvatar ? 'w-16 h-16 rounded-full' : 'w-40 h-[90px] rounded-lg'}"
-         style="background: var(--bg); border: 1px solid var(--border);">
+    <div class="frame" class:avatar={isAvatar}>
       {#if value}
         <img src={value} alt="" class="w-full h-full object-cover" />
       {/if}
     </div>
-    <div class="flex items-center gap-3">
-      <button type="button" on:click={() => input.click()} disabled={busy}
-              class="px-3 py-2 rounded-md text-sm font-medium transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-              style="background: var(--bg); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer;">
-        Upload
-      </button>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
+      <button type="button" on:click={() => input.click()} disabled={busy} class="d-btn d-btn-text primary">Upload</button>
       {#if value}
-        <button type="button" on:click={remove} disabled={busy}
-                class="text-sm transition-opacity hover:opacity-70 disabled:opacity-30 disabled:cursor-not-allowed"
-                style="background: none; border: none; color: var(--text-muted); cursor: pointer;">
-          Remove
-        </button>
+        <button type="button" on:click={remove} disabled={busy} class="d-btn d-btn-text d-btn-danger">Remove</button>
       {/if}
+      <slot />
       <span class="w-4 h-4 shrink-0 flex items-center justify-center" aria-live="polite">
         {#if busy}<span class="spinner" role="status" aria-label="Uploading"></span>{/if}
       </span>
     </div>
   </div>
-  <p class="text-sm min-h-5" style="color: var(--error);" role={error ? 'alert' : undefined}>{error}</p>
+  <p class="err" role={error ? 'alert' : undefined}>{error}</p>
   <input bind:this={input} type="file" class="hidden" on:change={onPick}
          accept="image/jpeg,image/png,image/webp,image/gif,image/avif" />
 </div>
+
+<style>
+  .frame {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 160px;
+    height: 90px;
+    overflow: hidden;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .frame.avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+  }
+  .primary {
+    color: var(--text-primary);
+  }
+  .err {
+    min-height: 18px;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--error);
+  }
+</style>
