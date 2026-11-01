@@ -116,14 +116,40 @@ model LongURL {
   secretKind      String?
   /// When the one-time link was opened (claimed). Null while unopened.
   openedAt        DateTime?
+  /// "review" (held after reports, until an admin acts) or "disabled" (by an admin). Null when neither.
+  /// Separate from safeVerdict so a Safe Browsing re-check or a settings edit never clears it.
+  moderation      String?
+  /// When moderation was last set.
+  moderatedAt     DateTime?
   user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   clicks          Click[]
   profileRows     ProfileRow[]
+  reports         LinkReport[]
 
   @@index([createdAt(sort: Desc)])
   @@index([clickCount(sort: Desc)])
   @@index([userId])
   @@index([safeCheckedAt])
+}
+
+/// A visitor's report of a short link (phishing, malware...). See src/lib/server/reports.ts.
+model LinkReport {
+  id        Int      @id @default(autoincrement())
+  linkId    Int
+  /// phishing | malware | spam | illegal | other
+  reason    String
+  details   String?
+  /// Only when the reporter asked for a follow-up.
+  email     String?
+  /// HMAC-SHA256 of the reporter's IP keyed with SECRET_KEY. The IP itself is never stored.
+  ipHash    String
+  /// open | actioned | dismissed
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  link      LongURL  @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model Click {

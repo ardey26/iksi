@@ -15,7 +15,8 @@ const RESERVED_DIRECTORIES = [
 	'/_app',
 	'/fonts',
 	'/internal',
-	'/_edge'
+	'/_edge',
+	'/report'
 ] as const;
 
 /**
