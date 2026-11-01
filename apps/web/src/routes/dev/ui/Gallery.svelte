@@ -323,9 +323,9 @@
         <Badge variant="error">Flagged</Badge>
         <Badge>1,284</Badge>
       </Specimen>
-      <Specimen label="Logo (white chip) and Monogram · 40 and 32">
+      <Specimen label="Logo (no chip) and Monogram · 40 and 32">
         <Logo src="/brands/gcash.svg" alt="GCash" />
-        <Logo src="/brands/maya.svg" alt="Maya" inset={0.1} />
+        <Logo src="/brands/maya.svg" alt="Maya" />
         <Logo src="/brands/maribank.png" alt="MariBank" />
         <Monogram name="BPI" />
         <Monogram name="paypal" />

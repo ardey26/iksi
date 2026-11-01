@@ -1,12 +1,13 @@
 <script>
-  // Brand logos sit on a white chip in both themes, so their colours hold.
+  // Brand logos sit directly on the surface: transparent artwork, no chip.
+  // The square box keeps them aligned with monograms.
   export let src;
   /** Brand name. Empty when a visible label already names it. */
   export let alt = '';
   /** 32 | 40 */
   export let size = 40;
   /** Padding as a share of the chip; lower for wide wordmarks. */
-  export let inset = 0.15;
+  export let inset = 0;
 </script>
 
 <span class="logo" style="--size: {size}px; --inset: {inset};">
@@ -22,10 +23,6 @@
     width: var(--size);
     height: var(--size);
     padding: calc(var(--size) * var(--inset));
-    overflow: hidden;
-    background-color: var(--chip);
-    border-radius: var(--radius-control);
-    box-shadow: inset 0 0 0 1px var(--chip-border);
   }
   img {
     display: block;
