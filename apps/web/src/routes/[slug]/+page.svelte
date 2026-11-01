@@ -65,6 +65,8 @@
   <div class="w-full max-w-[500px] text-center">
     {#if revealed !== null}
       <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">One-time message</h1>
+      <!-- A long message scrolls, so keyboard users must be able to focus it. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div
         class="secret mt-6 px-5 py-4 rounded-xl text-left"
         role="region"
