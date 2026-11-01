@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "iksi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Shorten any link or page with iksi from the right-click menu. The short link is copied for you.",
   "homepage_url": "https://www.iksi.app/",
   "minimum_chrome_version": "116",
@@ -27,6 +27,6 @@
     "service_worker": "src/background.js",
     "type": "module"
   },
-  "permissions": ["contextMenus", "storage", "activeTab", "offscreen", "clipboardWrite", "notifications"],
+  "permissions": ["contextMenus", "storage", "activeTab", "offscreen", "clipboardWrite", "notifications", "identity"],
   "host_permissions": ["https://www.iksi.app/*"]
 }
