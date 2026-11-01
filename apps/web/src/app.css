@@ -283,14 +283,17 @@ select[size]:not([size="1"]) {
 .d-row {
   display: grid;
   grid-template-columns: var(--d-label) minmax(0, 1fr);
+  align-items: start;
   column-gap: 24px;
   padding: 20px 0;
   border-bottom: 1px solid var(--border);
 }
+/* Top-aligned: the padding centres the label's line on a single-line
+   control, so it lines up with the first line of a field, a textarea or
+   an inline group, however tall the control column grows. */
 .d-label {
-  display: flex;
-  align-items: center;
-  min-height: var(--d-ctl);
+  display: block;
+  padding-top: calc((var(--d-ctl) - 18px) / 2);
   font-size: 13px;
   line-height: 18px;
   color: var(--text-muted);
@@ -315,7 +318,7 @@ select[size]:not([size="1"]) {
     row-gap: 8px;
     padding: 16px 0;
   }
-  .d-label { min-height: 0; }
+  .d-label { padding-top: 0; }
 }
 
 /* Controls */
