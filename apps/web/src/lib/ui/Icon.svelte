@@ -1,7 +1,6 @@
 <script context="module">
-  // One icon set (Lucide), one stroke: 1.5px at every size.
-  import ArrowDown from 'lucide-svelte/icons/arrow-down';
-  import ArrowUp from 'lucide-svelte/icons/arrow-up';
+  // One icon set (Lucide), one stroke: 1.5px at every size. No arrow icons:
+  // reordering is drag-only (SortableList), never up/down buttons.
   import Check from 'lucide-svelte/icons/check';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
@@ -31,8 +30,6 @@
 
   export const ICONS = {
     'alert': CircleAlert,
-    'arrow-down': ArrowDown,
-    'arrow-up': ArrowUp,
     'check': Check,
     'check-circle': CircleCheck,
     'chevron-down': ChevronDown,

@@ -14,6 +14,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    border-radius: inherit;
   }
   .list > :global(li + li) { border-top: 1px solid var(--border); }
 </style>

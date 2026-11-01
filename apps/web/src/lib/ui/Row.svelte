@@ -34,11 +34,22 @@
     padding: 8px 16px;
     transition: background-color var(--duration-normal) var(--ease-out), opacity var(--duration-normal) var(--ease-out);
   }
+  /* Paper does not clip, so a row's hover fill follows the paper's corners. */
+  .row:first-child {
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+  }
+  .row:last-child {
+    border-bottom-left-radius: inherit;
+    border-bottom-right-radius: inherit;
+  }
   .interactive:hover { background-color: var(--surface-2); }
   .muted { opacity: 0.5; }
   .leading {
     display: flex;
     flex: none;
+    align-items: center;
+    gap: 8px;
   }
   .text {
     flex: 1 1 auto;

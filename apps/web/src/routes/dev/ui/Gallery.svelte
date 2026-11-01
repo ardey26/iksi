@@ -2,6 +2,7 @@
   import {
     Badge,
     Button,
+    DragHandle,
     ChipGroup,
     EmptyState,
     IconButton,
@@ -18,6 +19,7 @@
     Select,
     Sheet,
     Skeleton,
+    SortableList,
     Stack,
     Switch,
     Textarea,
@@ -73,6 +75,12 @@
   let chips = ['ios', 'web'];
   let text = { plain: '', filled: 'iksi.app/sale', note: '' };
   let paymentsState = 'ready';
+  let rows = [
+    { id: 'sale', path: 'iksi.app/sale', host: 'shop.mariasantos.ph', clicks: '12,480' },
+    { id: 'q3', path: 'iksi.app/q3', host: 'docs.google.com', clicks: '1,284' },
+    { id: 'yt', path: 'iksi.app/yt', host: 'youtube.com/@mariasantos', clicks: '48' },
+    { id: 'cv', path: 'iksi.app/cv', host: 'mariasantos.ph/cv.pdf', clicks: '9' }
+  ];
   let sheetOpen = false;
   let plainSheet = false;
 </script>
@@ -208,7 +216,7 @@
         <IconButton icon="plus" label="Add" variant="secondary" />
         <IconButton icon="plus" label="Add" variant="secondary" size="md" />
         <IconButton icon="trash" label="Delete" variant="danger" />
-        <IconButton icon="arrow-up" label="Move up" disabled />
+        <IconButton icon="settings" label="Settings" disabled />
       </Specimen>
       <Specimen label="Focus">
         <span class="g-focus"><IconButton icon="settings" label="Settings" /></span>
@@ -363,6 +371,20 @@
           <svelte:fragment slot="meta">0</svelte:fragment>
         </Row>
       </List>
+    </Paper>
+  </Section>
+
+  <Section title="Reorder" description="The only reorder pattern: drag the grip. Touch: press and hold the grip. Keyboard: Space on the grip, arrows, Space; Escape cancels.">
+    <Paper padding="none">
+      <SortableList label="Profile links" name={(r) => r.path} bind:items={rows} on:reorder={(e) => toast(`New order: ${e.detail.ids.join(', ')}`)} let:item let:handle>
+        <Row title={item.path} subtitle={item.host}>
+          <svelte:fragment slot="leading">
+            <DragHandle {handle} />
+            <Monogram name={item.host} />
+          </svelte:fragment>
+          <svelte:fragment slot="meta">{item.clicks}</svelte:fragment>
+        </Row>
+      </SortableList>
     </Paper>
   </Section>
 

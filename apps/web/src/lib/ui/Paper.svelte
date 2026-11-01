@@ -20,7 +20,6 @@
     border-radius: var(--radius-paper);
     box-shadow: var(--paper-shadow);
   }
-  .pad-none { overflow: hidden; }
   .pad-sm { padding: 16px; }
   .pad-md { padding: 24px; }
   @media (max-width: 639px) {

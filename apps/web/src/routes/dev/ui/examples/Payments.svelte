@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import {
     Button,
+    DragHandle,
     EmptyState,
     IconButton,
     List,
@@ -13,6 +14,7 @@
     Section,
     Segmented,
     Skeleton,
+    SortableList,
     Stack,
     toast
   } from '#lib/ui/index.js';
@@ -22,7 +24,8 @@
 
   const START = [
     { id: 'gcash', name: 'GCash', detail: 'Pays to Maria Santos', logo: '/brands/gcash.svg' },
-    { id: 'maya', name: 'Maya', detail: 'Pays to Maria Santos', logo: '/brands/maya.svg', inset: 0.1 },
+    { id: 'maya', name: 'Maya', detail: 'Pays to Maria Santos', logo: '/brands/maya.svg' },
+    { id: 'maribank', name: 'MariBank', detail: 'Pays to Maria Santos', logo: '/brands/maribank.png' },
     { id: 'bpi', name: 'BPI', detail: 'Pays to Maria Santos · Savings' },
     { id: 'paypal', name: 'PayPal', detail: 'paypal.me/mariasantos' }
   ];
@@ -33,12 +36,9 @@
 
   $: shown = state === 'empty' ? [] : methods;
 
-  function move(i, dir) {
-    const j = i + dir;
-    if (j < 0 || j >= methods.length) return;
-    const next = methods.slice();
-    [next[i], next[j]] = [next[j], next[i]];
-    methods = next;
+  // SortableList has already reordered `methods`; a screen would save the order.
+  function saved(e) {
+    toast(`Order saved: ${e.detail.ids.length} methods`);
   }
 
   // Keyboard focus follows the inline confirm in and back out.
@@ -89,7 +89,10 @@
         <List label="Payment methods loading">
           {#each [0, 1, 2] as i (i)}
             <Row>
-              <Skeleton slot="leading" shape="square" height="40px" />
+              <svelte:fragment slot="leading">
+                <DragHandle />
+                <Skeleton shape="square" height="40px" />
+              </svelte:fragment>
               <Skeleton width={i === 1 ? '64px' : '88px'} height="22px" />
               <Skeleton slot="subtitle" width="148px" height="18px" />
             </Row>
@@ -104,29 +107,26 @@
           <Button variant="primary" icon="qr" on:click={() => add('qr')}>Add payment QR</Button>
         </EmptyState>
       {:else}
-        <List label="Payment methods">
-          {#each shown as m, i (m.id)}
-            <Row title={m.name} subtitle={confirming === m.id ? 'Remove it from your Pay button?' : m.detail}>
-              <svelte:fragment slot="leading">
-                {#if m.logo}
-                  <Logo src={m.logo} inset={m.inset ?? 0.15} />
-                {:else}
-                  <Monogram name={m.name} />
-                {/if}
-              </svelte:fragment>
-              <svelte:fragment slot="actions">
-                {#if confirming === m.id}
-                  <Button size="sm" variant="ghost" id="pay-{m.id}-cancel" on:click={() => cancel(m)}>Cancel</Button>
-                  <Button size="sm" variant="danger" on:click={() => remove(m)}>Remove</Button>
-                {:else}
-                  <IconButton icon="arrow-up" label="Move {m.name} up" disabled={i === 0} on:click={() => move(i, -1)} />
-                  <IconButton icon="arrow-down" label="Move {m.name} down" disabled={i === shown.length - 1} on:click={() => move(i, 1)} />
-                  <IconButton icon="trash" label="Remove {m.name}" variant="danger" id="pay-{m.id}-remove" on:click={() => ask(m)} />
-                {/if}
-              </svelte:fragment>
-            </Row>
-          {/each}
-        </List>
+        <SortableList label="Payment methods" name={(m) => m.name} bind:items={methods} on:reorder={saved} let:item={m} let:handle>
+          <Row title={m.name} subtitle={confirming === m.id ? 'Remove it from your Pay button?' : m.detail}>
+            <svelte:fragment slot="leading">
+              <DragHandle {handle} />
+              {#if m.logo}
+                <Logo src={m.logo} />
+              {:else}
+                <Monogram name={m.name} />
+              {/if}
+            </svelte:fragment>
+            <svelte:fragment slot="actions">
+              {#if confirming === m.id}
+                <Button size="sm" variant="ghost" id="pay-{m.id}-cancel" on:click={() => cancel(m)}>Cancel</Button>
+                <Button size="sm" variant="danger" on:click={() => remove(m)}>Remove</Button>
+              {:else}
+                <IconButton icon="trash" label="Remove {m.name}" variant="danger" id="pay-{m.id}-remove" on:click={() => ask(m)} />
+              {/if}
+            </svelte:fragment>
+          </Row>
+        </SortableList>
       {/if}
     </Paper>
 
