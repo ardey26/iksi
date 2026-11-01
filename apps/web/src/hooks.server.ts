@@ -83,9 +83,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         "frame-ancestors 'none'"
     ].join('; '));
 
-    if (event.url.pathname.startsWith('/static/') || event.url.pathname.includes('.')) {
-        response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-    }
+    // No blanket Cache-Control here: static assets never reach this hook (the CDN
+    // serves them, cached per vercel.json), and every dynamic route sets its own.
+    // A path-based override once froze robots.txt and sitemap.xml for a year.
 
     return response;
 };
