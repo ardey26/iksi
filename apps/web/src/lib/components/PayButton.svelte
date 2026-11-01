@@ -1,8 +1,9 @@
 <script lang="ts">
-  // Public profile Pay button and its sheet. Uses the profile palette
-  // (--bg, --surface, --border, --text-primary, --text-muted) it sits in.
-  import { onDestroy, tick } from 'svelte';
+  // Public profile Pay button and its sheet (kit Sheet). Both use the profile
+  // palette they sit in; the sheet carries it through its portal.
+  import { tick } from 'svelte';
   import QRCode from 'qrcode';
+  import { Button, Sheet } from '#lib/ui/index.js';
   import PayMark from './PayMark.svelte';
   import {
     PAY_LABEL_TEXT,
@@ -23,8 +24,7 @@
   const QR_SIZE = 264;
 
   let open = false;
-  let sheetEl: HTMLElement | undefined;
-  let trigger: HTMLButtonElement;
+  let root: HTMLElement;
   // Rendered PNGs by method id; a missing entry is still rendering.
   let images: Record<string, { url: string; file: File | null }> = {};
   // QR payloads by method id, fetched once when the sheet first opens.
@@ -38,6 +38,7 @@
   $: picking = methods.length > 1;
   $: shown = picking ? methods.filter((m) => m.id === selected) : methods;
   $: cols = methods.length <= 3 ? methods.length : methods.length === 4 ? 2 : 3;
+  $: current = shown[0];
   // Links have no bank, so they always get a monogram of the service name.
   const institutionOf = (m: PublicPayMethod) => (m.kind === 'qr' ? m.institution : null);
 
@@ -97,46 +98,23 @@
     }
   }
 
-  async function show() {
+  function show() {
     open = true;
-    document.body.style.overflow = 'hidden';
     load();
-    await tick();
-    sheetEl?.focus();
-  }
-  async function close() {
-    if (!open) return;
-    open = false;
-    document.body.style.overflow = '';
-    await tick();
-    trigger?.focus();
   }
 
-  onDestroy(() => {
-    if (open && typeof document !== 'undefined') document.body.style.overflow = '';
-  });
+  // The kit sheet returns focus to whatever had it on open; a tap on a phone
+  // may not focus the button, so the button takes it back explicitly.
+  async function closed() {
+    open = false;
+    await tick();
+    root?.querySelector<HTMLElement>('.pay-btn')?.focus();
+  }
 
   function onWindowKeydown(e: KeyboardEvent) {
     if (open && e.key === 'Escape') {
       e.preventDefault();
-      close();
-    }
-  }
-
-  const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-  function trapFocus(e: KeyboardEvent) {
-    if (e.key !== 'Tab' || !sheetEl) return;
-    const items = [...sheetEl.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    if (items.length === 0) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && (active === first || active === sheetEl)) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && active === last) {
-      e.preventDefault();
-      first.focus();
+      closed();
     }
   }
 
@@ -152,330 +130,235 @@
 
 <svelte:window on:keydown={onWindowKeydown} />
 
-<button type="button" class="pay-btn" bind:this={trigger} on:click={show}
-        aria-haspopup="dialog" aria-expanded={open}>{PAY_LABEL_TEXT[label]}</button>
+<div class="pay" bind:this={root}>
+  <Button variant="primary" size="lg" full class="pay-btn" aria-haspopup="dialog" aria-expanded={open} on:click={show}>
+    {PAY_LABEL_TEXT[label]}
+  </Button>
+</div>
 
-{#if open}
-  <div class="pay-root">
-    <!-- Pointer-only shortcut; Escape and the close button cover keyboards. -->
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="pay-backdrop" on:click={close}></div>
-    <div class="pay-sheet" role="dialog" aria-modal="true" aria-labelledby="pay-sheet-title"
-         tabindex="-1" bind:this={sheetEl} on:keydown={trapFocus}>
-      <header class="pay-head">
-        <h2 id="pay-sheet-title" class="pay-title">{title}</h2>
-        <button type="button" class="pay-close" aria-label="Close" on:click={close}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </header>
-
-      {#if picking}
-        <div class="pay-pick" role="radiogroup" aria-label="Payment method" style="--cols: {cols};">
-          {#each methods as m (m.id)}
-            <label class="pay-key">
-              <input type="radio" class="sr-only" name="pay-pick-{handle}" value={m.id} bind:group={selected} />
-              <span title={methodTitle(m)}>
-                <PayMark institution={institutionOf(m)} label={methodTitle(m)} size={24} alt="" />
-                <span class="pay-key-text">{methodTitle(m)}</span>
-              </span>
-            </label>
-          {/each}
-        </div>
-      {/if}
-
-      <ul class="pay-list">
-        {#each shown as m (m.id)}
-          <li class="pay-item">
-            {#if m.kind === 'qr'}
-              <div class="qr-frame" style="width: {QR_SIZE}px;">
-                {#if images[m.id]}
-                  <img src={images[m.id].url} alt="Payment QR for {titleCase(m.name)}" width={QR_SIZE} height={QR_SIZE} />
-                {:else if failed(m.id)}
-                  <div class="qr-failed" role="alert">
-                    <p>Could not load this QR.</p>
-                    <button type="button" class="qr-retry" on:click={retry}>Try again</button>
-                  </div>
-                {/if}
-              </div>
-              <div class="pay-who">
-                <PayMark institution={m.institution} label={m.label} size={28} alt="" />
-                <p class="pay-method">{m.label}</p>
-              </div>
-              <p class="pay-name">Pays to {titleCase(m.name)}</p>
-              <p class="pay-meta">{qrPlace(m)}</p>
-              <p class="pay-meta">Pays in {m.currency}</p>
-              <div class="pay-action">
-                {#if images[m.id]}
-                  <a class="pay-secondary" href={images[m.id].url} download={fileName}
-                     on:click={(e) => onSave(e, images[m.id].file)}>Save QR image</a>
-                {:else}
-                  <span class="pay-secondary pending" aria-hidden="true">Save QR image</span>
-                {/if}
-              </div>
-              <p class="pay-note">Scan or upload this QR in your bank or e-wallet app.</p>
-            {:else}
-              <a class="pay-primary" href={m.url} target="_blank" rel="noopener">Pay with {PROVIDER_NAMES[m.provider]}</a>
-            {/if}
-          </li>
-        {/each}
-      </ul>
+<Sheet bind:open {title} width={420} on:close={closed}>
+  {#if picking}
+    <div class="pick" role="radiogroup" aria-label="Payment method" style="--cols: {cols};">
+      {#each methods as m (m.id)}
+        <label class="key">
+          <input type="radio" class="sr-only" name="pay-pick-{handle}" value={m.id} bind:group={selected} />
+          <span class="key-face" title={methodTitle(m)}>
+            <PayMark institution={institutionOf(m)} label={methodTitle(m)} size={32} alt="" />
+            <span class="pay-key-text">{methodTitle(m)}</span>
+          </span>
+        </label>
+      {/each}
     </div>
-  </div>
-{/if}
+  {/if}
+
+  <ul class="pay-list">
+    {#each shown as m (m.id)}
+      <li class="pay-item">
+        {#if m.kind === 'qr'}
+          <!-- With a picker, the chosen key already names the method. -->
+          {#if !picking}
+            <div class="pay-who">
+              <PayMark institution={m.institution} label={m.label} size={32} alt="" />
+              <p class="pay-method">{m.label}</p>
+            </div>
+          {/if}
+
+          <div class="qr-frame" class:failed={!images[m.id] && failed(m.id)} style="max-width: {QR_SIZE}px;">
+            {#if images[m.id]}
+              <img src={images[m.id].url} alt="Payment QR for {titleCase(m.name)}" width={QR_SIZE} height={QR_SIZE} />
+            {:else if failed(m.id)}
+              <div class="qr-failed" role="alert">
+                <p>Could not load this QR.</p>
+                <Button size="sm" on:click={retry}>Try again</Button>
+              </div>
+            {/if}
+          </div>
+
+          <div class="pay-to">
+            <p class="pay-name">Pays to {titleCase(m.name)}</p>
+            <p class="pay-meta">{qrPlace(m)}</p>
+            <p class="pay-meta">Pays in {m.currency}</p>
+          </div>
+          <p class="pay-note">Scan or upload this QR in your bank or e-wallet app.</p>
+        {:else}
+          {#if !picking}
+            <div class="pay-who">
+              <PayMark label={methodTitle(m)} size={32} alt="" />
+              <p class="pay-method">{methodTitle(m)}</p>
+            </div>
+          {/if}
+          <p class="pay-note">Opens {PROVIDER_NAMES[m.provider]} in a new tab. You pay {displayName} there.</p>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+
+  <svelte:fragment slot="footer">
+    {#if current?.kind === 'qr'}
+      {#if images[current.id]}
+        <Button
+          variant="primary"
+          size="lg"
+          href={images[current.id].url}
+          download={fileName}
+          on:click={(e) => onSave(e, images[current.id].file)}
+        >
+          Save QR image
+        </Button>
+      {:else}
+        <Button variant="primary" size="lg" disabled>Save QR image</Button>
+      {/if}
+    {:else if current}
+      <Button variant="primary" size="lg" href={current.url} target="_blank" rel="noopener" iconEnd="external">
+        Pay with {PROVIDER_NAMES[current.provider]}
+      </Button>
+    {/if}
+  </svelte:fragment>
+</Sheet>
 
 <style>
-  .pay-btn,
-  .pay-primary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    min-height: 48px;
-    padding: 0 20px;
-    border: none;
-    border-radius: 9999px;
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--bg);
-    background-color: var(--text-primary);
-    cursor: pointer;
-    transition: opacity var(--duration-normal) var(--ease-out);
-  }
-  .pay-btn:hover,
-  .pay-primary:hover { opacity: 0.9; }
-  .pay-btn:active,
-  .pay-primary:active { transform: scale(0.98); }
-  .pay-btn:focus-visible,
-  .pay-primary:focus-visible,
-  .pay-secondary:focus-visible,
-  .pay-close:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+  .pay { width: 100%; }
 
-  .pay-root {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-  }
-  .pay-backdrop {
-    position: absolute;
-    inset: 0;
-    background-color: rgb(0 0 0 / 0.5);
-    animation: pay-fade 200ms var(--ease-out);
-  }
-  .pay-sheet {
-    position: relative;
-    width: 100%;
-    max-height: 92dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 8px 20px calc(24px + env(safe-area-inset-bottom));
-    color: var(--text-primary);
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 20px 20px 0 0;
-    outline: none;
-    animation: pay-up 200ms var(--ease-out);
-  }
-  @media (min-width: 640px) {
-    .pay-root { align-items: center; padding: 24px; }
-    .pay-sheet {
-      max-width: 420px;
-      max-height: calc(100dvh - 48px);
-      padding: 8px 28px 28px;
-      border-bottom: 1px solid var(--border);
-      border-radius: 20px;
-    }
-  }
-
-  .pay-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 56px;
-  }
-  .pay-title {
-    min-width: 0;
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    overflow-wrap: anywhere;
-  }
-  .pay-close {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    margin-right: -10px;
-    color: var(--text-muted);
-    background-color: transparent;
-    border: none;
-    border-radius: 9999px;
-    cursor: pointer;
-  }
-  .pay-close:hover { color: var(--text-primary); }
-
-  .pay-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 0;
-    text-align: center;
-    border-top: 1px solid var(--border);
-  }
-  .pay-item:first-child { border-top: none; padding-top: 8px; }
-  .pay-item:last-child { padding-bottom: 0; }
-
-  .qr-frame {
-    flex: none;
-    max-width: 100%;
-    aspect-ratio: 1;
-    overflow: hidden;
-    background-color: #ffffff;
-    border-radius: 12px;
-  }
-  .qr-frame img { display: block; width: 100%; height: 100%; }
-  /* The frame stays white in both themes, so its text is set dark. */
-  .qr-failed {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: 100%;
-    padding: 24px;
-    font-size: 14px;
-    color: #52525b;
-  }
-  .qr-retry {
-    min-height: 44px;
-    padding: 0 16px;
-    font: inherit;
-    font-weight: 500;
-    color: #18181b;
-    background-color: transparent;
-    border: 1px solid #d4d4d8;
-    border-radius: 9999px;
-    cursor: pointer;
-  }
-  .qr-retry:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .pay-who {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    max-width: 100%;
-    margin-top: 16px;
-  }
-  .pay-method {
-    min-width: 0;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-muted);
-    overflow-wrap: anywhere;
-  }
-  .pay-name {
-    min-width: 0;
-    margin-top: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-
-  /* Picker: one key per method, the chosen one outlined in the text color. */
-  .pay-pick {
+  /* Picker: one key per method; the chosen one is outlined in the text colour. */
+  .pick {
     display: grid;
     grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
   }
-  .pay-key { display: flex; min-width: 0; cursor: pointer; }
-  .pay-key > span {
+  .key {
+    display: flex;
+    min-width: 0;
+    cursor: pointer;
+  }
+  .key-face {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     width: 100%;
     height: 48px;
-    padding: 0 10px;
+    padding: 0 10px 0 6px;
     color: var(--text-muted);
+    background-color: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    transition: border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+    border-radius: var(--radius-control);
+    transition:
+      border-color var(--duration-normal) var(--ease-out),
+      color var(--duration-normal) var(--ease-out);
   }
-  .pay-key:hover > span { color: var(--text-primary); border-color: var(--text-muted); }
-  .pay-key input:checked + span {
+  .key:hover .key-face {
     color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+  .key input:checked + .key-face {
+    color: var(--text-primary);
+    background-color: var(--surface);
     border-color: var(--text-primary);
     box-shadow: inset 0 0 0 1px var(--text-primary);
   }
-  .pay-key input:focus-visible + span {
+  .key input:focus-visible + .key-face {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   .pay-key-text {
     min-width: 0;
     overflow: hidden;
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 18px;
     font-weight: 500;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .pay-meta {
-    margin-top: 2px;
-    font-size: 14px;
-    color: var(--text-muted);
+
+  .pay-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
-  .pay-action { margin-top: 16px; }
-  .pay-secondary {
-    display: inline-flex;
+  .pay-item {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 0 20px;
+    text-align: center;
+  }
+  .pay-who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 16px;
+    text-align: left;
+  }
+  .pay-method {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
     font-size: 15px;
+    line-height: 22px;
     font-weight: 500;
     color: var(--text-primary);
-    border: 1px solid var(--border);
-    border-radius: 9999px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
-  .pay-secondary:hover { border-color: var(--text-muted); }
-  .pay-secondary.pending { opacity: 0.4; }
-  .pay-note {
-    max-width: 300px;
-    margin-top: 12px;
+
+  /* White in both themes with a full quiet zone: what payment apps scan best. */
+  .qr-frame {
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background-color: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-paper);
+  }
+  .qr-frame img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .qr-frame.failed { background-color: var(--surface-2); }
+  .qr-failed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 100%;
+    padding: 24px;
+  }
+  .qr-failed p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--text-muted);
+  }
+
+  .pay-to { margin-top: 16px; }
+  .pay-name {
+    margin: 0;
+    font-size: 17px;
+    line-height: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+  .pay-meta {
+    margin: 2px 0 0;
     font-size: 13px;
     line-height: 18px;
     color: var(--text-muted);
   }
+  .pay-note {
+    max-width: 300px;
+    margin: 16px 0 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-faint);
+  }
 
-  @keyframes pay-up {
-    from { transform: translateY(24px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-  @keyframes pay-fade {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .pay-sheet,
-    .pay-backdrop { animation: none; }
-    .pay-btn,
-    .pay-primary,
-    .pay-key > span { transition: none; }
-    .pay-btn:active,
-    .pay-primary:active { transform: none; }
+    .key-face { transition: none; }
   }
 </style>
