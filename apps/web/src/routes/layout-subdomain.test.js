@@ -48,4 +48,8 @@ describe('layout on a profile subdomain', () => {
     expect(container.querySelector('a[href$="/login"]')?.getAttribute('href')).toBe('/login');
     expect(canonical).toBe('https://www.iksi.app/@andre/sale');
   });
+
+  it('leaves ?via=sub out of the canonical', () => {
+    expect(at('https://www.iksi.app/@andre/sale?via=sub', '/@[handle]/[name]').canonical).toBe('https://www.iksi.app/@andre/sale');
+  });
 });

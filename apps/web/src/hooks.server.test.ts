@@ -28,7 +28,7 @@ describe('subdomain gate', () => {
   it('302s a subdomain request back to www/@handle, uncached, while SUBDOMAINS_ENABLED is unset', async () => {
     const res = await run(event('https://andre.iksi.app/sale+', '/@[handle]/[name]', { handle: 'andre', name: 'sale+' }));
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toBe('https://www.iksi.app/@andre/sale+');
+    expect(res.headers.get('location')).toBe('https://www.iksi.app/@andre/sale+?via=sub');
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(resolve).not.toHaveBeenCalled();
   });
@@ -59,6 +59,13 @@ describe('subdomain gate', () => {
       status: 301,
       location: 'https://andre.iksi.app/'
     });
+  });
+
+  it.each([['true'], ['']])('serves www/@handle?via=sub without redirecting (SUBDOMAINS_ENABLED=%s)', async (flag) => {
+    vi.stubEnv('SUBDOMAINS_ENABLED', flag);
+    const res = await run(event('https://www.iksi.app/@andre?via=sub', '/@[handle]', { handle: 'andre' }));
+    expect(res.status).toBe(200);
+    expect(resolve).toHaveBeenCalledTimes(1);
   });
 
   it('keeps admin.iksi.app as it was', async () => {

@@ -36,18 +36,24 @@ describe('on a profile subdomain', () => {
   it('sends a subdomain back to www/@handle while subdomains are off, never cached', () => {
     const back = (location: string) => ({ kind: 'redirect', status: 302, location, cacheControl: 'no-store' });
     expect(subdomainDecision(sub({ enabled: false, routeId: '/@[handle]', handle: 'andre' }))).toEqual(
-      back('https://www.iksi.app/@andre')
+      back('https://www.iksi.app/@andre?via=sub')
     );
     expect(subdomainDecision(sub({ enabled: false, pathname: '/sale', search: '?s=x', routeId: '/@[handle]/[name]', handle: 'andre' }))).toEqual(
-      back('https://www.iksi.app/@andre/sale?s=x')
+      back('https://www.iksi.app/@andre/sale?s=x&via=sub')
     );
     expect(subdomainDecision(sub({ enabled: false, pathname: '/sale+', routeId: '/@[handle]/[name]', handle: 'andre' }))).toEqual(
-      back('https://www.iksi.app/@andre/sale+')
+      back('https://www.iksi.app/@andre/sale+?via=sub')
     );
     expect(subdomainDecision(sub({ enabled: false, pathname: '/dashboard', routeId: '/(app)/dashboard' }))).toEqual(
-      back('https://www.iksi.app/dashboard')
+      back('https://www.iksi.app/dashboard?via=sub')
     );
-    expect(subdomainDecision(sub({ enabled: false, pathname: '/a/b', routeId: null }))).toEqual(back('https://www.iksi.app/a/b'));
+    expect(subdomainDecision(sub({ enabled: false, pathname: '/a/b', routeId: null }))).toEqual(back('https://www.iksi.app/a/b?via=sub'));
+  });
+
+  it('marks the way back once, replacing any via already there', () => {
+    expect(
+      subdomainDecision(sub({ enabled: false, pathname: '/sale', search: '?via=x&s=1', routeId: '/@[handle]/[name]', handle: 'andre' }))
+    ).toMatchObject({ location: 'https://www.iksi.app/@andre/sale?via=sub&s=1' });
   });
 
   it('leaves reserved and invalid hosts alone while off', () => {
@@ -96,6 +102,15 @@ describe('www profile redirect', () => {
     expect(
       subdomainDecision(req({ pathname: '/@Andre/Sale+', search: '?s=profile', routeId: '/@[handle]/[name]', handle: 'Andre' }))
     ).toEqual({ kind: 'redirect', status: 301, location: 'https://andre.iksi.app/Sale+?s=profile', cacheControl: DAILY });
+  });
+
+  it('never redirects a request that came back from a subdomain (?via=sub)', () => {
+    for (const enabled of [true, false]) {
+      expect(subdomainDecision(req({ enabled, pathname: '/@andre', search: '?via=sub', routeId: '/@[handle]', handle: 'andre' }))).toEqual(PASS);
+      expect(
+        subdomainDecision(req({ enabled, pathname: '/@andre/sale', search: '?s=x&via=sub', routeId: '/@[handle]/[name]', handle: 'andre' }))
+      ).toEqual(PASS);
+    }
   });
 
   it('never redirects while off', () => {

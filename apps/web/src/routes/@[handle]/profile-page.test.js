@@ -113,3 +113,14 @@ describe('profile canonical and share URL', () => {
     expect(head({ handle: 'a_b', subdomains: true }).canonical).toBe('https://www.iksi.app/@a_b');
   });
 });
+
+describe('profile canonical after a way back from a subdomain', () => {
+  it('has no via param, since the page never sees the query', () => {
+    document.head.innerHTML = '';
+    render(Page, { data: { ...base, backgroundUrl: null, subdomains: false } });
+    const canonical = document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
+    const og = document.head.querySelector('meta[property="og:url"]')?.getAttribute('content');
+    expect(canonical).toBe('https://www.iksi.app/@ann');
+    expect(og).toBe(canonical);
+  });
+});

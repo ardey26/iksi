@@ -108,7 +108,7 @@ To turn it back on:
 
 ## Subdomains go-live
 
-Gives every handle `https://<handle>.iksi.app/`. The code is already deployed and does nothing until `SUBDOMAINS_ENABLED=true`: a subdomain request gets a `no-store` 302 back to the same page on www (`/` to `/@handle`, `/<name>` to `/@handle/<name>`) and `www.iksi.app/@handle` serves the profile as before. Vercel issues the `*.iksi.app` certificate only when Vercel runs the DNS, so the nameservers move off Cloudflare first. The proxy is already off, so no visitor traffic depends on Cloudflare.
+Gives every handle `https://<handle>.iksi.app/`. The code is already deployed and does nothing until `SUBDOMAINS_ENABLED=true`: a subdomain request gets a `no-store` 302 back to the same page on www, marked `?via=sub` (`/` to `/@handle?via=sub`, `/<name>` to `/@handle/<name>?via=sub`) and `www.iksi.app/@handle` serves the profile as before. Vercel issues the `*.iksi.app` certificate only when Vercel runs the DNS, so the nameservers move off Cloudflare first. The proxy is already off, so no visitor traffic depends on Cloudflare.
 
 Before you start:
 - In Cloudflare, export the zone (DNS > Records > Export) and note every record that is not `@`, `www` or `admin`: MX, SPF/DKIM/DMARC TXT, site-verification TXT. Each one must exist in Vercel DNS before step 2, or mail and verification break.
@@ -133,7 +133,7 @@ Steps:
 4. In the Vercel project, Settings > Domains, add `*.iksi.app` (production).
 5. Wait until Vercel shows the wildcard certificate as issued. Then a subdomain answers over valid TLS with the 302 that means "flag off":
    ```sh
-   curl -sI https://andre.iksi.app/ | grep -iE "^HTTP|location|cache-control"   # 302, https://www.iksi.app/@andre, no-store; no certificate error
+   curl -sI https://andre.iksi.app/ | grep -iE "^HTTP|location|cache-control"   # 302, https://www.iksi.app/@andre?via=sub, no-store; no certificate error
    ```
 6. Set `SUBDOMAINS_ENABLED=true` in Vercel (Settings > Environment Variables, Production only).
 7. Redeploy production (env changes only apply to new deployments).
@@ -156,4 +156,9 @@ Steps:
 
 `www.iksi.app/@handle` serves profiles again, and every subdomain request gets a `no-store` 302 back to the same page on www, so shared `andre.iksi.app` links keep working. Leave `*.iksi.app` and the Vercel DNS in place; with the flag off they only redirect.
 
-Known gap: a browser that already followed the 301 keeps it for up to a day (`max-age=86400`). For that browser, `www.iksi.app/@andre` goes to the cached 301, then `andre.iksi.app/`, then the 302 back to `www.iksi.app/@andre`, which is a redirect loop until the cached 301 expires. To check it, open `https://www.iksi.app/@andre` in a browser that visited it while the flag was on.
+A browser that followed the 301 keeps it for up to a day (`max-age=86400`), so it still goes from `www.iksi.app/@andre` to `andre.iksi.app/`. The 302 back adds `?via=sub`. That URL is not the one the browser cached, so it reaches the app and gets the profile with no loop. www never sends a `?via=sub` request to a subdomain, even with the flag on, so a partial rollout cannot loop either. Canonical and OG URLs carry no query. Check:
+```sh
+curl -sI https://andre.iksi.app/ | grep -iE "^HTTP|location|cache-control"   # 302, https://www.iksi.app/@andre?via=sub, no-store
+curl -sI "https://www.iksi.app/@andre?via=sub" | head -1                      # 200
+```
+Then open `https://www.iksi.app/@andre` in a browser that visited it while the flag was on: it should end on the profile.

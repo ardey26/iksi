@@ -217,4 +217,15 @@ describe('profile on its subdomain', () => {
     vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
     expect((await at('https://www.iksi.app/@ann')).subdomains).toBe(true);
   });
+
+  it('renders www/@handle?via=sub like www/@handle: same cache header, same owner tag, same data', async () => {
+    findFirst.mockResolvedValue(rows());
+    const plain: Record<string, string> = {};
+    const a = await at('https://www.iksi.app/@ann', (h) => Object.assign(plain, h));
+    const via: Record<string, string> = {};
+    const b = await at('https://www.iksi.app/@ann?via=sub', (h) => Object.assign(via, h));
+    expect(via).toEqual(plain);
+    expect(b).toEqual(a);
+    expect(tagProfile.mock.calls).toEqual([[42], [42]]);
+  });
 });
