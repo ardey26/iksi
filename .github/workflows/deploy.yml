@@ -2,7 +2,8 @@ name: Deploy
 
 # Runs after CI passes on main: database migrations, then the web app, then
 # the edge Worker. Order matters: new app code may read new columns, and the
-# Worker may read new fields the app serves.
+# Worker may read new fields the app serves. The Worker step only runs when
+# the repository variable EDGE_ENABLED is 'true' (see infra/cloudflare/README.md).
 on:
   workflow_run:
     workflows: [CI]
@@ -52,6 +53,7 @@ jobs:
           npx --yes vercel@65.9.0 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
       - name: Edge Worker
+        if: vars.EDGE_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         env:
           EDGE_SECRET: ${{ secrets.EDGE_SECRET }}

@@ -6,6 +6,7 @@ const res = (status: number) => new Response(null, { status });
 describe('purgeEdge', () => {
   beforeEach(() => {
     process.env.EDGE_SECRET = 'edge';
+    process.env.EDGE_ENABLED = 'true';
     delete process.env.EDGE_PURGE_URL;
     vi.useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -14,12 +15,20 @@ describe('purgeEdge', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     delete process.env.EDGE_SECRET;
+    delete process.env.EDGE_ENABLED;
   });
 
   const run = async (p: Promise<boolean>) => {
     await vi.runAllTimersAsync();
     return p;
   };
+
+  it('does nothing while the edge layer is switched off', async () => {
+    delete process.env.EDGE_ENABLED;
+    const f = vi.fn().mockResolvedValue(res(204));
+    expect(await run(purgeEdge(['a'], f as never))).toBe(false);
+    expect(f).not.toHaveBeenCalled();
+  });
 
   it('POSTs slugs with the edge header and returns true on 204', async () => {
     const f = vi.fn().mockResolvedValue(res(204));

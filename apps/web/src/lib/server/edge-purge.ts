@@ -12,6 +12,9 @@ const ATTEMPT_TIMEOUT_MS = 2000;
  * that triggered it.
  */
 export async function purgeEdge(slugs: string[], fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  // The edge layer is off unless EDGE_ENABLED=true: with no Worker in front of
+  // the site, /_edge/purge would only reach the app and 404.
+  if (process.env.EDGE_ENABLED !== 'true') return false;
   const secret = process.env.EDGE_SECRET;
   if (!secret || slugs.length === 0) return false;
 
