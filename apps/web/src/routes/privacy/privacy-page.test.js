@@ -91,6 +91,14 @@ describe('privacy page', () => {
     expect(container.querySelector('#ads')).toBeNull();
   });
 
+  it('lists Cloudflare for images and backups only, with no stale link copies or DNS', () => {
+    const { container } = render(Privacy);
+    const item = [...container.querySelectorAll('#services li')].find((li) => li.textContent.startsWith('Cloudflare'));
+    expect(item.textContent).toContain('R2');
+    expect(item.textContent).toContain('kept for 30 days');
+    expect(item.textContent).not.toMatch(/link records|DNS/);
+  });
+
   it('gets an indexable title, description and canonical from the layout', () => {
     const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
     render(Layout, { props: { data: { user: null }, children } });

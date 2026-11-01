@@ -218,7 +218,7 @@
       <ul>
         <li><strong>Vercel</strong> hosts the site. The app runs in Singapore, and Vercel sees every request.</li>
         <li><strong>Supabase</strong> hosts the database, in Singapore. It holds the account, link, click, profile and report data described on this page.</li>
-        <li><strong>Cloudflare</strong> stores uploaded images (R2) and nightly copies of the database, which are kept for 30 days. It also still holds copies of some link records (short name, destination and settings) from when short links were served through Cloudflare's network. That layer is switched off now, and visitor traffic does not go through Cloudflare.</li>
+        <li><strong>Cloudflare</strong> stores uploaded images (R2) and nightly copies of the database, which are kept for 30 days. Visitor traffic does not go through Cloudflare.</li>
         <li><strong>GitHub</strong> runs the nightly backup job. The database copy passes through a temporary GitHub machine on its way to Cloudflare.</li>
         <li><strong>Google Safe Browsing</strong> receives link destinations to check them for malware and phishing.</li>
         <li><strong>Google and X</strong> handle sign-in.</li>
