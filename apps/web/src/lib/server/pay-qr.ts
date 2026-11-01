@@ -5,6 +5,8 @@
 // What this cannot prove: that the code belongs to the profile owner. The
 // decoded merchant name (tag 59) is shown to payers as the safeguard.
 
+import type { QrProvider } from '#lib/pay-methods.js';
+
 export type PayQrErrorCode = 'not_qr' | 'not_payment' | 'damaged' | 'malformed';
 
 export const PAY_QR_ERROR_TEXT: Record<PayQrErrorCode, string> = {
@@ -126,4 +128,25 @@ export function validatePayQr(text: string): PayQrResult {
 			currency: CURRENCY_LETTERS[currency] ?? currency
 		}
 	};
+}
+
+/**
+ * BICs (sub-tag 01 of a QR Ph merchant account) of the wallets with a logo.
+ * Maya's is not confirmed, so a Maya QR is known only by the owner's choice.
+ */
+const PROVIDER_BICS: Record<string, QrProvider> = {
+	GXCHPHM2XXX: 'gcash',
+	LAUIPHM2XXX: 'maribank'
+};
+
+/** The wallet a payment QR is for, from its BIC. Null when unknown or not a payment code. */
+export function qrProviderOf(payload: string): QrProvider | null {
+	const entries = parseTlv(payload);
+	if (!entries) return null;
+	for (const [tag, value] of entries) {
+		if (!isMerchantTag(tag)) continue;
+		const bic = parseTlv(value)?.find(([t]) => t === '01')?.[1].trim().toUpperCase();
+		if (bic && PROVIDER_BICS[bic]) return PROVIDER_BICS[bic];
+	}
+	return null;
 }

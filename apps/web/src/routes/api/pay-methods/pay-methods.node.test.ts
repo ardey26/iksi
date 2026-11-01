@@ -27,10 +27,11 @@ import { POST, DELETE, PATCH } from './+server';
 const qrPng = async (text: string) => new Blob([await QRCode.toBuffer(text, { type: 'png', width: 400, margin: 4 })]);
 const event = (request: Request) => ({ request, url: new URL(request.url), cookies: { get: () => 'c' } }) as any;
 
-async function upload(file: Blob) {
+async function upload(file: Blob, provider?: string) {
 	const fd = new FormData();
 	fd.set('kind', 'qr');
 	fd.set('file', file, 'qr.png');
+	if (provider) fd.set('provider', provider);
 	return POST(event(new Request('http://x/api/pay-methods', { method: 'POST', body: fd })));
 }
 async function addLink(url: string) {
@@ -70,6 +71,31 @@ describe('POST /api/pay-methods: upload a QR image', () => {
 		expect(h.cacheDelete).toHaveBeenCalledWith('profile-7');
 	});
 
+	it('saves the app the owner chose with the QR', async () => {
+		const res = await upload(await qrPng(payQrPayload({ bic: 'MAYAPHXXXXX' })), 'maya');
+		expect(res.status).toBe(200);
+		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: 'maya' })]);
+		expect((await res.json()).notice).toBeNull();
+	});
+
+	it('saves the app the QR belongs to, and says so when it differs from the choice', async () => {
+		const res = await upload(await qrPng(payQrPayload({ bic: 'LAUIPHM2XXX' })), 'gcash');
+		expect(res.status).toBe(200);
+		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: 'maribank' })]);
+		expect((await res.json()).notice).toBe('This is a MariBank QR. Saved as MariBank.');
+	});
+
+	it('saves no app for an unknown bank uploaded without a choice', async () => {
+		const res = await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })));
+		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);
+		expect(res.status).toBe(200);
+	});
+
+	it('ignores an app choice it does not know', async () => {
+		await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })), 'bpi');
+		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);
+	});
+
 	it('stores a QR holding a Venmo link as a link method', async () => {
 		const res = await upload(await qrPng('https://venmo.com/u/ana-reyes'));
 		expect(res.status).toBe(200);
@@ -95,8 +121,8 @@ describe('POST /api/pay-methods: upload a QR image', () => {
 		expect((await res.json()).error).toBe('Use a JPEG, PNG, WebP, GIF or AVIF image.');
 	});
 
-	it('refuses a fourth method', async () => {
-		h.profile.payMethods = stored(3);
+	it('refuses a seventh method', async () => {
+		h.profile.payMethods = stored(6);
 		const res = await upload(await qrPng(payQrPayload()));
 		expect(res.status).toBe(400);
 		expect((await res.json()).code).toBe('too_many');
@@ -166,6 +192,32 @@ describe('PATCH /api/pay-methods', () => {
 		expect(h.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { payLabel: 'tip' } });
 		expect((await res.json()).label).toBe('tip');
 		expect(h.cacheDelete).toHaveBeenCalledWith('profile-7');
+	});
+
+	it('saves a new order and clears the cached profile', async () => {
+		h.profile.payMethods = stored(3);
+		const res = await patch({ order: ['m2', 'm0', 'm1'] });
+		expect(res.status).toBe(200);
+		expect(h.updateMany).toHaveBeenCalledWith({
+			where: { id: 3, updatedAt: UPDATED },
+			data: { payMethods: [expect.objectContaining({ id: 'm2' }), expect.objectContaining({ id: 'm0' }), expect.objectContaining({ id: 'm1' })] }
+		});
+		expect((await res.json()).methods.map((m: any) => m.id)).toEqual(['m2', 'm0', 'm1']);
+		expect(h.cacheDelete).toHaveBeenCalledWith('profile-7');
+	});
+
+	it('refuses an order that is not the current methods', async () => {
+		h.profile.payMethods = stored(3);
+		const res = await patch({ order: ['m2', 'm0'] });
+		expect(res.status).toBe(409);
+		expect(h.updateMany).not.toHaveBeenCalled();
+		expect(h.cacheDelete).not.toHaveBeenCalled();
+	});
+
+	it('refuses a reorder when the profile changed since it was read', async () => {
+		h.profile.payMethods = stored(2);
+		h.updateMany.mockResolvedValue({ count: 0 });
+		expect((await patch({ order: ['m1', 'm0'] })).status).toBe(409);
 	});
 
 	it('refuses an unknown label', async () => {

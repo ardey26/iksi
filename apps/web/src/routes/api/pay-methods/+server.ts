@@ -10,10 +10,12 @@ import {
 	methodFromImage,
 	methodFromLink,
 	PayMethodError,
+	providerNotice,
 	readPayMethods,
-	removePayMethod
+	removePayMethod,
+	reorderPayMethods
 } from '#lib/server/pay-methods.js';
-import { payLabelOf, type PayLabel, type PayMethod } from '#lib/pay-methods.js';
+import { parseQrProvider, payLabelOf, type PayLabel, type PayMethod } from '#lib/pay-methods.js';
 
 // Payment methods behind the profile's Pay button. An uploaded QR image is
 // decoded in memory and never stored; only what the QR holds is saved.
@@ -40,7 +42,7 @@ async function saveMethods(p: Profile, methods: PayMethod[]): Promise<boolean> {
 	return count === 1;
 }
 
-const view = (methods: PayMethod[], label: PayLabel) => json({ methods, label });
+const view = (methods: PayMethod[], label: PayLabel, notice: string | null = null) => json({ methods, label, notice });
 const changed = () => json({ error: 'Your payment methods changed in another tab. Reload and try again.' }, { status: 409 });
 const noProfile = () => json({ error: 'No profile' }, { status: 404 });
 const signedOut = () => json({ error: 'Not signed in' }, { status: 401 });
@@ -65,12 +67,14 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
 	try {
 		const newId = () => crypto.randomUUID();
 		let method: PayMethod;
+		// The wallet tile the owner tapped, if any. The QR's own BIC wins over it.
+		const chosen = parseQrProvider(form.get('provider'));
 		const kind = form.get('kind');
 		if (kind === 'qr') {
 			const file = form.get('file');
 			if (!(file instanceof File)) return json({ error: 'File required' }, { status: 400 });
 			if (file.size > MAX_UPLOAD_BYTES) throw new MediaError('too_large');
-			method = await methodFromImage(new Uint8Array(await file.arrayBuffer()), newId);
+			method = await methodFromImage(new Uint8Array(await file.arrayBuffer()), newId, chosen);
 		} else if (kind === 'link') {
 			const url = form.get('url');
 			method = methodFromLink(typeof url === 'string' ? url : '', newId);
@@ -80,7 +84,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
 
 		const methods = addPayMethod(readPayMethods(p.payMethods), method);
 		if (!(await saveMethods(p, methods))) return changed();
-		return view(methods, payLabelOf(p.payLabel));
+		return view(methods, payLabelOf(p.payLabel), providerNotice(chosen, method));
 	} catch (err) {
 		if (err instanceof PayMethodError) return json({ error: err.message, code: err.code }, { status: 400 });
 		if (err instanceof MediaError) return json({ error: MEDIA_ERROR_TEXT[err.code], code: err.code }, { status: 400 });
@@ -105,6 +109,16 @@ const handlePatch: RequestHandler = async ({ request, cookies }) => {
 	if (uid === null) return signedOut();
 
 	const body = await request.json().catch(() => ({}));
+
+	// Order sets which method the Pay sheet shows first.
+	if (typeof body === 'object' && body !== null && 'order' in body) {
+		const p = await profileOf(uid);
+		if (!p) return noProfile();
+		const methods = reorderPayMethods(readPayMethods(p.payMethods), body.order);
+		if (!methods || !(await saveMethods(p, methods))) return changed();
+		return view(methods, payLabelOf(p.payLabel));
+	}
+
 	if (body?.label !== 'pay' && body?.label !== 'tip') return json({ error: 'Invalid label' }, { status: 400 });
 
 	const p = await profileOf(uid);

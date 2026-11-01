@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { addPayMethod, methodFromLink, PayMethodError, readPayMethods, removePayMethod } from './pay-methods';
+import {
+	addPayMethod,
+	methodFromLink,
+	PayMethodError,
+	providerNotice,
+	publicPayMethods,
+	readPayMethods,
+	removePayMethod,
+	reorderPayMethods
+} from './pay-methods';
 import type { LinkMethod, PayMethod, QrMethod } from '#lib/pay-methods.js';
 import { payQrPayload } from '../../test/pay-qr';
 
 const link = (id: string, url = `https://paypal.me/${id}`): LinkMethod => ({ id, kind: 'link', provider: 'paypal', url });
-const qr = (id: string, payload = payQrPayload()): QrMethod => ({
+const qr = (id: string, payload = payQrPayload(), provider: QrMethod['provider'] = 'gcash'): QrMethod => ({
 	id,
 	kind: 'qr',
+	provider,
 	payload,
 	name: 'JUAN DELA CRUZ',
 	city: 'MANDALUYONG',
@@ -29,13 +39,15 @@ describe('addPayMethod', () => {
 		expect(addPayMethod([link('a')], qr('b')).map((m) => m.id)).toEqual(['a', 'b']);
 	});
 
-	it('allows up to three methods', () => {
-		const three = addPayMethod([link('a'), link('b')], link('c'));
-		expect(three).toHaveLength(3);
+	const links = (n: number) => Array.from({ length: n }, (_, i) => link(`m${i}`));
+
+	it('allows up to six methods, one per bank or wallet', () => {
+		expect(addPayMethod(links(5), link('z'))).toHaveLength(6);
 	});
 
-	it('refuses a fourth method', () => {
-		expect(codeOf(() => addPayMethod([link('a'), link('b'), link('c')], link('d')))).toBe('too_many');
+	it('refuses a seventh method and says how many are allowed', () => {
+		expect(codeOf(() => addPayMethod(links(6), link('z')))).toBe('too_many');
+		expect(new PayMethodError('too_many').message).toBe('You can add up to 6 payment methods. Remove one to add another.');
 	});
 
 	it('refuses the same link twice', () => {
@@ -74,8 +86,33 @@ describe('readPayMethods', () => {
 		expect(out.map((m) => m.id)).toEqual(['a', 'c']);
 	});
 
-	it('never returns more than three', () => {
-		expect(readPayMethods([link('a'), link('b'), link('c'), link('d')])).toHaveLength(3);
+	it('never returns more than six', () => {
+		expect(readPayMethods(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => link(id)))).toHaveLength(6);
+	});
+
+	it('reads a QR stored before providers were saved', () => {
+		const { provider: _p, ...old } = qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }));
+		expect(readPayMethods([old])).toEqual([{ ...old, provider: null }]);
+	});
+
+	it('names an old GCash QR by its BIC', () => {
+		const { provider: _p, ...old } = qr('a');
+		expect(readPayMethods([old])[0]).toMatchObject({ provider: 'gcash' });
+	});
+
+	it('keeps a stored Maya choice when the BIC is unknown', () => {
+		const stored = qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'maya');
+		expect(readPayMethods([stored])[0]).toMatchObject({ provider: 'maya' });
+	});
+
+	it('trusts the BIC over a stored provider', () => {
+		const stored = qr('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), 'gcash');
+		expect(readPayMethods([stored])[0]).toMatchObject({ provider: 'maribank' });
+	});
+
+	it('drops a stored provider it does not know', () => {
+		const stored = { ...qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' })), provider: 'bpi' };
+		expect(readPayMethods([stored])[0]).toMatchObject({ provider: null });
 	});
 
 	it('drops a stored link that no longer passes the allow-list', () => {
@@ -106,5 +143,49 @@ describe('methodFromLink', () => {
 		} catch (e) {
 			expect((e as Error).message).toMatch(/^Use a link from PayPal/);
 		}
+	});
+});
+
+describe('providerNotice', () => {
+	it('says when the QR is from another app than the one chosen', () => {
+		expect(providerNotice('gcash', qr('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), 'maribank'))).toBe(
+			'This is a MariBank QR. Saved as MariBank.'
+		);
+	});
+
+	it.each([
+		['the chosen app matches', 'gcash', qr('a')],
+		['nothing was chosen', null, qr('a')],
+		['the app is unknown', 'gcash', qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), null)],
+		['it is a link', 'gcash', link('a')]
+	] as const)('says nothing when %s', (_name, chosen, method) => {
+		expect(providerNotice(chosen, method)).toBeNull();
+	});
+});
+
+describe('reorderPayMethods', () => {
+	it('puts the methods in the given order', () => {
+		expect(reorderPayMethods([link('a'), link('b'), link('c')], ['c', 'a', 'b'])?.map((m) => m.id)).toEqual(['c', 'a', 'b']);
+	});
+
+	it.each([
+		['a missing id', ['a', 'b']],
+		['an unknown id', ['a', 'b', 'z']],
+		['a repeated id', ['a', 'a', 'b']],
+		['not a list', 'a,b,c'],
+		['ids that are not text', [1, 2, 3]]
+	])('refuses an order with %s', (_name, order) => {
+		expect(reorderPayMethods([link('a'), link('b'), link('c')], order)).toBeNull();
+	});
+});
+
+describe('publicPayMethods', () => {
+	it('leaves out the QR payload, which can hold a mobile number', () => {
+		const out = publicPayMethods([qr('a'), link('b')]);
+		expect(out).toEqual([
+			{ id: 'a', kind: 'qr', provider: 'gcash', name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
+			link('b')
+		]);
+		expect(JSON.stringify(out)).not.toContain('09171234567');
 	});
 });

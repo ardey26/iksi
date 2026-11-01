@@ -116,7 +116,7 @@ describe('profile payment methods', () => {
     expect(((await run()) as any).pay).toEqual({
       label: 'tip',
       methods: [
-        { id: 'q1', kind: 'qr', payload, name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
+        { id: 'q1', kind: 'qr', provider: 'gcash', payload, name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
         kofi
       ]
     });

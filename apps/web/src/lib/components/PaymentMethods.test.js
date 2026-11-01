@@ -94,10 +94,17 @@ describe('PaymentMethods', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/pay-methods?id=q1', { method: 'DELETE' });
   });
 
-  it('hides the add controls at three methods and says why', () => {
-    render(PaymentMethods, { props: { methods: [qr, paypal, kofi], label: 'pay' } });
+  it('hides the add controls at six methods and says why', () => {
+    const more = [1, 2, 3].map((i) => ({ ...kofi, id: `k${i}`, url: `https://ko-fi.com/ana${i}` }));
+    render(PaymentMethods, { props: { methods: [qr, paypal, kofi, ...more], label: 'pay' } });
     expect(screen.queryByRole('radio', { name: 'Upload a QR image' })).toBeNull();
-    expect(screen.getByText(/3 payment methods, the most a profile can have/)).toBeInTheDocument();
+    expect(screen.getByText(/6 payment methods, the most a profile can have/)).toBeInTheDocument();
+  });
+
+  it('still offers to add at five methods', () => {
+    const more = [1, 2].map((i) => ({ ...kofi, id: `k${i}`, url: `https://ko-fi.com/ana${i}` }));
+    render(PaymentMethods, { props: { methods: [qr, paypal, kofi, ...more], label: 'pay' } });
+    expect(screen.queryByText(/the most a profile can have/)).toBeNull();
   });
 
   it('saves the button label when switched', async () => {

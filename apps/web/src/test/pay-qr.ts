@@ -30,6 +30,8 @@ export interface PayloadParts {
 	currency?: string;
 	name?: string | null;
 	city?: string | null;
+	/** The account's bank or e-wallet BIC (sub-tag 01 of the merchant account); '' leaves it out. */
+	bic?: string;
 }
 
 /** The body of a payload, without tag 63. Defaults to a GCash-style P2P code. */
@@ -40,12 +42,13 @@ export function payQrBody(p: PayloadParts = {}): string {
 		country = 'PH',
 		currency = '608',
 		name = 'JUAN DELA CRUZ',
-		city = 'MANDALUYONG'
+		city = 'MANDALUYONG',
+		bic = 'GXCHPHM2XXX'
 	} = p;
 	return (
 		tlv('00', '01') +
 		tlv('01', '11') +
-		tlv(merchantTag, tlv('00', guid) + tlv('01', 'GXCHPHM2XXX') + tlv('02', '99964403') + tlv('04', '09171234567')) +
+		tlv(merchantTag, tlv('00', guid) + (bic === '' ? '' : tlv('01', bic)) + tlv('02', '99964403') + tlv('04', '09171234567')) +
 		tlv('52', '6016') +
 		(currency === '' ? '' : tlv('53', currency)) +
 		(country === '' ? '' : tlv('58', country)) +
