@@ -71,7 +71,6 @@ describe('privacy page', () => {
       'user_session',
       'login_next',
       'Google Safe Browsing',
-      'AdSense',
       'Cloudflare',
       'Supabase',
       'Vercel',
@@ -81,6 +80,15 @@ describe('privacy page', () => {
     ]) {
       expect(text).toContain(fact);
     }
+  });
+
+  it('says iksi shows no ads, and names no ad service', () => {
+    const { container } = render(Privacy);
+    const text = container.textContent;
+    expect(text).toContain('shows no ads');
+    expect(text).toContain('no advertising or analytics cookies');
+    expect(text).not.toMatch(/AdSense|adsbygoogle|googlesyndication/);
+    expect(container.querySelector('#ads')).toBeNull();
   });
 
   it('gets an indexable title, description and canonical from the layout', () => {

@@ -4,6 +4,7 @@ vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findFirst: vi.fn(async (
 vi.mock('#lib/server/crypto.js', () => ({ decodeURL: vi.fn() }));
 
 import { handle } from './hooks.server';
+import appHtml from './app.html?raw';
 
 function event(href: string, routeId: string | null, params: Record<string, string> = {}, isDataRequest = false) {
   const url = new URL(href);
@@ -87,5 +88,22 @@ describe('referrer policy', () => {
     resolve.mockImplementationOnce(async () => new Response('page', { headers: { 'referrer-policy': 'no-referrer' } }));
     const res = await run(event('https://www.iksi.app/connect/extension', '/connect/extension'));
     expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+});
+
+describe('no ads', () => {
+  const AD = /adsbygoogle|googlesyndication|doubleclick|adservice\.google|google-adsense|ca-pub-/;
+
+  it('the page template every rendered page is wrapped in loads no ad code', () => {
+    expect(appHtml).toContain('%sveltekit.body%');
+    expect(appHtml).not.toMatch(AD);
+  });
+
+  it('the CSP allows no ad domains', async () => {
+    const res = await run(event('https://www.iksi.app/', '/'));
+    const csp = res.headers.get('content-security-policy')!;
+    expect(csp).not.toMatch(AD);
+    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
+    expect(csp).toContain("connect-src 'self'");
   });
 });

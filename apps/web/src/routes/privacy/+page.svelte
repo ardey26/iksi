@@ -19,7 +19,6 @@
     { id: 'extension', title: 'API keys and the browser extension' },
     { id: 'ip-addresses', title: 'IP addresses' },
     { id: 'cookies', title: 'Cookies and local storage' },
-    { id: 'ads', title: 'Ads' },
     { id: 'services', title: 'Services that handle data' },
     { id: 'retention', title: 'How long data is kept' },
     { id: 'deletion', title: 'Deleting your data' },
@@ -56,7 +55,7 @@
         <li>You can shorten links without an account. If you sign in, iksi keeps a few details from Google or X, your links and your profile.</li>
         <li>The address a short link points to is stored encrypted. Clicks are counted by country, device, browser and the site they came from. IP addresses are never stored as they are: clicks have none, and rate limits and reports keep only a keyed hash.</li>
         <li>Your profile page is public, and so is everything you put on it, including payment QR codes.</li>
-        <li>iksi does not sell personal data. Google shows ads on iksi through AdSense, which uses its own cookies.</li>
+        <li>iksi does not sell personal data, shows no ads and sets no advertising or analytics cookies.</li>
         <li>Email <a href="mailto:{CONTACT}">{CONTACT}</a> to get a copy of your data, fix it or delete it.</li>
       </ul>
     </Section>
@@ -211,25 +210,7 @@
         iksi also saves your light or dark theme choice in your browser's local storage, under the name theme. It never
         leaves your device.
       </p>
-      <p>Google's ad code sets its own cookies; see <a href="#ads">Ads</a>.</p>
-    </Section>
-
-    <Section id="ads" title={title('ads')}>
-      <p>
-        Every iksi page loads Google AdSense, shortly after the page finishes loading. Third-party
-        vendors, including Google, use cookies to serve ads based on your earlier visits to iksi and other websites.
-        Google's use of advertising cookies lets it and its partners serve ads based on those visits.
-      </p>
-      <p>
-        You can turn off personalized ads in <a href="https://myadcenter.google.com/" rel="noopener">Google's My Ad Center</a>,
-        or with other vendors at <a href="https://www.aboutads.info/" rel="noopener">aboutads.info</a>. How Google uses data
-        from sites that use its services:
-        <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">policies.google.com/technologies/partner-sites</a>.
-      </p>
-      <p>
-        iksi does not give your account details to Google for ads. Google collects data directly through its ad code. iksi
-        does not show a cookie consent prompt at the moment; you can block or clear these cookies in your browser.
-      </p>
+      <p>iksi shows no ads and sets no advertising or analytics cookies.</p>
     </Section>
 
     <Section id="services" title={title('services')}>
@@ -241,10 +222,9 @@
         <li><strong>GitHub</strong> runs the nightly backup job. The database copy passes through a temporary GitHub machine on its way to Cloudflare.</li>
         <li><strong>Google Safe Browsing</strong> receives link destinations to check them for malware and phishing.</li>
         <li><strong>Google and X</strong> handle sign-in.</li>
-        <li><strong>Google AdSense</strong> shows ads (see <a href="#ads">Ads</a>).</li>
       </ul>
       <p>
-        iksi does not use an analytics service, and its fonts are served from iksi itself. iksi's operator can see stored
+        iksi does not use an analytics or advertising service, and its fonts are served from iksi itself. iksi's operator can see stored
         data to run the service, handle reports and answer requests.
       </p>
       <p>Your data is stored outside the Philippines, mainly in Singapore. Google, X and the other services may process it in other countries.</p>
