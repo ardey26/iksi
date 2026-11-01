@@ -1,5 +1,9 @@
 import { Prisma } from '@prisma/client';
+import { isHttpUrl, MAX_URL_LENGTH } from '@iksi/core';
 import { FLAGGED_VERDICTS, isFlagged } from '#lib/server/link-record.js';
+import { ONE_TIME_TEXT_MAX, type OneTimeKind } from '#lib/one-time.js';
+import { PASSWORD_MIN, PASSWORD_MAX } from '#lib/password-limits.js';
+import { addPrefix, isValidURLServer } from '#lib/utils/urlValidation.js';
 
 /**
  * Burn after reading. A one-time link holds its content (a URL or a text,
@@ -51,4 +55,40 @@ export async function claimOneTime(
       AND ("safeVerdict" IS NULL OR "safeVerdict" NOT IN (${Prisma.join([...FLAGGED_VERDICTS])}))
   `);
   return affected === 1;
+}
+
+export type OneTimeInput =
+  | { ok: true; kind: OneTimeKind; content: string; password: string | null }
+  | { ok: false; error: string };
+
+const bad = (error: string): OneTimeInput => ({ ok: false, error });
+
+/** Validates `{ kind, content, password? }` from a create request. A text is kept byte for byte. */
+export function parseOneTimeInput(input: unknown): OneTimeInput {
+  if (typeof input !== 'object' || input === null) return bad('Invalid input');
+  const { kind, content, password } = input as Record<string, unknown>;
+  if (kind !== 'url' && kind !== 'text') return bad('Choose a URL or a text');
+  if (typeof content !== 'string') return bad('Invalid input');
+
+  let value: string;
+  if (kind === 'text') {
+    if (content.trim() === '') return bad('Enter the text to share');
+    if (content.length > ONE_TIME_TEXT_MAX) {
+      return bad(`Text is too long (max ${ONE_TIME_TEXT_MAX.toLocaleString('en-US')} characters)`);
+    }
+    value = content;
+  } else {
+    if (content.trim() === '') return bad('Enter a valid URL');
+    value = addPrefix(content);
+    if (value.length > MAX_URL_LENGTH) return bad(`URL is too long (max ${MAX_URL_LENGTH} characters)`);
+    if (!isValidURLServer(value) || !isHttpUrl(value)) return bad('Enter a valid URL');
+  }
+
+  if (password === undefined || password === null || password === '') {
+    return { ok: true, kind, content: value, password: null };
+  }
+  if (typeof password !== 'string' || password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
+    return bad(`Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters`);
+  }
+  return { ok: true, kind, content: value, password };
 }

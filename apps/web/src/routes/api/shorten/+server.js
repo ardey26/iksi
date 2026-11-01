@@ -10,6 +10,19 @@ import { classifyPath } from '@iksi/core';
 import { clientOf } from '#lib/server/client.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
+import { BCRYPT_COST } from '#lib/server/link-settings.js';
+import { parseOneTimeInput } from '#lib/server/one-time.js';
+import { ONE_TIME_TTL_MS } from '#lib/one-time.js';
+import bcrypt from 'bcrypt';
+
+/**
+ * Room for a one-time text of 2,000 characters even when every one is
+ * JSON-escaped (6 bytes), plus the rest of the body.
+ */
+const MAX_BODY_BYTES = 16 * 1024;
+
+/** One-time links carry a secret, so their names are longer and harder to guess. */
+const ONE_TIME_SLUG_LENGTH = 10;
 
 /** What anonymous dedupe needs to know about the row already holding a urlHash. */
 const DEDUPE_SELECT = {
@@ -21,7 +34,8 @@ const DEDUPE_SELECT = {
 	maxClicks: true,
 	expiredAt: true,
 	permanent: true,
-	safeVerdict: true
+	safeVerdict: true,
+	oneTime: true
 };
 
 /**
@@ -40,11 +54,12 @@ function reusable(row) {
 		row.maxClicks === null &&
 		row.expiredAt === null &&
 		!row.permanent &&
+		!row.oneTime &&
 		!(row.safeVerdict !== null && FLAGGED_VERDICTS.includes(row.safeVerdict))
 	);
 }
 
-const generateShortURL = async (retries = SHORT_URL.retries) => {
+const generateShortURL = async (retries = SHORT_URL.retries, lengthOfShortUrl = SHORT_URL.length) => {
 	if (!retries) {
 		throw new Error('Number of collisions exceeded maximum retries, please try again.');
 	}
@@ -52,8 +67,6 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 	// Optimized character set (removed confusing chars like 0, O, I, l)
 	const availableChars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 	let shortURL = '';
-
-	const lengthOfShortUrl = SHORT_URL.length;
 
 	// Use crypto for better randomness
 	const randomBytesArray = randomBytes(lengthOfShortUrl);
@@ -74,12 +87,60 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 
 	if (hasCollision) {
 		const newRetries = retries - 1;
-		return generateShortURL(newRetries); // Fixed: added return statement
+		return generateShortURL(newRetries, lengthOfShortUrl);
 	}
 
 	return shortURL;
 };
 
+
+const jsonResponse = (body, status = 200) =>
+	new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+/**
+ * A one-time link: its content goes, encrypted, into `secret` and never into
+ * originalURL or urlHash, so dedupe can never find it or hand it out again.
+ * Unopened, it expires after ONE_TIME_TTL_MS.
+ */
+async function createOneTime(input, customURL, uid) {
+	if (typeof customURL === 'string' && customURL.trim() !== '') {
+		return jsonResponse({ error: 'One-time links get a random name' }, 400);
+	}
+	const parsed = parseOneTimeInput(input);
+	if (!parsed.ok) return jsonResponse({ error: parsed.error }, 400);
+
+	const shortURL = await generateShortURL(SHORT_URL.retries, ONE_TIME_SLUG_LENGTH);
+	const url = await prisma.longURL.create({
+		data: {
+			originalURL: '',
+			urlHash: null,
+			shortURL,
+			userId: uid,
+			oneTime: true,
+			secretKind: parsed.kind,
+			secret: encodeURL(parsed.content),
+			passwordHash: parsed.password ? await bcrypt.hash(parsed.password, BCRYPT_COST) : null,
+			expiresAt: new Date(Date.now() + ONE_TIME_TTL_MS)
+		},
+		select: { id: true, shortURL: true, clickCount: true, createdAt: true, safeVerdict: true, settingsVersion: true }
+	});
+
+	// A flagged destination is never revealed; the URL is checked like any other.
+	if (parsed.kind === 'url') settleVerdictInBackground(url.shortURL, [parsed.content], url.settingsVersion);
+
+	return jsonResponse({
+		shortURL: url.shortURL,
+		link: {
+			id: url.id,
+			shortURL: url.shortURL,
+			originalURL: '',
+			clickCount: url.clickCount,
+			createdAt: url.createdAt,
+			safeVerdict: url.safeVerdict,
+			oneTime: { kind: parsed.kind, state: 'unopened' }
+		}
+	});
+}
 
 export const POST = async (event) => {
 	const { request, cookies } = event;
@@ -101,15 +162,17 @@ export const POST = async (event) => {
 
 		// Check content length
 		const contentLength = request.headers.get('content-length');
-		if (contentLength && parseInt(contentLength) > 4096) { // 4KB limit
+		if (contentLength && parseInt(contentLength) > MAX_BODY_BYTES) {
 			return new Response(JSON.stringify({ error: 'Request body too large' }), {
 				status: 413,
 				headers: { 'Content-Type': 'application/json' }
 			});
 		}
 
-		const { longURL, customURL } = await request.json();
+		const { longURL, customURL, oneTime } = await request.json();
 		const uid = verifyUserSession(cookies.get('user_session'));
+
+		if (oneTime !== undefined) return await createOneTime(oneTime, customURL, uid);
 
 		// Input validation
 		if (!longURL || typeof longURL !== 'string') {

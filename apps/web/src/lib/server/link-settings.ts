@@ -9,7 +9,8 @@ import { isFlagged } from '#lib/server/link-record.js';
 const MAX_URL = 2048;
 const MAX_CLICKS_CAP = 1_000_000_000;
 const INVALID_URL = 'Enter a valid URL';
-const BCRYPT_COST = 10;
+/** Shared with one-time link creation, so every link password is hashed the same way. */
+export const BCRYPT_COST = 10;
 
 export interface SettingsInput {
   destination?: string;
