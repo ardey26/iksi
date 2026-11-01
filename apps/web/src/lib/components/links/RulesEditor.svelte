@@ -341,9 +341,13 @@
     padding: 0.5rem 0.75rem;
     border-radius: 8px;
     color: var(--text-primary);
-    background: var(--bg);
+    background-color: var(--bg);
     border: 1px solid var(--border);
     transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  select.field {
+    height: auto;
+    padding-right: 40px;
   }
   .field:focus {
     outline: none;
