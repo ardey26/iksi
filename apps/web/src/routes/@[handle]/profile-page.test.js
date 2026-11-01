@@ -59,3 +59,16 @@ describe('public profile background', () => {
     expect(img.getAttribute('height')).toBe('56');
   });
 });
+
+describe('public profile Pay button', () => {
+  it('shows the Pay button when the profile has payment methods', () => {
+    const pay = { label: 'tip', methods: [{ id: 'l1', kind: 'link', provider: 'kofi', url: 'https://ko-fi.com/ann' }] };
+    const { getByRole } = render(Page, { data: { ...base, backgroundUrl: null, pay } });
+    expect(getByRole('button', { name: 'Send a tip' })).toBeInTheDocument();
+  });
+
+  it('shows no Pay button without payment methods', () => {
+    const { queryByRole } = render(Page, { data: { ...base, backgroundUrl: null, pay: null } });
+    expect(queryByRole('button', { name: /^(Pay|Send a tip)$/ })).toBeNull();
+  });
+});

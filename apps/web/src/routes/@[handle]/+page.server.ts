@@ -4,6 +4,8 @@ import { decodeURL } from '#lib/server/crypto.js';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 import { mediaUrl } from '#lib/server/media-url.js';
 import { tagProfile } from '#lib/server/profile-cache.js';
+import { readPayMethods } from '#lib/server/pay-methods.js';
+import { payLabelOf } from '#lib/pay-methods.js';
 
 // Popular social domains we recognize on row destinations — used to build
 // Schema.org `sameAs` entries so Google can associate the profile with the
@@ -46,6 +48,8 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
       theme: true,
       accent: true,
       publicClicks: true,
+      payMethods: true,
+      payLabel: true,
       rows: {
         where: { enabled: true, quarantined: false },
         orderBy: { position: 'asc' },
@@ -91,6 +95,10 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
 
   const sameAs = extractSameAs(decoded);
 
+  // Re-validated on read: a stored method that no longer passes is never shown.
+  const payMethods = readPayMethods(p.payMethods);
+  const pay = payMethods.length ? { label: payLabelOf(p.payLabel), methods: payMethods } : null;
+
   // Record the view before responding. Vercel's Node runtime freezes the
   // function once the response is sent, so a fire-and-forget write here was
   // silently dropped. With the function co-located with the DB this is one
@@ -111,6 +119,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
     accent: p.accent,
     publicClicks: p.publicClicks,
     rows,
-    sameAs
+    sameAs,
+    pay
   };
 };

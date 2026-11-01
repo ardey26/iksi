@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import PayButton from '#lib/components/PayButton.svelte';
 
   export let data;
 
@@ -228,6 +229,12 @@
         <p class="text-2xl leading-tight font-medium" style="color: var(--text-primary);">
           {data.bio}
         </p>
+      </div>
+    {/if}
+
+    {#if data.pay}
+      <div class="px-7 sm:px-8 pb-8">
+        <PayButton handle={data.handle} displayName={data.displayName} label={data.pay.label} methods={data.pay.methods} />
       </div>
     {/if}
 

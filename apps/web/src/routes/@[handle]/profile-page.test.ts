@@ -8,6 +8,7 @@ const tagProfile = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('#lib/server/profile-cache.js', () => ({ tagProfile }));
 
 import { load } from './+page.server';
+import { payQrPayload } from '../../test/pay-qr';
 
 const link = (id: number, originalURL: string, passwordHash: string | null = null) => ({
   id,
@@ -94,5 +95,44 @@ describe('profile media urls', () => {
     expect(out.backgroundUrl).toBe(
       'https://www.iksi.app/media/7/background/0b9f1c2e-3d4a-4b5c-8d6e-7f8091a2b3c4.1600.webp'
     );
+  });
+});
+
+describe('profile payment methods', () => {
+  const kofi = { id: 'l1', kind: 'link', provider: 'kofi', url: 'https://ko-fi.com/ann' };
+
+  it('returns no Pay button without methods', async () => {
+    findFirst.mockResolvedValue(profile([]));
+    expect(((await run()) as any).pay).toBeNull();
+  });
+
+  it('returns the methods and label for the Pay button', async () => {
+    const payload = payQrPayload();
+    findFirst.mockResolvedValue({
+      ...profile([]),
+      payLabel: 'tip',
+      payMethods: [{ id: 'q1', kind: 'qr', payload }, kofi]
+    });
+    expect(((await run()) as any).pay).toEqual({
+      label: 'tip',
+      methods: [
+        { id: 'q1', kind: 'qr', payload, name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
+        kofi
+      ]
+    });
+  });
+
+  it('never shows a stored link that fails the allow-list', async () => {
+    findFirst.mockResolvedValue({
+      ...profile([]),
+      payMethods: [{ id: 'l9', kind: 'link', provider: 'paypal', url: 'https://paypal.me.evil.com/x' }]
+    });
+    expect(((await run()) as any).pay).toBeNull();
+  });
+
+  it('selects the payment columns', async () => {
+    findFirst.mockResolvedValue(profile([]));
+    await run();
+    expect(findFirst.mock.calls[0][0].select).toMatchObject({ payMethods: true, payLabel: true });
   });
 });
