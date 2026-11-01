@@ -2,9 +2,13 @@
   import { invalidateAll } from '$app/navigation';
   import ImageUpload from '#lib/components/ImageUpload.svelte';
   import PaymentMethods from '#lib/components/PaymentMethods.svelte';
+  import { Button, Container, Field, Input, PageHeader, Paper, Section, Stack, Switch, Textarea, toast } from '#lib/ui/index.js';
+  import { uid } from '#lib/ui/uid.js';
   import { profileLabel } from '#lib/subdomains.js';
 
   export let data;
+
+  const ids = { scope: uid('scope'), scopeDesc: uid('scope-desc') };
 
   // Reuse `theme` column: numeric-in-string 0..100 (brightness). Legacy values map:
   //   'light' → 100, everything else ('dark' | 'default' | 'mono' | undefined) → 20.
@@ -28,20 +32,19 @@
   let brightness: number = themeToBrightness(data.profile?.theme);
 
   let saving = false;
-  let saved = false;
   let dirty = false;
 
   $: {
-    const origBright = themeToBrightness(data.profile?.theme);
     const orig = {
       displayName: data.profile?.displayName ?? '',
       bio: data.profile?.bio ?? '',
       avatarUrl: savedAvatarUrl,
       accent: data.profile?.accent ?? '#3B82F6',
-      brightness: origBright
+      brightness: themeToBrightness(data.profile?.theme)
     };
     dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
-      || accent !== orig.accent || brightness !== orig.brightness;
+      // The color input reports lowercase hex; case is not a change.
+      || accent.toLowerCase() !== orig.accent.toLowerCase() || brightness !== orig.brightness;
   }
 
   // Uploads are persisted by /api/media immediately; refresh load data so the
@@ -77,9 +80,9 @@
         displayName, bio, avatarUrl, accent,
         theme: String(Math.round(brightness))
       })
-    });
+    }).catch(() => null);
     saving = false;
-    if (res.ok) {
+    if (res?.ok) {
       // Server may have normalized the avatar URL (e.g. Google Drive rewrite);
       // reflect that back into the input.
       const body = await res.json().catch(() => ({}));
@@ -87,12 +90,11 @@
         avatarUrl = body.avatarUrl ?? '';
       }
       savedAvatarUrl = avatarUrl;
-      saved = true;
+      toast('Profile saved', { variant: 'success' });
       await invalidateAll();
-      setTimeout(() => { saved = false; }, 1400);
     } else {
-      const body = await res.json().catch(() => ({}));
-      alert(body.error || 'Save failed');
+      const body = res ? await res.json().catch(() => ({})) : {};
+      toast(body.error || 'Could not save your profile', { variant: 'error' });
     }
   }
 
@@ -102,8 +104,7 @@
   let scopeError = '';
   async function toggleScope() {
     if (scopeSaving) return;
-    const on = !scopeCustomNames;
-    scopeCustomNames = on;
+    const on = scopeCustomNames;
     scopeSaving = true;
     scopeError = '';
     const ok = await fetch('/dashboard/profile', {
@@ -137,321 +138,378 @@
             --p-muted: oklch(from ${accent} ${mL} 0.018 h);`;
   })();
 
-  $: previewName = displayName || data.user.twitterHandle || data.user.googleEmail?.split('@')[0] || '@you';
+  $: placeholderName = data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name';
+  $: previewName = displayName || data.user.twitterHandle || data.user.googleEmail?.split('@')[0] || 'You';
   $: previewHandle = data.user.handle || data.user.twitterHandle || 'you';
   function initials(name: string) {
     const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '·';
+    if (parts.length === 0) return '?';
     if (parts.length === 1) return parts[0].slice(0, 2).toLowerCase();
     return (parts[0][0] + parts[1][0]).toLowerCase();
   }
-  const sampleRows = [
-    { title: 'Website', short: 'me', dest: 'yoursite.com' },
-    { title: 'Latest post', short: 'post', dest: 'blog.io' },
-    { title: 'Newsletter', short: 'sub', dest: 'buttondown.email' }
-  ];
+  const sampleRows = ['Website', 'Latest post', 'Newsletter'];
 </script>
 
 <svelte:head><title>Profile — iksi</title></svelte:head>
 
-<section class="w-full max-w-2xl mx-auto d-scope">
-  <header class="mb-12">
-    <p class="text-sm mb-8" style="color: var(--text-muted);">
-      <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
-    </p>
-    <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Profile</h1>
-  </header>
+<Container width="wide">
+  <PageHeader back="/dashboard" backLabel="Dashboard" title="Profile" description="How your public page looks, and how people pay you.">
+    <svelte:fragment slot="actions">
+      {#if data.user.handle}
+        <Button icon="external" href={`/@${data.user.handle}`} target="_blank" rel="noopener">View page</Button>
+      {/if}
+    </svelte:fragment>
+  </PageHeader>
 
-  <!-- Identity -->
-  <section class="d-section" aria-labelledby="p-identity">
-    <h2 class="d-title" id="p-identity">Identity</h2>
-    <p class="d-desc">How you show up on your public page.</p>
-    <div class="d-spec">
-      <div class="d-row">
-        <span class="d-label">Avatar</span>
-        <div class="d-control">
-          <ImageUpload kind="avatar" value={avatarUrl || null} savedUrl={savedAvatarUrl || null} on:change={onAvatarChange}>
-            <button type="button" on:click={() => (showUrlInput = !showUrlInput)}
-                    class="d-btn d-btn-text" aria-expanded={showUrlInput} aria-controls="p-avatar-url">
-              Paste a URL instead
-            </button>
-          </ImageUpload>
-          {#if showUrlInput}
-            <input id="p-avatar-url" type="url" bind:value={avatarUrl} placeholder="https://..." aria-label="Avatar URL" class="d-field" />
-          {/if}
-        </div>
-      </div>
+  <div class="layout">
+    <div class="edit">
+      <Section title="Identity" description="How you show up on your public page.">
+        <Paper>
+          <Stack gap={20}>
+            <Field label="Avatar" group reserve={false}>
+              <ImageUpload kind="avatar" value={avatarUrl || null} savedUrl={savedAvatarUrl || null} on:change={onAvatarChange}>
+                <Button size="sm" variant="ghost" aria-expanded={showUrlInput} aria-controls="p-avatar-url" on:click={() => (showUrlInput = !showUrlInput)}>
+                  Paste a URL instead
+                </Button>
+              </ImageUpload>
+              {#if showUrlInput}
+                <div class="avatar-url">
+                  <Input id="p-avatar-url" label="Avatar URL" hideLabel inputmode="url" placeholder="https://..." reserve={false} bind:value={avatarUrl} />
+                </div>
+              {/if}
+            </Field>
 
-      <div class="d-row">
-        <label class="d-label" for="p-name">Display name</label>
-        <div class="d-control">
-          <input id="p-name" type="text" bind:value={displayName} maxlength="80"
-                 placeholder={data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name'}
-                 class="d-field" />
-        </div>
-      </div>
+            <Input label="Display name" maxlength="80" placeholder={placeholderName} reserve={false} bind:value={displayName} />
 
-      <div class="d-row">
-        <label class="d-label" for="p-bio">Bio</label>
-        <div class="d-control">
-          <textarea id="p-bio" bind:value={bio} maxlength="200" rows="3" placeholder="A line or two about you."
-                    aria-describedby="p-bio-count" class="d-field"></textarea>
-          <p class="d-hint text-right tabular-nums" id="p-bio-count">{bio.length} of 200</p>
-        </div>
-      </div>
-    </div>
-  </section>
+            <Textarea label="Bio" maxlength="200" rows={3} placeholder="A line or two about you." reserve={false} bind:value={bio}>
+              <span slot="aside" class="t-caption t-muted t-tabular">{bio.length} of 200</span>
+            </Textarea>
+          </Stack>
+        </Paper>
+      </Section>
 
-  <!-- Appearance -->
-  <section class="d-section" aria-labelledby="p-appearance">
-    <h2 class="d-title" id="p-appearance">Appearance</h2>
-    <p class="d-desc">Pick a color and a brightness. The full palette is derived from both.</p>
-    <div class="d-spec">
-      <div class="d-row">
-        <span class="d-label">Accent</span>
-        <div class="d-control d-inline">
-          <label class="swatch" style="background-color: {accent};">
-            <input type="color" bind:value={accent} aria-label="Accent color" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-          </label>
-          <span class="d-readout">{accent.toUpperCase()}</span>
-        </div>
-      </div>
+      <Section title="Appearance" description="Pick a color and a brightness. The palette is derived from both.">
+        <Paper>
+          <Stack gap={20}>
+            <Field label="Accent" group reserve={false} let:labelId>
+              <div class="inline">
+                <label class="swatch" style="background-color: {accent};">
+                  <input type="color" bind:value={accent} aria-label="Accent color" aria-describedby={labelId} />
+                </label>
+                <span class="t-readout t-mono">{accent.toUpperCase()}</span>
+              </div>
+            </Field>
 
-      <div class="d-row">
-        <span class="d-label">Brightness</span>
-        <div class="d-control">
-          <div class="d-inline flex-nowrap">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              bind:value={brightness}
-              class="brightness-slider"
-              aria-label="Palette brightness"
-            />
-            <span class="d-readout readout">{Math.round(brightness)}</span>
+            <Field label="Brightness" group reserve={false} let:labelId>
+              <div class="inline">
+                <span class="t-caption t-muted">Dark</span>
+                <input type="range" min="0" max="100" step="1" bind:value={brightness} class="slider" aria-label="Palette brightness" aria-describedby={labelId} />
+                <span class="t-caption t-muted">Light</span>
+                <span class="t-readout readout">{Math.round(brightness)}</span>
+              </div>
+            </Field>
+
+            <Field label="Background" group reserve={false}>
+              <ImageUpload kind="background" value={backgroundUrl} on:change={onBackgroundChange} />
+            </Field>
+          </Stack>
+        </Paper>
+      </Section>
+
+      <div class="save">
+        <Paper padding="sm">
+          <div class="save-row">
+            <p class="t-label" class:t-muted={!dirty}>{dirty ? 'Unsaved changes' : 'Identity and appearance save together.'}</p>
+            <Button variant="primary" loading={saving} disabled={!dirty} on:click={saveProfile}>Save changes</Button>
           </div>
-          <div class="ends" aria-hidden="true"><span>Dark</span><span>Light</span></div>
-        </div>
-      </div>
-
-      <div class="d-row">
-        <span class="d-label">Background</span>
-        <div class="d-control">
-          <ImageUpload kind="background" value={backgroundUrl} on:change={onBackgroundChange} />
-        </div>
+        </Paper>
       </div>
     </div>
-  </section>
 
-  <!-- Payments: saved as they change, outside the Save button below -->
-  {#if data.payments}
-    <section class="d-section" aria-labelledby="p-payments">
-      <h2 class="d-title" id="p-payments">Payments</h2>
-      <p class="d-desc">A button on your public page that shows how to pay you. Changes save right away. Payers see the name in your QR, so check that it is yours.</p>
-      <p class="d-desc">Your QR may include your mobile number. Anyone who opens Pay can see it.</p>
-      <PaymentMethods methods={data.payments.methods} label={data.payments.label} />
-    </section>
-  {/if}
-
-  <!-- Short links: saved as it changes, outside the Save button below -->
-  <section class="d-section" aria-labelledby="p-links">
-    <h2 class="d-title" id="p-links">Short links</h2>
-    <p class="d-desc">Changes save right away.</p>
-    <div class="d-spec">
-      <div class="d-row">
-        <span class="d-label" id="p-scope-label">Use my handle for custom names</span>
-        <div class="d-control">
-          <div class="d-inline">
-            <button
-              type="button"
-              role="switch"
-              class="d-switch"
-              aria-checked={scopeCustomNames}
-              aria-labelledby="p-scope-label"
-              aria-describedby="p-scope-hint"
-              on:click={toggleScope}
-            ></button>
-            <span class="scope-readout">iksi.app/{scopeCustomNames ? `@${data.user.handle}/` : ''}name</span>
-          </div>
-          <p class="d-hint" id="p-scope-hint">New custom names go under iksi.app/@{data.user.handle}. Links with a random name stay as they are.</p>
-          <p class="d-hint scope-error" role={scopeError ? 'alert' : undefined}>{scopeError}</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Live preview — mirrors the /@handle card layout -->
-  <section class="d-section" aria-labelledby="p-preview">
-    <h2 class="d-title" id="p-preview">Preview</h2>
-    <p class="d-desc">Your public page with these settings.</p>
-    <div class="stage mt-4 transition-colors"
-         style="{paletteStyle} background-color: var(--p-bg);{backgroundUrl ? ` background-image: url('${backgroundUrl}'); background-size: cover; background-position: center;` : ''}">
-      <div class="w-full rounded-2xl overflow-hidden preview-card"
-           style="background: var(--p-surface); border: 1px solid var(--p-border); color: var(--p-text);">
-        <!-- Header: avatar + identity + copy pill -->
-        <div class="p-4 flex items-start gap-3">
-          {#if avatarUrl}
-            <img src={avatarUrl} alt="" class="w-10 h-10 rounded-full object-cover shrink-0"
-                 style="border: 1px solid var(--p-border);" />
-          {:else}
-            <div class="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold"
-                 style="background: oklch(from {accent} 0.90 max(c, 0.08) h); color: var(--p-accent-text);">
-              {initials(previewName)}
+    <aside class="preview" aria-labelledby="p-preview">
+      <h2 id="p-preview" class="t-title">Preview</h2>
+      <p class="t-body t-muted lede">Your public page with these settings.</p>
+      <div class="stage" style="{paletteStyle} background-color: var(--p-bg);{backgroundUrl ? ` background-image: url('${backgroundUrl}'); background-size: cover; background-position: center;` : ''}">
+        <div class="card">
+          <div class="card-head">
+            {#if avatarUrl}
+              <img src={avatarUrl} alt="" class="avatar" />
+            {:else}
+              <div class="avatar initials" style="background: oklch(from {accent} 0.90 max(c, 0.08) h); color: var(--p-accent-text);">{initials(previewName)}</div>
+            {/if}
+            <div class="who">
+              <div class="name">{previewName}</div>
+              <div class="handle">{profileLabel(previewHandle, !!data.subdomains)}</div>
             </div>
-          {/if}
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold tracking-tight leading-tight truncate" style="color: var(--p-text);">{previewName}</div>
-            <div class="text-xs mt-0.5 truncate" style="color: var(--p-accent-text);">{profileLabel(previewHandle, !!data.subdomains)}</div>
+            <span class="pill">Copy</span>
           </div>
-          <span class="px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
-                style="background: var(--p-text); color: var(--p-bg);">Copy</span>
-        </div>
-
-        <!-- Bio -->
-        {#if bio}
-          <div class="px-4 pb-4">
-            <p class="text-sm leading-tight font-medium" style="color: var(--p-text);">{bio}</p>
-          </div>
-        {/if}
-
-        <!-- Sample rows (kebab shown as visual cue) -->
-        <div>
-          {#each sampleRows as row, i}
-            <div class="px-4 py-3 flex items-center gap-3" style="border-top: 1px solid var(--p-border);">
-              <span class="text-xs tabular-nums" style="color: var(--p-muted); opacity: 0.6;">{i + 1}.</span>
-              <div class="flex-1 min-w-0 text-sm font-semibold tracking-tight truncate" style="color: var(--p-text);">{row.title}</div>
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" style="color: var(--p-muted);" aria-hidden="true">
-                <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
-              </svg>
-            </div>
+          {#if bio}<p class="bio">{bio}</p>{/if}
+          {#each sampleRows as row}
+            <div class="sample">{row}</div>
           {/each}
-        </div>
-
-        <!-- Footer -->
-        <div class="px-4 pb-3 pt-2 text-center">
-          <span class="text-xs" style="color: var(--p-muted);">
-            {previewHandle} shortens links with <span class="underline decoration-1 underline-offset-2" style="color: var(--p-text);">iksi</span>
-          </span>
+          <p class="foot">{previewHandle} shortens links with <span>iksi</span></p>
         </div>
       </div>
-    </div>
-  </section>
+    </aside>
 
-  <!-- Save profile changes: last thing on the page -->
-  <div class="save-bar">
-    <button on:click={saveProfile} disabled={!dirty || saving} class="d-btn d-btn-primary">
-      {saving ? 'Saving…' : saved ? 'Saved' : 'Save changes'}
-    </button>
-    <span class="text-[13px]" style="color: var(--text-muted); visibility: {dirty && !saving ? 'visible' : 'hidden'};">Unsaved changes</span>
+    <div class="rest">
+      {#if data.payments}
+        <PaymentMethods methods={data.payments.methods} label={data.payments.label} />
+      {/if}
+
+      <Section title="Short links" description="Changes save right away.">
+        <Paper>
+          <div class="setting">
+            <div class="setting-text">
+              <p id={ids.scope} class="t-body t-primary setting-title">Use my handle for custom names</p>
+              <p id={ids.scopeDesc} class="t-label t-muted">New custom names go under iksi.app/@{data.user.handle}. Links with a random name stay as they are.</p>
+              <p class="t-label t-mono example">iksi.app/{scopeCustomNames ? `@${data.user.handle}/` : ''}name</p>
+            </div>
+            <Switch labelledby={ids.scope} describedby={ids.scopeDesc} disabled={scopeSaving} bind:checked={scopeCustomNames} on:change={toggleScope} />
+          </div>
+          <p class="t-caption scope-error" role={scopeError ? 'alert' : undefined}>{scopeError}</p>
+        </Paper>
+      </Section>
+    </div>
   </div>
-</section>
+</Container>
 
 <style>
-  .scope-readout {
-    min-width: 0;
-    font-size: 13px;
-    color: var(--text-muted);
-    overflow-wrap: anywhere;
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'edit' 'preview' 'rest';
+    row-gap: 48px;
   }
-  /* Keeps its height when empty, so an error never moves the page. */
-  .scope-error {
-    margin-top: 4px;
-    min-height: 18px;
-    color: var(--error);
+  .edit { grid-area: edit; min-width: 0; }
+  .rest { grid-area: rest; min-width: 0; }
+  .preview { grid-area: preview; min-width: 0; }
+  @media (min-width: 1024px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr) 320px;
+      grid-template-areas: 'edit preview' 'rest preview';
+      grid-template-rows: auto 1fr;
+      column-gap: 48px;
+    }
+    .preview {
+      position: sticky;
+      top: 96px;
+      align-self: start;
+    }
+  }
+
+  .avatar-url { margin-top: 12px; }
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
   }
   .swatch {
     position: relative;
-    display: block;
     flex: none;
     width: 40px;
     height: 40px;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+  }
+  .swatch input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
     cursor: pointer;
   }
   .swatch:focus-within {
-    outline: 1px solid var(--border-focus);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
-  /* Flat hardware fader: hairline track, square cap. */
-  .brightness-slider {
+  /* A pill track with a round white thumb, like the kit's Switch. */
+  .slider {
     -webkit-appearance: none;
     appearance: none;
     flex: 1 1 auto;
     min-width: 0;
     height: 24px;
+    margin: 0;
     background: transparent;
     cursor: pointer;
   }
-  .brightness-slider::-webkit-slider-runnable-track {
-    height: 2px;
-    background-color: var(--border);
-    border-radius: 1px;
+  .slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background-color: var(--switch-off);
   }
-  .brightness-slider::-moz-range-track {
-    height: 2px;
-    background-color: var(--border);
-    border-radius: 1px;
+  .slider::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background-color: var(--switch-off);
   }
-  .brightness-slider::-webkit-slider-thumb {
+  .slider::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background-color: var(--text-primary);
+  }
+  .slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px;
-    height: 20px;
-    margin-top: -9px;
-    background-color: var(--text-primary);
-    border: none;
-    border-radius: 3px;
+    width: 18px;
+    height: 18px;
+    margin-top: -7px;
+    background-color: #ffffff;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.06);
   }
-  .brightness-slider::-moz-range-thumb {
-    width: 14px;
-    height: 20px;
-    background-color: var(--text-primary);
-    border: none;
-    border-radius: 3px;
+  .slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background-color: #ffffff;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(0 0 0 / 0.06);
   }
-  .brightness-slider:focus {
-    outline: none;
-  }
-  .brightness-slider:focus-visible::-webkit-slider-thumb {
-    outline: 1px solid var(--border-focus);
-    outline-offset: 2px;
-  }
-  .brightness-slider:focus-visible::-moz-range-thumb {
-    outline: 1px solid var(--border-focus);
-    outline-offset: 2px;
+  .slider:focus { outline: none; }
+  .slider:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .slider:focus-visible::-moz-range-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 639px) {
+    /* 44px touch targets on phones. */
+    .swatch { width: 44px; height: 44px; }
+    .slider { height: 44px; }
   }
   .readout {
-    width: 32px;
+    width: 28px;
     text-align: right;
-  }
-  .ends {
-    display: flex;
-    justify-content: space-between;
-    margin-right: 48px;
-    font-size: 12px;
-    color: var(--text-muted);
+    color: var(--text-primary);
   }
 
+  .save {
+    position: sticky;
+    bottom: 16px;
+    z-index: 5;
+    margin-top: 24px;
+  }
+  .save :global(.paper) { box-shadow: var(--overlay-shadow); }
+  .save-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-left: 4px;
+  }
+  .save-row p { margin: 0; }
+
+  .setting {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .setting-text p { margin: 0; }
+  .setting-title { font-weight: 500; }
+  .example {
+    margin-top: 8px !important;
+    color: var(--text-primary);
+  }
+  .scope-error {
+    min-height: 16px;
+    margin: 8px 0 -8px;
+    color: var(--error);
+  }
+
+  .preview h2 { margin: 0; }
+  .lede { margin: 4px 0 16px; }
   .stage {
     padding: 24px;
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-paper);
   }
-  .preview-card {
+  .card {
+    overflow: hidden;
+    color: var(--p-text);
+    background: var(--p-surface);
+    border: 1px solid var(--p-border);
+    border-radius: 16px;
     box-shadow:
       0 16px 40px -14px oklch(from var(--accent) 0.15 0.08 h / 0.35),
       0 4px 14px -4px oklch(from var(--accent) 0.15 0.04 h / 0.18);
   }
-
-  .save-bar {
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+  .avatar {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--p-border);
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .initials {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-top: 48px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    border: 0;
+  }
+  .who { flex: 1; min-width: 0; }
+  .name,
+  .handle {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .name {
+    font-size: 14px;
+    line-height: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .handle {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--p-accent-text);
+  }
+  .pill {
+    flex: none;
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--p-bg);
+    background: var(--p-text);
+    border-radius: 999px;
+  }
+  .bio {
+    margin: 0;
+    padding: 0 16px 16px;
+    font-size: 14px;
+    line-height: 18px;
+    font-weight: 500;
+  }
+  .sample {
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    border-top: 1px solid var(--p-border);
+  }
+  .foot {
+    margin: 0;
+    padding: 8px 16px 12px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--p-muted);
+  }
+  .foot span {
+    color: var(--p-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 </style>

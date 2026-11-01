@@ -1,5 +1,8 @@
 <script lang="ts">
+  // An image field for the profile editor: a preview, Upload and Remove.
+  // Uploads are stored by /api/media straight away.
   import { createEventDispatcher } from 'svelte';
+  import { Button } from '#lib/ui/index.js';
 
   export let kind: 'avatar' | 'background';
   export let value: string | null = null;
@@ -8,12 +11,15 @@
   // unsaved local one (e.g. a typed URL) and is cleared locally.
   // undefined means "value is always the stored image".
   export let savedUrl: string | null | undefined = undefined;
+  /** Accessible name for the Upload button's target, e.g. "avatar". */
+  export let name = kind;
 
   const MAX_BYTES = 4 * 1024 * 1024;
   const dispatch = createEventDispatcher<{ change: { url: string | null; persisted: boolean } }>();
 
   let input: HTMLInputElement;
   let busy = false;
+  let removing = false;
   let error = '';
 
   $: isAvatar = kind === 'avatar';
@@ -56,7 +62,7 @@
       dispatch('change', { url: null, persisted: false });
       return;
     }
-    busy = true;
+    busy = removing = true;
     try {
       const res = await fetch(`/api/media?kind=${kind}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -69,35 +75,35 @@
     } catch {
       error = 'Could not remove image.';
     } finally {
-      busy = false;
+      busy = removing = false;
     }
   }
 </script>
 
 <div class="upload">
-  <div class="flex items-center gap-4">
-    <div class="frame" class:avatar={isAvatar}>
-      {#if value}
-        <img src={value} alt="" class="w-full h-full object-cover" />
-      {/if}
+  <div class="body">
+    <div class="frame" class:avatar={isAvatar} class:empty={!value} aria-busy={busy || undefined}>
+      {#if value}<img src={value} alt="" />{/if}
     </div>
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
-      <button type="button" on:click={() => input.click()} disabled={busy} class="d-btn d-btn-text primary">Upload</button>
+    <div class="actions">
+      <Button size="sm" icon="plus" loading={busy && !removing} disabled={busy} aria-label="Upload {name}" on:click={() => input.click()}>Upload</Button>
       {#if value}
-        <button type="button" on:click={remove} disabled={busy} class="d-btn d-btn-text d-btn-danger">Remove</button>
+        <Button size="sm" variant="danger" loading={removing} disabled={busy} on:click={remove}>Remove</Button>
       {/if}
       <slot />
-      <span class="w-4 h-4 shrink-0 flex items-center justify-center" aria-live="polite">
-        {#if busy}<span class="spinner" role="status" aria-label="Uploading"></span>{/if}
-      </span>
     </div>
   </div>
-  <p class="err" role={error ? 'alert' : undefined}>{error}</p>
+  <p class="err t-caption" role={error ? 'alert' : undefined}>{error}</p>
   <input bind:this={input} type="file" class="hidden" on:change={onPick}
          accept="image/jpeg,image/png,image/webp,image/gif,image/avif" />
 </div>
 
 <style>
+  .body {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
   .frame {
     display: flex;
     flex: none;
@@ -106,23 +112,35 @@
     width: 160px;
     height: 90px;
     overflow: hidden;
-    background-color: var(--surface);
+    background-color: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
   }
+  .frame.empty { border-style: dashed; }
   .frame.avatar {
     width: 64px;
     height: 64px;
-    border-radius: 12px;
+    border-radius: 50%;
   }
-  .primary {
-    color: var(--text-primary);
+  .frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  /* Keeps its line, so an error never moves the layout. */
   .err {
-    min-height: 18px;
-    margin-top: 8px;
-    font-size: 13px;
-    line-height: 18px;
+    min-height: 16px;
+    margin: 6px 0 0;
     color: var(--error);
+  }
+  @media (max-width: 639px) {
+    .frame:not(.avatar) { width: 112px; height: 63px; }
   }
 </style>

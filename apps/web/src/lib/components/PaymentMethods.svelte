@@ -3,7 +3,22 @@
   // Every change is saved immediately by /api/pay-methods. Banks are never
   // listed here: each QR names its own (#lib/pay-institutions).
   import { tick } from 'svelte';
-  import PayMark from './PayMark.svelte';
+  import {
+    Button,
+    DragHandle,
+    EmptyState,
+    Icon,
+    IconButton,
+    Input,
+    Logo,
+    Monogram,
+    Paper,
+    Row,
+    Section,
+    Segmented,
+    SortableList,
+    Stack
+  } from '#lib/ui/index.js';
   import { defaultQrLabel, institutionById } from '#lib/pay-institutions.js';
   import {
     MAX_METHOD_LABEL_LENGTH,
@@ -16,12 +31,13 @@
     type PayMethod,
     type QrMethod
   } from '#lib/pay-methods.js';
+  import { displayUrl } from '#lib/format.js';
 
   export let methods: PayMethod[] = [];
   export let label: PayLabel = 'pay';
 
   const MAX_BYTES = 4 * 1024 * 1024;
-  const LABELS: PayLabel[] = ['pay', 'tip'];
+  const LABELS = (['pay', 'tip'] as PayLabel[]).map((value) => ({ value, label: PAY_LABEL_TEXT[value] }));
 
   /** What happened to one picked image, or to a pasted link. */
   type Result = { file: string; ok: boolean; text: string };
@@ -30,14 +46,17 @@
   let error = '';
   let labelError = '';
   let busy = false;
+  let uploading = false;
   let linkOpen = false;
   let linkUrl = '';
+  let linkError = '';
   // The QR being renamed, and the name being typed.
   let editing: string | null = null;
   let draft = '';
   let renameError = '';
+  let confirming: string | null = null;
   let fileInput: HTMLInputElement;
-  let listEl: HTMLElement;
+  let root: HTMLElement;
 
   $: full = methods.length >= MAX_PAY_METHODS;
 
@@ -54,13 +73,24 @@
 
   function clearMessages() {
     error = '';
+    linkError = '';
     results = [];
   }
+
+  const focus = async (sel: string) => {
+    await tick();
+    root?.querySelector<HTMLElement>(sel)?.focus();
+  };
 
   /** "Added GCash": the name the server gave the method it added. */
   function addedText(body: any): string {
     const m = methods.find((x) => x.id === body.added);
     return m ? `Added ${methodTitle(m)}` : 'Added';
+  }
+
+  function logoOf(m: PayMethod) {
+    const info = m.kind === 'qr' ? institutionById(m.institution) : null;
+    return info?.logo ? info : null;
   }
 
   async function uploadOne(file: File): Promise<Result> {
@@ -81,10 +111,10 @@
     const files = [...(target.files ?? [])];
     target.value = '';
     if (files.length === 0 || busy) return;
-    busy = true;
+    busy = uploading = true;
     clearMessages();
     for (const file of files) results = [...results, await uploadOne(file)];
-    busy = false;
+    busy = uploading = false;
   }
 
   async function addLink() {
@@ -97,11 +127,21 @@
     const { ok, body } = await send('/api/pay-methods', { method: 'POST', body: form });
     busy = false;
     if (!ok) {
-      error = body.error || 'Could not add that link.';
+      linkError = body.error || 'Could not add that link.';
       return;
     }
     results = [{ file: '', ok: true, text: addedText(body) }];
     linkUrl = '';
+  }
+
+  // Removing confirms inline; keyboard focus follows the confirm in and out.
+  function ask(m: PayMethod) {
+    confirming = m.id;
+    focus(`[data-pay-cancel="${m.id}"]`);
+  }
+  function keep(m: PayMethod) {
+    confirming = null;
+    focus(`[data-pay-remove="${m.id}"]`);
   }
 
   async function remove(m: PayMethod) {
@@ -110,24 +150,21 @@
     clearMessages();
     const { ok, body } = await send(`/api/pay-methods?id=${encodeURIComponent(m.id)}`, { method: 'DELETE' });
     busy = false;
+    confirming = null;
     if (!ok) error = body.error || 'Could not remove that payment method.';
   }
-
-  const focusRename = async (id: string) => {
-    await tick();
-    listEl?.querySelector<HTMLButtonElement>(`[data-rename="${id}"]`)?.focus();
-  };
 
   function startRename(m: QrMethod) {
     editing = m.id;
     draft = m.label;
     renameError = '';
+    focus(`[data-rename-field="${m.id}"]`);
   }
 
   function cancelRename(id: string) {
     editing = null;
     renameError = '';
-    focusRename(id);
+    focus(`[data-rename="${id}"]`);
   }
 
   async function saveRename(m: QrMethod) {
@@ -147,38 +184,24 @@
     cancelRename(m.id);
   }
 
-  function focusOnMount(node: HTMLInputElement) {
-    node.focus();
-    node.select();
-  }
-
-  // Order sets which method the Pay sheet opens on. Moves show at once and are put back if saving fails.
-  async function move(i: number, by: -1 | 1) {
-    const j = i + by;
-    if (busy || j < 0 || j >= methods.length) return;
+  // Order sets which method the Pay sheet opens on. SortableList has already
+  // moved the row; the order is saved, and put back if saving fails.
+  async function saveOrder(e: CustomEvent<{ ids: string[] }>) {
     const prev = methods;
-    const next = [...methods];
-    [next[i], next[j]] = [next[j], next[i]];
-    const id = next[j].id;
-    methods = next;
+    const byId = new Map(methods.map((m) => [m.id, m]));
+    methods = e.detail.ids.map((id) => byId.get(id)!).filter(Boolean);
     busy = true;
     clearMessages();
     const { ok, body } = await send('/api/pay-methods', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: next.map((m) => m.id) })
+      body: JSON.stringify({ order: methods.map((m) => m.id) })
     });
     busy = false;
     if (!ok) {
       methods = prev;
       error = body.error || 'Could not save the order.';
-      return;
     }
-    // Keep focus on the moved method, on the button that can still move it.
-    await tick();
-    const btn = (dir: string) => listEl?.querySelector<HTMLButtonElement>(`[data-move="${id}:${dir}"]`);
-    const same = btn(by < 0 ? 'up' : 'down');
-    (same && !same.disabled ? same : btn(by < 0 ? 'down' : 'up'))?.focus();
   }
 
   async function setLabel(next: PayLabel) {
@@ -196,175 +219,178 @@
       labelError = 'Could not save the label.';
     }
   }
+
+  function toggleLink() {
+    linkOpen = !linkOpen;
+    if (linkOpen) focus('[data-act="pay-link"]');
+  }
 </script>
 
-<div class="d-spec" bind:this={listEl}>
-  {#each methods as m, i (m.id)}
-    <div class="d-row">
-      <span class="d-label">{methodTitle(m)}</span>
-      <div class="d-control method">
-        {#if m.kind === 'qr' && editing === m.id}
-          <div class="rename">
-            <form class="d-inline flex-nowrap" on:submit|preventDefault={() => saveRename(m)}>
-              <input type="text" class="d-field" bind:value={draft} maxlength={MAX_METHOD_LABEL_LENGTH}
-                     aria-label="Name for {m.label}" autocomplete="off" use:focusOnMount
-                     on:keydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); cancelRename(m.id); } }} />
-              <button type="submit" class="d-btn d-btn-secondary shrink-0" disabled={busy}>Save</button>
-              <button type="button" class="d-btn d-btn-text shrink-0" on:click={() => cancelRename(m.id)}>Cancel</button>
-            </form>
-            {#if renameError}
-              <p class="msg err" role="alert">{renameError}</p>
-            {:else}
-              <p class="d-hint">Up to {MAX_METHOD_LABEL_LENGTH} characters. Leave empty to use {defaultQrLabel(institutionById(m.institution))}.</p>
-            {/if}
-          </div>
+<Section title="Payments" description="A Pay button on your public page. People pick a method and pay you directly. Changes save right away.">
+  <svelte:fragment slot="actions">
+    <Segmented label="Button label" options={LABELS} value={label} on:change={(e) => setLabel(e.detail.value)} />
+  </svelte:fragment>
+
+  <div class="payments" bind:this={root}>
+    <Stack gap={16}>
+      {#if labelError}<p class="t-label err" role="alert">{labelError}</p>{/if}
+
+      <Paper padding="none">
+        {#if methods.length === 0}
+          <EmptyState icon="wallet" title="No payment methods yet" description="Add a QR from your bank or e-wallet, or a payment link." />
         {:else}
-          <div class="who">
-            <PayMark institution={m.kind === 'qr' ? m.institution : null} label={methodTitle(m)} size={32} alt="" />
-            <div class="min-w-0">
-              {#if m.kind === 'qr'}
-                <p class="primary">Pays to {titleCase(m.name)}</p>
-                <p class="meta">{qrPlace(m)}</p>
-                <p class="meta">Pays in {m.currency}</p>
+          <SortableList label="Payment methods" items={methods} name={methodTitle} disabled={busy || editing !== null} on:reorder={saveOrder} let:item={m} let:handle>
+            {@const logo = logoOf(m)}
+            <Row muted={busy && confirming === m.id}>
+              <svelte:fragment slot="leading">
+                <DragHandle {handle} />
+                {#if logo}
+                  <Logo src={logo.logo} inset={logo.wordmark ? 0.1 : 0} />
+                {:else}
+                  <Monogram name={methodTitle(m)} />
+                {/if}
+              </svelte:fragment>
+
+              {#if m.kind === 'qr' && editing === m.id}
+                <form class="rename" on:submit|preventDefault={() => saveRename(m)}>
+                  <Input
+                    label="Name for {m.label}"
+                    hideLabel
+                    bind:value={draft}
+                    maxlength={MAX_METHOD_LABEL_LENGTH}
+                    autocomplete="off"
+                    data-rename-field={m.id}
+                    error={renameError}
+                    hint="Up to {MAX_METHOD_LABEL_LENGTH} characters. Empty uses {defaultQrLabel(institutionById(m.institution))}."
+                    on:focus={(e) => e.currentTarget.select()}
+                    on:keydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelRename(m.id); } }}
+                  />
+                </form>
               {:else}
-                <p class="primary url">{m.url}</p>
+                <span class="clip">{methodTitle(m)}</span>
               {/if}
-            </div>
-          </div>
-          <div class="actions">
-            {#if methods.length > 1}
-              <button type="button" class="d-icon" disabled={busy || i === 0} data-move="{m.id}:up"
-                      aria-label="Move {methodTitle(m)} up" on:click={() => move(i, -1)}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
-              </button>
-              <button type="button" class="d-icon" disabled={busy || i === methods.length - 1} data-move="{m.id}:down"
-                      aria-label="Move {methodTitle(m)} down" on:click={() => move(i, 1)}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
-              </button>
-            {/if}
-            {#if m.kind === 'qr'}
-              <button type="button" class="d-btn d-btn-text" disabled={busy} data-rename={m.id}
-                      aria-label="Rename {m.label}" on:click={() => startRename(m)}>Rename</button>
-            {/if}
-            <button type="button" class="d-btn d-btn-text d-btn-danger" disabled={busy}
-                    aria-label="Remove {methodTitle(m)}" on:click={() => remove(m)}>Remove</button>
-          </div>
+
+              <svelte:fragment slot="subtitle">
+                {#if editing === m.id}
+                  <!-- The field's own hint line says what a name can be. -->
+                {:else if confirming === m.id}
+                  <span class="line">Remove it from your Pay button?</span>
+                {:else if m.kind === 'qr'}
+                  <span class="line" title="Pays to {titleCase(m.name)}">Pays to {titleCase(m.name)}</span>
+                  <span class="line" title={qrPlace(m)}>{qrPlace(m)}</span>
+                {:else}
+                  <span class="line" title={m.url}>{displayUrl(m.url)}</span>
+                {/if}
+              </svelte:fragment>
+
+              <svelte:fragment slot="meta">
+                {#if m.kind === 'qr' && editing !== m.id}<span class="t-label currency" title="Pays in {m.currency}">{m.currency}</span>{/if}
+              </svelte:fragment>
+
+              <svelte:fragment slot="actions">
+                {#if m.kind === 'qr' && editing === m.id}
+                  <Button size="sm" variant="ghost" on:click={() => cancelRename(m.id)}>Cancel</Button>
+                  <Button size="sm" loading={busy} on:click={() => saveRename(m)}>Save</Button>
+                {:else if confirming === m.id}
+                  <Button size="sm" variant="ghost" data-pay-cancel={m.id} disabled={busy} on:click={() => keep(m)}>Cancel</Button>
+                  <Button size="sm" variant="danger" loading={busy} on:click={() => remove(m)}>Remove</Button>
+                {:else}
+                  {#if m.kind === 'qr'}
+                    <Button size="sm" variant="ghost" data-rename={m.id} disabled={busy} aria-label="Rename {m.label}" on:click={() => startRename(m)}>Rename</Button>
+                  {/if}
+                  <IconButton icon="trash" variant="danger" label="Remove {methodTitle(m)}" data-pay-remove={m.id} disabled={busy} on:click={() => ask(m)} />
+                {/if}
+              </svelte:fragment>
+            </Row>
+          </SortableList>
         {/if}
-      </div>
-    </div>
-  {/each}
+      </Paper>
 
-  <div class="d-row">
-    <span class="d-label">Add a method</span>
-    <div class="d-control">
       {#if full}
-        <p class="meta limit">You have {MAX_PAY_METHODS} payment methods, the most a profile can have. Remove one to add another.</p>
+        <p class="t-label t-muted">You have {MAX_PAY_METHODS} payment methods, the most a profile can have. Remove one to add another.</p>
       {:else}
-        <div class="d-inline">
-          <button type="button" class="d-btn d-btn-primary" disabled={busy} on:click={() => fileInput.click()}>Add payment QR</button>
-          <button type="button" class="d-btn d-btn-secondary" aria-expanded={linkOpen} aria-controls="pay-link"
-                  on:click={() => (linkOpen = !linkOpen)}>Add payment link</button>
-          <span class="w-4 h-4 shrink-0 flex items-center justify-center">
-            {#if busy}<span class="spinner" role="progressbar" aria-label="Saving"></span>{/if}
-          </span>
-        </div>
-        <p class="d-hint">Pick one or more screenshots of the payment QR in your bank or e-wallet app. Each image is read, then discarded.</p>
+        <Stack gap={12}>
+          <Stack direction="row" gap={8} wrap>
+            <Button variant={methods.length === 0 ? 'primary' : 'secondary'} icon="qr" loading={uploading} disabled={busy} on:click={() => fileInput.click()}>Add payment QR</Button>
+            <Button icon="link" aria-expanded={linkOpen} aria-controls="pay-link" on:click={toggleLink}>Add payment link</Button>
+          </Stack>
+          <p class="t-caption t-muted">Pick one or more screenshots of the payment QR in your bank or e-wallet app. Each image is read, then discarded.</p>
 
-        <!-- Progressive disclosure: the panel animates its height open, so nothing below jumps. -->
-        <div id="pay-link" class="reveal" class:open={linkOpen} aria-hidden={!linkOpen} inert={!linkOpen}>
-          <div>
-            <div class="panel">
-              <form class="d-inline flex-nowrap" on:submit|preventDefault={addLink}>
-                <input type="url" class="d-field" bind:value={linkUrl} aria-label="Payment link"
-                       placeholder="https://paypal.me/you" autocomplete="off" spellcheck="false" />
-                <button type="submit" class="d-btn d-btn-secondary shrink-0" disabled={busy || !linkUrl.trim()}>Add link</button>
+          <!-- Progressive disclosure: the panel animates its height open, so nothing below jumps. -->
+          <div id="pay-link" class="reveal" class:open={linkOpen} aria-hidden={!linkOpen} inert={!linkOpen}>
+            <div>
+              <form class="link-form" on:submit|preventDefault={addLink}>
+                <Input
+                  label="Payment link"
+                  inputmode="url"
+                  placeholder="https://paypal.me/you"
+                  autocomplete="off"
+                  spellcheck="false"
+                  data-act="pay-link"
+                  error={linkError}
+                  hint="PayPal, Venmo, Cash App, Wise, Revolut, Ko-fi, Buy Me a Coffee or Stripe."
+                  bind:value={linkUrl}
+                />
+                <Button type="submit" loading={busy && !uploading && linkOpen} disabled={!linkUrl.trim()}>Add link</Button>
               </form>
-              <p class="d-hint">PayPal, Venmo, Cash App, Wise, Revolut, Ko-fi, Buy Me a Coffee or Stripe.</p>
             </div>
           </div>
-        </div>
+        </Stack>
       {/if}
+
       <div class="msg" role="status">
         {#if error}
           <p class="err" role="alert">{error}</p>
         {:else if results.length === 1}
-          <p class:err={!results[0].ok} role={results[0].ok ? undefined : 'alert'}>{results[0].text}</p>
+          <p class:err={!results[0].ok} class:ok={results[0].ok} role={results[0].ok ? undefined : 'alert'}>{results[0].text}</p>
         {:else if results.length > 1}
           <ul aria-label="Upload results">
             {#each results as r}<li class:err={!r.ok}>{r.file}: {r.text}</li>{/each}
           </ul>
         {/if}
       </div>
+
+      <p class="note t-caption t-muted">
+        <Icon name="info" />
+        <span>
+          <span class="block">Payers see the name in your QR, so check that it is yours.</span>
+          <span class="block">Your QR may include your mobile number. Anyone who opens Pay can see it.</span>
+        </span>
+      </p>
+
       <input bind:this={fileInput} type="file" class="hidden" multiple on:change={onPick}
              accept="image/jpeg,image/png,image/webp,image/gif,image/avif" />
-    </div>
+    </Stack>
   </div>
-
-  <div class="d-row">
-    <span class="d-label" id="pay-label-label">Button label</span>
-    <div class="d-control">
-      <div class="d-seg" role="radiogroup" aria-labelledby="pay-label-label">
-        {#each LABELS as l}
-          <label class="d-key">
-            <input type="radio" class="sr-only" name="pay-label" value={l} checked={label === l}
-                   on:change={() => setLabel(l)} />
-            <span>{PAY_LABEL_TEXT[l]}</span>
-          </label>
-        {/each}
-      </div>
-      <p class="msg err" role={labelError ? 'alert' : undefined}>{labelError}</p>
-    </div>
-  </div>
-</div>
+</Section>
 
 <style>
-  .method {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    min-height: var(--d-ctl);
-    padding-top: calc((var(--d-ctl) - 20px) / 2);
+  .clip,
+  .line {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .who {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    min-width: 0;
-  }
-  .who :global(.pay-mark) { margin-top: -6px; }
-  .actions {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 4px;
-    margin-top: calc((20px - var(--d-ctl)) / 2);
-  }
-  .actions .d-btn { margin-left: 8px; }
-  .rename {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-top: calc((20px - var(--d-ctl)) / 2);
-  }
-  .rename .d-field { flex: 1 1 auto; min-width: 0; }
-  .primary {
-    font-size: 14px;
-    line-height: 20px;
-    font-weight: 500;
-    color: var(--text-primary);
-    overflow-wrap: anywhere;
-  }
-  .url {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px;
-    font-weight: 400;
-  }
-  .meta {
+  .rename { margin: 4px 0 -4px; }
+  .msg {
     font-size: 13px;
     line-height: 18px;
     color: var(--text-muted);
   }
-  .limit { padding-top: calc((var(--d-ctl) - 18px) / 2); }
+  .msg:empty { display: none; }
+  .msg p,
+  .msg ul { margin: 0; padding: 0; list-style: none; }
+  .msg .ok { color: var(--success); }
+  .err { margin: 0; color: var(--error); }
+  .msg .err { color: var(--error); }
+  .note {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+  }
+  .note :global(.ui-icon) { margin-top: 0; color: var(--text-faint); }
+  .block { display: block; }
+  p.t-caption { margin: 0; }
 
   /* Height animates from 0 to the content's own (DESIGN.md, progressive disclosure). */
   .reveal {
@@ -372,7 +398,7 @@
     grid-template-rows: 0fr;
     opacity: 0;
     visibility: hidden;
-    transition: grid-template-rows var(--duration-slow) var(--ease-out), opacity var(--duration-slow) var(--ease-out), visibility 0s linear var(--duration-slow);
+    transition: grid-template-rows var(--duration-normal) var(--ease-out), opacity var(--duration-normal) var(--ease-out), visibility 0s linear var(--duration-normal);
   }
   .reveal.open {
     grid-template-rows: 1fr;
@@ -381,23 +407,22 @@
     transition-delay: 0s;
   }
   .reveal > div { min-height: 0; overflow: hidden; }
-  /* Room for the focus rings inside the clipped panel. */
-  .panel { padding: 12px 3px 3px; }
-  .panel .d-field { flex: 1 1 auto; min-width: 0; }
-  .msg {
-    min-height: 18px;
-    margin-top: 8px;
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--text-muted);
+  .link-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    /* Room for the focus ring inside the clipped panel. */
+    padding: 2px;
   }
-  .msg .err,
-  .msg.err { color: var(--error); }
-
+  .link-form > :global(button) { margin-top: 26px; }
   @media (max-width: 639px) {
-    .method { flex-direction: column; gap: 8px; }
-    .actions { margin-top: 0; margin-left: -6px; }
-    .rename { margin-top: 0; width: 100%; }
+    .link-form { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .link-form > :global(button) { margin-top: 0; justify-self: start; }
+  }
+  /* Phones give the room to who it pays; the currency shows from 640px. */
+  @media (max-width: 639px) {
+    .currency { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .reveal { transition: none; }

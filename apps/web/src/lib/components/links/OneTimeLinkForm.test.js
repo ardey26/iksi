@@ -16,12 +16,11 @@ function mockFetch(status, body) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('OneTimeLinkForm (dashboard)', () => {
-  it('is a spec-sheet section with a content switch, a field, a password and a create button', () => {
+  it('is a form with a content switch, a field, a password and a create button', () => {
     render(OneTimeLinkForm);
-    expect(screen.getByRole('heading', { name: 'One-time link' })).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: 'Content' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Link to share')).toHaveClass('d-field');
-    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText('Link to share')).toHaveAttribute('inputmode', 'url');
+    expect(screen.getByLabelText(/^Password/)).toHaveAttribute('type', 'password');
     expect(screen.getByRole('button', { name: 'Create one-time link' })).toBeDisabled();
   });
 
@@ -40,7 +39,7 @@ describe('OneTimeLinkForm (dashboard)', () => {
     render(OneTimeLinkForm, { events });
     await fireEvent.click(screen.getByRole('radio', { name: 'Text' }));
     await fireEvent.input(screen.getByLabelText('Message'), { target: { value: 'door code 4521' } });
-    await fireEvent.input(screen.getByLabelText('Password'), { target: { value: 'open sesame' } });
+    await fireEvent.input(screen.getByLabelText(/^Password/), { target: { value: 'open sesame' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Create one-time link' }));
     await waitFor(() => expect(events.created).toHaveBeenCalled());
     expect(JSON.parse(fn.mock.calls[0][1].body)).toEqual({
@@ -49,7 +48,7 @@ describe('OneTimeLinkForm (dashboard)', () => {
     const arg = events.created.mock.calls[0][0];
     expect(arg.detail ?? arg).toEqual(created.link);
     expect(screen.getByLabelText('Message')).toHaveValue('');
-    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText(/^Password/)).toHaveValue('');
   });
 
   it('shows the server error and keeps what was typed', async () => {
