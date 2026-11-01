@@ -3,7 +3,7 @@
   import { ThemeToggle, SEO } from '../lib/components';
   import UserMenu from '#lib/components/UserMenu.svelte';
   import { page, navigating } from '$app/state';
-  import { isProfilePath } from '#lib/utils/route-kind.js';
+  import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
 
   let { data, children } = $props();
 
@@ -70,6 +70,7 @@
   const onLoginPage = $derived(page.url.pathname === '/login');
   // Only /@handle itself: /@handle/name is a short link and keeps the site chrome.
   const isProfilePage = $derived(isProfilePath(page.url.pathname));
+  const isDashboard = $derived(isDashboardPath(page.url.pathname));
   // Public homepage + login use a full-height centered layout.
   // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
   const centerContent = $derived(page.url.pathname === '/' || onLoginPage);
@@ -144,22 +145,48 @@
       </div>
     {/if}
 
-    <!-- Theme toggle: bottom-right -->
-    <div class="fixed bottom-6 right-6 z-50">
-      <ThemeToggle />
-    </div>
+    <!-- Theme toggle: bottom-right. Dashboard pages render it after their
+         content instead, so on narrow screens it can sit in the page flow. -->
+    {#if !isDashboard}{@render themeDock(false)}{/if}
 
     {#if centerContent}
       <main
         class="flex-1 flex items-center justify-center px-4"
       >{@render children()}</main>
     {:else}
-      <main class="flex-1 flex flex-col pt-24 pb-24 px-4">{@render children()}</main>
+      <main class="flex-1 flex flex-col pt-24 pb-24 px-4" class:dash-main={isDashboard}>{@render children()}</main>
     {/if}
+
+    {#if isDashboard}{@render themeDock(true)}{/if}
   </div>
 {/if}
 
+{#snippet themeDock(inFlow)}
+  <div class="theme-dock" class:in-flow={inFlow}>
+    <ThemeToggle />
+  </div>
+{/snippet}
+
 <style>
+  .theme-dock {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 50;
+  }
+  /* A fixed corner button covers row actions (Revoke, delete) on a narrow
+     dashboard, however far the page scrolls; there it ends the page instead. */
+  @media (max-width: 639px) {
+    .theme-dock.in-flow {
+      position: static;
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 16px max(24px, env(safe-area-inset-bottom));
+    }
+    .dash-main {
+      padding-bottom: 32px;
+    }
+  }
   .nav-progress {
     position: fixed;
     top: 0;
