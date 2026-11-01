@@ -39,7 +39,8 @@ describe('layout on a profile subdomain', () => {
     const { container, canonical } = at('https://andre.iksi.app/sale', '/@[handle]/[name]');
     expect(container.querySelector('a.brand')?.getAttribute('href')).toBe('https://www.iksi.app/');
     expect(container.querySelector('a[href$="/login"]')?.getAttribute('href')).toBe('https://www.iksi.app/login');
-    expect(canonical).toBe('https://andre.iksi.app/sale');
+    // The subdomain is a vanity alias: the canonical is always www.
+    expect(canonical).toBe('https://www.iksi.app/@andre/sale');
   });
 
   it('keeps relative links and www canonicals on www', () => {

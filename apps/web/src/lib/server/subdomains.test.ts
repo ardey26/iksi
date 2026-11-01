@@ -15,7 +15,6 @@ const req = (over: Partial<Input>): Input => ({
 });
 
 const PASS = { kind: 'pass' };
-const DAILY = 'public, max-age=86400';
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -88,55 +87,24 @@ describe('on a profile subdomain', () => {
   });
 });
 
-describe('www profile redirect', () => {
-  it('301s www/@handle to the subdomain root, rechecked daily', () => {
-    expect(subdomainDecision(req({ pathname: '/@andre', routeId: '/@[handle]', handle: 'andre' }))).toEqual({
-      kind: 'redirect',
-      status: 301,
-      location: 'https://andre.iksi.app/',
-      cacheControl: DAILY
-    });
-  });
-
-  it('301s www/@handle/name (and name+) to the subdomain path, keeping the query', () => {
+describe('www profile URLs', () => {
+  // www/@handle is canonical: www serves profiles itself, flag on or off.
+  it.each([true, false])('serves www/@handle and www/@handle/name (enabled: %s)', (enabled) => {
+    expect(subdomainDecision(req({ enabled, pathname: '/@andre', routeId: '/@[handle]', handle: 'andre' }))).toEqual(PASS);
     expect(
-      subdomainDecision(req({ pathname: '/@Andre/Sale+', search: '?s=profile', routeId: '/@[handle]/[name]', handle: 'Andre' }))
-    ).toEqual({ kind: 'redirect', status: 301, location: 'https://andre.iksi.app/Sale+?s=profile', cacheControl: DAILY });
+      subdomainDecision(req({ enabled, pathname: '/@Andre/Sale+', search: '?s=profile', routeId: '/@[handle]/[name]', handle: 'Andre' }))
+    ).toEqual(PASS);
+    expect(subdomainDecision(req({ enabled, method: 'HEAD', pathname: '/@andre', routeId: '/@[handle]', handle: 'andre' }))).toEqual(PASS);
   });
 
-  it('never redirects a request that came back from a subdomain (?via=sub)', () => {
+  it('serves a request that came back from a subdomain (?via=sub)', () => {
     for (const enabled of [true, false]) {
       expect(subdomainDecision(req({ enabled, pathname: '/@andre', search: '?via=sub', routeId: '/@[handle]', handle: 'andre' }))).toEqual(PASS);
-      expect(
-        subdomainDecision(req({ enabled, pathname: '/@andre/sale', search: '?s=x&via=sub', routeId: '/@[handle]/[name]', handle: 'andre' }))
-      ).toEqual(PASS);
-    }
-  });
-
-  it('never redirects while off', () => {
-    expect(subdomainDecision(req({ enabled: false, pathname: '/@andre', routeId: '/@[handle]', handle: 'andre' }))).toEqual(PASS);
-  });
-
-  it('never redirects a handle without a subdomain', () => {
-    for (const handle of ['my_handle', 'www', 'admin', 'ab--c']) {
-      expect(subdomainDecision(req({ pathname: `/@${handle}`, routeId: '/@[handle]', handle }))).toEqual(PASS);
-    }
-  });
-
-  it('never redirects on the apex, admin, previews or localhost', () => {
-    for (const host of ['iksi.app', 'admin.iksi.app', 'iksi-abc.vercel.app', 'localhost:5174']) {
-      expect(subdomainDecision(req({ host, pathname: '/@andre', routeId: '/@[handle]', handle: 'andre' }))).toEqual(PASS);
     }
   });
 
   it('never touches short links or other pages', () => {
     expect(subdomainDecision(req({ pathname: '/abc', routeId: '/[slug]' }))).toEqual(PASS);
-    expect(subdomainDecision(req({ host: 'iksi.app', pathname: '/@andre/sale', routeId: '/@[handle]/[name]', handle: 'andre' }))).toEqual(PASS);
     expect(subdomainDecision(req({ pathname: '/api/@andre', routeId: '/api/@[handle]' }))).toEqual(PASS);
-  });
-
-  it('only redirects reads', () => {
-    expect(subdomainDecision(req({ method: 'POST', pathname: '/@andre/sale', routeId: '/@[handle]/[name]', handle: 'andre' }))).toEqual(PASS);
-    expect(subdomainDecision(req({ method: 'HEAD', pathname: '/@andre', routeId: '/@[handle]', handle: 'andre' })).kind).toBe('redirect');
   });
 });

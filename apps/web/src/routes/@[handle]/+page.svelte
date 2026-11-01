@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import PayButton from '#lib/components/PayButton.svelte';
   import { Button, IconButton, List, Paper, Row } from '#lib/ui/index.js';
-  import { profileLabel, profileUrl as profileUrlOf } from '#lib/subdomains.js';
+  import { canonicalProfileUrl, profileLabel, profileShareUrl } from '#lib/subdomains.js';
 
   export let data;
 
@@ -122,9 +122,10 @@
   $: bgUrl = safeBackground(data.backgroundUrl);
   $: bgStyle = bgUrl ? ` background: var(--bg) url("${bgUrl}") center / cover no-repeat fixed;` : ' background: var(--bg);';
 
-  // Canonical URL and derived SEO strings for the head.
-  // <handle>.iksi.app once subdomains are on, www/@handle until then.
-  $: profileUrl = profileUrlOf(data.handle, !!data.subdomains);
+  // The address people copy: <handle>.iksi.app once subdomains are on,
+  // www/@handle until then. Search engines always get www/@handle.
+  $: profileUrl = profileShareUrl(data.handle, !!data.subdomains);
+  $: canonicalUrl = canonicalProfileUrl(data.handle);
   $: ogImageUrl = `https://www.iksi.app/api/@${data.handle}/og`;
   $: seoTitle = `${data.displayName} (@${data.handle}) — iksi`;
   $: seoDescription = data.bio
@@ -149,7 +150,7 @@
     '@type': 'Person',
     name: data.displayName,
     alternateName: `@${data.handle}`,
-    url: profileUrl,
+    url: canonicalUrl,
     ...(data.avatarUrl ? { image: data.avatarUrl } : {}),
     ...(data.bio ? { description: data.bio } : {}),
     ...(data.sameAs && data.sameAs.length ? { sameAs: data.sameAs } : {})
@@ -163,7 +164,7 @@
   <meta name="description" content={seoDescription} />
   <meta name="author" content={data.displayName} />
   <meta name="robots" content={indexable ? 'index, follow' : 'noindex, follow'} />
-  <link rel="canonical" href={profileUrl} />
+  <link rel="canonical" href={canonicalUrl} />
 
   <!-- Open Graph — dynamic per-user card (avatar + bio + @handle + iksi mark) -->
   <meta property="og:type" content="profile" />
@@ -171,7 +172,7 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:title" content={seoTitle} />
   <meta property="og:description" content={seoDescription} />
-  <meta property="og:url" content={profileUrl} />
+  <meta property="og:url" content={canonicalUrl} />
   <meta property="og:image" content={ogImageUrl} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />

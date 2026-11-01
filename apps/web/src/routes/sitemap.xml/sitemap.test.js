@@ -21,11 +21,12 @@ describe('sitemap profile URLs', () => {
     expect(await sitemap()).toContain('<loc>https://www.iksi.app/@ann</loc>');
   });
 
-  it('lists the canonical subdomain when on, and www/@handle for a handle without one', async () => {
+  it('lists only www/@handle when on, never a subdomain', async () => {
     vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
     findMany.mockResolvedValue([profile('ann'), profile('a_b')]);
     const xml = await sitemap();
-    expect(xml).toContain('<loc>https://ann.iksi.app/</loc>');
+    expect(xml).toContain('<loc>https://www.iksi.app/@ann</loc>');
     expect(xml).toContain('<loc>https://www.iksi.app/@a_b</loc>');
+    expect(xml).not.toContain('ann.iksi.app');
   });
 });

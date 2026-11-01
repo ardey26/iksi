@@ -1,6 +1,5 @@
 import { prisma } from '#lib/prisma.js';
-import { subdomainsEnabled } from '#lib/server/subdomains.js';
-import { profileUrl } from '#lib/subdomains.js';
+import { canonicalProfileUrl } from '#lib/subdomains.js';
 
 // Cache the sitemap in-memory for a bit so we're not hitting the DB on every crawl.
 let cache = null;
@@ -46,13 +45,11 @@ export async function GET() {
 
 	// Google ignores changefreq/priority and only trusts lastmod when it is accurate,
 	// so the homepage carries no lastmod rather than an always-today one.
-	const subdomains = subdomainsEnabled();
 	const profileUrls = profiles
 		.filter((p) => p.user.handle)
 		.map((p) => {
-			// The canonical address. Subdomain entries are valid in this www sitemap
-			// because robots.txt on every subdomain points here.
-			const loc = xmlEscape(profileUrl(p.user.handle.handle, subdomains));
+			// The canonical address, always www/@handle: the subdomain is a vanity alias.
+			const loc = xmlEscape(canonicalProfileUrl(p.user.handle.handle));
 			const newestRow = p.rows[0]?.createdAt;
 			const lastmod = newestRow && newestRow > p.updatedAt ? newestRow : p.updatedAt;
 			return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${day(lastmod)}</lastmod>\n  </url>`;

@@ -76,8 +76,17 @@ export function routedPathname(url: URL, dev = false): string {
   return subdomainReroute(url, dev) ?? url.pathname;
 }
 
-/** Canonical address of a profile. */
-export function profileUrl(handle: string, subdomains: boolean): string {
+/**
+ * Canonical address of a profile, or of a link in its namespace: always
+ * www/@handle. The subdomain is a vanity alias for sharing; search engines
+ * are always pointed at www.
+ */
+export function canonicalProfileUrl(handle: string, name?: string): string {
+  return `${WWW_ORIGIN}/@${handle}${name ? `/${name}` : ''}`;
+}
+
+/** The address people copy and share: `<handle>.iksi.app` when subdomains are on and the handle has one. */
+export function profileShareUrl(handle: string, subdomains: boolean): string {
   return subdomains && hasSubdomain(handle) ? `https://${handle}.${APEX}/` : `${WWW_ORIGIN}/@${handle}`;
 }
 
@@ -110,5 +119,5 @@ export function appHref(path: string, host: string, dev = false): string {
 
 /** A link to a profile from inside the app: the subdomain when it has one, else the www path. */
 export function profileHref(handle: string, subdomains: boolean): string {
-  return subdomains && hasSubdomain(handle) ? profileUrl(handle, true) : `/@${handle}`;
+  return subdomains && hasSubdomain(handle) ? profileShareUrl(handle, true) : `/@${handle}`;
 }

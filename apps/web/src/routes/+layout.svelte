@@ -6,7 +6,7 @@
   import BrandMark from '#lib/components/BrandMark.svelte';
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
-  import { appHref, subdomainHandleOf } from '#lib/subdomains.js';
+  import { appHref, routedPathname } from '#lib/subdomains.js';
 
   let { data, children } = $props();
 
@@ -58,19 +58,19 @@
         noindex: false
       };
     }
-    // On andre.iksi.app the page lives at that host, not at www.
-    const origin = subdomainHandleOf(host, import.meta.env.DEV) ? `https://${host}` : 'https://www.iksi.app';
+    // Always www: andre.iksi.app/sale is a vanity alias of www/@andre/sale.
     return {
       title: 'iksi — free URL shortener',
       description: 'iksi turns long URLs into clean, shareable short links in seconds.',
-      canonical: `${origin}${pathname}`,
+      canonical: `https://www.iksi.app${pathname}`,
       ogImage: 'https://www.iksi.app/og-image.png',
       structuredData: null,
       noindex: true
     };
   }
 
-  const seo = $derived(seoForRoute(page.url.pathname, page.url.host));
+  // By route: on andre.iksi.app the path `/sale` is @andre/sale.
+  const seo = $derived(seoForRoute(routedPathname(page.url, import.meta.env.DEV), page.url.host));
   const isAdminSurface = $derived(page.url.host === 'admin.iksi.app' || page.url.host === 'admin.localhost' || page.url.host.startsWith('admin.localhost:') || page.url.pathname.startsWith('/admin'));
   const onLoginPage = $derived(page.url.pathname === '/login');
   // Only /@handle itself: /@handle/name is a short link and keeps the site chrome.

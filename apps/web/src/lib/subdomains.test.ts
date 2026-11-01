@@ -3,7 +3,8 @@ import {
   RESERVED_HANDLES,
   hasSubdomain,
   profileLabel,
-  profileUrl,
+  canonicalProfileUrl,
+  profileShareUrl,
   routedPathname,
   subdomainHandleOf,
   subdomainReroute,
@@ -123,17 +124,26 @@ describe('hasSubdomain', () => {
   );
 });
 
-describe('profileUrl / profileLabel', () => {
+describe('canonicalProfileUrl', () => {
+  // www/@handle is the canonical profile address; the subdomain is a vanity alias.
+  it('is always www/@handle, and www/@handle/name for a scoped link', () => {
+    expect(canonicalProfileUrl('andre')).toBe('https://www.iksi.app/@andre');
+    expect(canonicalProfileUrl('andre', 'Sale+')).toBe('https://www.iksi.app/@andre/Sale+');
+    expect(canonicalProfileUrl('my_handle')).toBe('https://www.iksi.app/@my_handle');
+  });
+});
+
+describe('profileShareUrl / profileLabel', () => {
   it('uses the subdomain when enabled', () => {
-    expect(profileUrl('andre', true)).toBe('https://andre.iksi.app/');
+    expect(profileShareUrl('andre', true)).toBe('https://andre.iksi.app/');
     expect(profileLabel('andre', true)).toBe('andre.iksi.app');
   });
   it('uses www/@handle when disabled', () => {
-    expect(profileUrl('andre', false)).toBe('https://www.iksi.app/@andre');
+    expect(profileShareUrl('andre', false)).toBe('https://www.iksi.app/@andre');
     expect(profileLabel('andre', false)).toBe('iksi.app/@andre');
   });
   it('keeps www/@handle for a handle that cannot be a hostname', () => {
-    expect(profileUrl('my_handle', true)).toBe('https://www.iksi.app/@my_handle');
+    expect(profileShareUrl('my_handle', true)).toBe('https://www.iksi.app/@my_handle');
     expect(profileLabel('my_handle', true)).toBe('iksi.app/@my_handle');
   });
 });

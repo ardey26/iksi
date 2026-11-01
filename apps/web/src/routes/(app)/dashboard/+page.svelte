@@ -15,7 +15,7 @@
     toast
   } from '#lib/ui/index.js';
   import { formatCount } from '#lib/format.js';
-  import { profileHref, profileLabel, profileUrl } from '#lib/subdomains.js';
+  import { profileHref, profileLabel, profileShareUrl } from '#lib/subdomains.js';
 
   export let data;
 
@@ -26,7 +26,7 @@
   async function copyPublicUrl() {
     if (!handle) return;
     try {
-      await navigator.clipboard.writeText(profileUrl(handle, subdomains));
+      await navigator.clipboard.writeText(profileShareUrl(handle, subdomains));
       toast('Link copied', { variant: 'success' });
     } catch {
       toast('Could not copy the link', { variant: 'error' });

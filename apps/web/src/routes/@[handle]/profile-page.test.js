@@ -93,15 +93,16 @@ describe('profile canonical and share URL', () => {
     expect(view.container.textContent).toContain('iksi.app/@ann');
   });
 
-  it('uses the subdomain when on', () => {
+  // www/@handle is canonical; the subdomain is the vanity address people share.
+  it('keeps the www canonical when on, and shows the subdomain', () => {
     const { canonical, ogUrl, ld, view } = head({ subdomains: true });
-    expect(canonical).toBe('https://ann.iksi.app/');
-    expect(ogUrl).toBe('https://ann.iksi.app/');
-    expect(ld.url).toBe('https://ann.iksi.app/');
+    expect(canonical).toBe('https://www.iksi.app/@ann');
+    expect(ogUrl).toBe('https://www.iksi.app/@ann');
+    expect(ld.url).toBe('https://www.iksi.app/@ann');
     expect(view.container.textContent).toContain('ann.iksi.app');
   });
 
-  it('copies the same URL the canonical uses', async () => {
+  it('copies the vanity subdomain when on', async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     const { view } = head({ subdomains: true });

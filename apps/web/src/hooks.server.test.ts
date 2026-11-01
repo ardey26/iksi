@@ -44,20 +44,19 @@ describe('subdomain gate', () => {
     expect(res.status).toBe(200);
   });
 
-  it('301s www/@handle to the subdomain with a daily cache-control when enabled', async () => {
+  // www/@handle is the canonical profile URL; the subdomain is a vanity alias.
+  it('serves www/@handle and www/@handle/name without redirecting when enabled', async () => {
     vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
-    const res = await run(event('https://www.iksi.app/@andre/sale', '/@[handle]/[name]', { handle: 'andre', name: 'sale' }));
-    expect(res.status).toBe(301);
-    expect(res.headers.get('location')).toBe('https://andre.iksi.app/sale');
-    expect(res.headers.get('cache-control')).toBe('public, max-age=86400');
-    expect(resolve).not.toHaveBeenCalled();
+    expect((await run(event('https://www.iksi.app/@andre', '/@[handle]', { handle: 'andre' }))).status).toBe(200);
+    expect((await run(event('https://www.iksi.app/@andre/sale', '/@[handle]/[name]', { handle: 'andre', name: 'sale' }))).status).toBe(200);
+    expect((await run(event('https://www.iksi.app/@andre', '/@[handle]', { handle: 'andre' }, true))).status).toBe(200);
+    expect(resolve).toHaveBeenCalledTimes(3);
   });
 
-  it('answers a client-side data request with a redirect SvelteKit can follow', async () => {
-    vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
-    await expect(run(event('https://www.iksi.app/@andre', '/@[handle]', { handle: 'andre' }, true))).rejects.toMatchObject({
-      status: 301,
-      location: 'https://andre.iksi.app/'
+  it('answers a client-side data request on a switched-off subdomain with a redirect SvelteKit can follow', async () => {
+    await expect(run(event('https://andre.iksi.app/', '/@[handle]', { handle: 'andre' }, true))).rejects.toMatchObject({
+      status: 302,
+      location: 'https://www.iksi.app/@andre?via=sub'
     });
   });
 

@@ -37,8 +37,8 @@ export const handle: Handle = async ({ event, resolve }) => {
         return new Response('Not Found', { status: 404 });
     }
 
-    // 1b. Profile subdomains (<handle>.iksi.app, rerouted in hooks.ts) and the
-    //     www/@handle -> subdomain redirect. Off, a subdomain 302s back to www.
+    // 1b. Profile subdomains (<handle>.iksi.app, rerouted in hooks.ts), a vanity
+    //     alias of the canonical www/@handle. Off, a subdomain 302s back to www.
     const sub = subdomainDecision({
         host,
         pathname: event.url.pathname,
