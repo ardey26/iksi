@@ -122,6 +122,9 @@
   };
 </script>
 
+<!-- Row for row, the same heights as the form it replaces (mode row, field,
+     message line, buttons), so the swap moves nothing: Copy link lands where
+     Shorten was and Shorten another where Custom name was. -->
 <div class="result">
   <div class="head">
     <p class="t-label t-muted">Your short link</p>
@@ -131,15 +134,22 @@
 
   <div class="url-row">
     <a class="url t-mono" href={fullURL} target="_blank" rel="noopener" title={fullURL}>{displayURL}</a>
-    <IconButton icon="qr" label="Show QR code" size="md" aria-haspopup="dialog" on:click={openQR} />
+    <IconButton icon="qr" label="Show QR code" aria-haspopup="dialog" on:click={openQR} />
   </div>
+
+  <div class="line" aria-hidden="true"></div>
 
   <div class="actions">
     <Button variant="ghost" size="sm" class="flush" on:click={reset}>Shorten another</Button>
+    <!-- Both labels hold the width, so Copied never resizes the button. -->
     <Button variant="primary" icon={copied ? 'check' : 'copy'} on:click={copy}>
-      <span aria-live="polite">{copied ? 'Copied' : 'Copy link'}</span>
+      <span class="swap">
+        <span class:off={copied}>Copy link</span>
+        <span class:off={!copied} aria-hidden="true">Copied</span>
+      </span>
     </Button>
   </div>
+  <span class="sr-only" aria-live="polite">{copied ? 'Link copied' : ''}</span>
 </div>
 
 <Sheet bind:open={showQR} title="QR code" description={displayURL} width={400} on:close={closeQR}>
@@ -153,13 +163,18 @@
   </div>
   <svelte:fragment slot="footer">
     <Button icon={qrCopied ? 'check' : 'copy'} disabled={!qrDataUrl} on:click={copyQR}>
-      {qrCopied ? 'Copied' : 'Copy image'}
+      <span class="swap">
+        <span class:off={qrCopied}>Copy image</span>
+        <span class:off={!qrCopied} aria-hidden="true">Copied</span>
+      </span>
     </Button>
     <Button variant="primary" disabled={!qrDataUrl} on:click={downloadQR}>Download PNG</Button>
   </svelte:fragment>
 </Sheet>
 
 <style>
+  /* Mirrors the home form: 32px mode row and 16px under it, a field, a 20px
+     message line, the buttons. */
   .result {
     display: flex;
     flex-direction: column;
@@ -167,22 +182,31 @@
   }
   .head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
+    height: var(--control-sm);
+    margin-bottom: 4px;
   }
   .head p { margin: 0; }
+  .line {
+    height: 20px;
+    margin: -4px 0;
+  }
   .note {
-    min-height: 16px;
+    min-width: 0;
+    overflow: hidden;
     color: var(--text-muted);
     text-align: right;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .url-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: var(--control-lg);
-    padding: 4px 4px 4px 16px;
+    height: var(--control);
+    padding: 0 3px 0 12px;
     background-color: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
@@ -210,9 +234,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-top: 8px;
   }
   .actions :global(.flush) { margin-left: -10px; }
+  /* Two labels in one cell: the wider one sets the width. */
+  .swap { display: inline-grid; }
+  .swap > span { grid-area: 1 / 1; text-align: center; }
+  .swap > .off { visibility: hidden; }
 
   .qr {
     display: flex;
