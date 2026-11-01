@@ -94,3 +94,45 @@ describe('profile editor upload sync', () => {
     expect(save()).toBeDisabled(); // back to the saved (empty) baseline
   });
 });
+
+describe('use my handle for custom names', () => {
+  let fetchMock;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const toggle = () => screen.getByRole('switch', { name: 'Use my handle for custom names' });
+
+  it('is a spec row, off by default, reading out the address a custom name gets', () => {
+    render(Page, { props: { data: data() } });
+    expect(toggle()).toHaveAttribute('aria-checked', 'false');
+    expect(toggle().closest('.d-row')).not.toBeNull();
+    expect(screen.getByText('iksi.app/name')).toBeInTheDocument();
+  });
+
+  it('shows the stored value', () => {
+    render(Page, { props: { data: { ...data(), scopeCustomNames: true } } });
+    expect(toggle()).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('iksi.app/@me/name')).toBeInTheDocument();
+  });
+
+  it('saves right away', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true, on: true })));
+    render(Page, { props: { data: data() } });
+    await fireEvent.click(toggle());
+    expect(toggle()).toHaveAttribute('aria-checked', 'true');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/dashboard/profile');
+    expect(JSON.parse(init.body)).toEqual({ action: 'setScopeCustomNames', on: true });
+  });
+
+  it('goes back when the save fails', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 500 }));
+    render(Page, { props: { data: data() } });
+    await fireEvent.click(toggle());
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-checked', 'false'));
+    expect(screen.getByText('Could not save. Try again.')).toBeInTheDocument();
+  });
+});

@@ -18,6 +18,10 @@
   let isLoading = false;
   let error = '';
   let showCustomAlias = false;
+  // A free iksi.app/@handle/name the server offered for a taken custom name.
+  let suggestion = '';
+  // Editing either field means the offer no longer answers what is typed.
+  $: longURL, customURL, (suggestion = '');
   let inputRef;
   // 'link' is the regular shortener; 'oneTime' creates a burn-after-reading link.
   let mode = 'link';
@@ -52,16 +56,17 @@
     }
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (name = customURL.trim()) => {
     if (isLoading) return;
 
     isLoading = true;
     error = '';
+    suggestion = '';
 
     try {
       const response = await fetch('/api/shorten', {
         method: 'POST',
-        body: JSON.stringify({ longURL: longURL.trim(), customURL: customURL.trim() }),
+        body: JSON.stringify({ longURL: longURL.trim(), customURL: name }),
         headers: { 'content-type': 'application/json' }
       });
 
@@ -70,6 +75,10 @@
       if (response.ok) {
         shortURL = data.shortURL;
         // Don't reset isLoading on success - component unmounts anyway
+      } else if (typeof data.suggestion === 'string') {
+        // Stays until it is used or the name changes.
+        suggestion = data.suggestion;
+        isLoading = false;
       } else {
         error = data.error || 'Something went wrong';
         setTimeout(() => { error = ''; }, 4000);
@@ -88,6 +97,7 @@
     customURL = '';
     showCustomAlias = false;
     error = '';
+    suggestion = '';
     isLoading = false;
     mode = 'link';
     createdOneTime = false;
@@ -131,6 +141,8 @@
         {isLoading}
         {error}
         {handleSubmit}
+        {suggestion}
+        onSuggestion={() => handleSubmit(suggestion)}
         onOneTime={startOneTime}
       />
     {/if}

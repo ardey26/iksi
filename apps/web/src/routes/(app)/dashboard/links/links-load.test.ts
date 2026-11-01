@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const findMany = vi.hoisted(() => vi.fn());
 const count = vi.hoisted(() => vi.fn());
 const decodeURL = vi.hoisted(() => vi.fn(async (u: string) => u.replace(/^enc:/, '')));
-vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findMany, count } } }));
+const findUser = vi.hoisted(() => vi.fn());
+vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findMany, count }, user: { findUnique: findUser } } }));
 vi.mock('#lib/server/crypto.js', () => ({ decodeURL }));
 
 import { load } from './+page.server';
@@ -35,6 +36,7 @@ const run = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   count.mockResolvedValue(2);
+  findUser.mockResolvedValue({ scopeCustomNames: false });
 });
 
 describe('dashboard links load: one-time links', () => {
@@ -63,5 +65,15 @@ describe('dashboard links load: one-time links', () => {
     expect(byId[3].oneTime).toEqual({ kind: 'url', state: 'opened' });
     expect(byId[4].oneTime).toEqual({ kind: 'url', state: 'expired' });
     expect(decodeURL).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('dashboard links load: custom names setting', () => {
+  it.each([true, false])('passes scopeCustomNames=%s to the add row', async (on) => {
+    findMany.mockResolvedValue([]);
+    findUser.mockResolvedValue({ scopeCustomNames: on });
+    const data = (await run()) as { scopeCustomNames?: boolean };
+    expect(data.scopeCustomNames).toBe(on);
+    expect(findUser).toHaveBeenCalledWith({ where: { id: 7 }, select: { scopeCustomNames: true } });
   });
 });

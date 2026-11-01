@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   // query needed. Then fire the link list and total count in parallel.
   const profileId = user.profileId;
 
-  const [links, totalCount] = await Promise.all([
+  const [links, totalCount, account] = await Promise.all([
     prisma.longURL.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
@@ -54,7 +54,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
           : false
       }
     }),
-    prisma.longURL.count({ where: { userId: user.id } })
+    prisma.longURL.count({ where: { userId: user.id } }),
+    // Read fresh, not from the cached layout user: the add row shows where a custom name goes.
+    prisma.user.findUnique({ where: { id: user.id }, select: { scopeCustomNames: true } })
   ]);
 
   const now = Date.now();
@@ -108,6 +110,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     links: decoded,
     totalCount,
     limit,
-    hasMore: totalCount > limit
+    hasMore: totalCount > limit,
+    scopeCustomNames: account?.scopeCustomNames ?? false
   };
 };

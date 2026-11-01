@@ -242,7 +242,13 @@
   let newURL = '';
   let newTitle = '';
   let newPublish = true;
+  let newName = '';
   let addError = '';
+  // A free iksi.app/@handle/name the server offered for a taken custom name.
+  let addSuggestion = '';
+  // Editing the form means the offer no longer answers what is typed.
+  $: newURL, newName, (addSuggestion = '');
+  $: namePrefix = data.scopeCustomNames && data.user.handle ? `iksi.app/@${data.user.handle}/` : 'iksi.app/';
 
   function isValidUrl(s: string) {
     if (!s) return false;
@@ -254,18 +260,22 @@
   // Form stays enabled during in-flight adds — the optimistic prepend
   // makes the operation feel instant, and the user can queue another add
   // right away.
-  $: canAdd = isValidUrl(newURL);
+  $: nameOk = /^[A-Za-z0-9_-]{0,50}$/.test(newName.trim());
+  $: canAdd = isValidUrl(newURL) && nameOk;
 
-  async function add() {
+  /** `name` overrides the typed custom name; the suggestion button passes the scoped one. */
+  async function add(name: string = newName.trim()) {
     if (!canAdd) return;
 
     // Snapshot form values, clear the form immediately so the user can
     // keep adding.
     const url = newURL.trim();
     const typedTitle = newTitle.trim();
+    const typedName = newName;
     const wantsPublic = newPublish;
     newURL = '';
     newTitle = '';
+    newName = '';
     addError = '';
 
     // Prepend an optimistic row so it appears in the list instantly.
@@ -291,7 +301,7 @@
       const res = await fetch('/api/shorten', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ longURL: url, customURL: '' })
+        body: JSON.stringify({ longURL: url, customURL: name })
       });
       const body = await res.json();
       if (!res.ok) {
@@ -299,6 +309,13 @@
         links = links.filter((l) => l.id !== tempId);
         newURL = url;
         newTitle = typedTitle;
+        newName = typedName;
+        if (typeof body.suggestion === 'string') {
+          // Set after the restore above, which would otherwise clear it.
+          await tick();
+          addSuggestion = body.suggestion;
+          return;
+        }
         addError = body.error || 'Could not shorten.';
         toast(body.error || 'Could not shorten', 'error');
         return;
@@ -343,6 +360,7 @@
       links = links.filter((l) => l.id !== tempId);
       newURL = url;
       newTitle = typedTitle;
+      newName = typedName;
       addError = 'Network error.';
       toast('Network error', 'error');
     }
@@ -607,6 +625,21 @@
                 on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
                 class="title-input sub"
               />
+              <div class="name-field">
+                <span class="name-prefix" aria-hidden="true">{namePrefix}</span>
+                <input
+                  type="text"
+                  bind:value={newName}
+                  placeholder="custom name (optional)"
+                  maxlength="50"
+                  aria-label="New link custom name"
+                  aria-invalid={!nameOk}
+                  autocomplete="off"
+                  spellcheck="false"
+                  on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+                  class="title-input sub name-input"
+                />
+              </div>
             </div>
           </div>
         </td>
@@ -621,13 +654,23 @@
           ></button>
         </td>
         <td class="add-col" colspan="3">
-          <button type="button" on:click={add} disabled={!canAdd} class="d-btn d-btn-primary">Add link</button>
+          <button type="button" on:click={() => add()} disabled={!canAdd} class="d-btn d-btn-primary">Add link</button>
         </td>
       </tr>
     </tbody>
   </table>
 
-  <p class="add-error" role={addError ? 'alert' : undefined}>{addError}</p>
+  <p class="add-error" role={addError ? 'alert' : undefined} aria-live="polite">
+    {#if addSuggestion}
+      <span>That name is taken.</span>
+      <button type="button" class="d-btn d-btn-text suggest" on:click={() => add(addSuggestion)}
+      >Use iksi.app/{addSuggestion}?</button>
+    {:else if !nameOk}
+      Names use letters, numbers, - and _, up to 50.
+    {:else}
+      {addError}
+    {/if}
+  </p>
 
   <OneTimeLinkForm on:created={onOneTimeCreated} />
 </section>
@@ -764,12 +807,37 @@
   }
 
   .add-row { border-bottom: none; }
+  /* As tall as a control, so the suggestion button never moves the page. */
   .add-error {
-    min-height: 18px;
-    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 6px;
+    min-height: var(--d-ctl);
+    margin-top: 4px;
     font-size: 13px;
     color: var(--error);
   }
+  .add-error .suggest { color: var(--accent); overflow-wrap: anywhere; text-align: left; }
+  .add-error .suggest:hover:not(:disabled) { color: var(--accent); text-decoration: underline; }
+  .name-field {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .name-prefix {
+    flex: none;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .title-input.name-input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    margin: 0 -8px 0 0;
+    padding-left: 1px;
+  }
+  .title-input.name-input[aria-invalid='true'] { color: var(--error); }
 
   @media (max-width: 639px) {
     .handle-col { display: none; }

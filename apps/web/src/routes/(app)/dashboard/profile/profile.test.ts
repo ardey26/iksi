@@ -11,11 +11,13 @@ const checkURLs = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
 const rowFindUnique = vi.hoisted(() => vi.fn());
 const cacheDelete = vi.hoisted(() => vi.fn(async () => {}));
+const userUpdate = vi.hoisted(() => vi.fn(async () => ({})));
 vi.mock('@vercel/functions', () => ({ dangerouslyDeleteByTag: cacheDelete, addCacheTag: vi.fn(), waitUntil: vi.fn() }));
 
 vi.mock('#lib/prisma.js', () => ({
   prisma: {
     profile: { findUnique: profileFindUnique },
+    user: { update: userUpdate },
     longURL: { findUnique: linkFindUnique, updateMany: linkUpdate },
     profileRow: { aggregate: rowAggregate, create: rowCreate, findFirst: rowFindFirst, findUnique: rowFindUnique, update: rowUpdate }
   }
@@ -176,5 +178,25 @@ describe('profile page cache', () => {
     const r = await call({ action: 'nope' });
     expect(r.status).toBe(400);
     expect(cacheDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('setScopeCustomNames', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    profileFindUnique.mockResolvedValue({ id: 3, userId: 7 });
+  });
+
+  it.each([true, false])('stores %s on the signed-in user', async (on) => {
+    const res = await call({ action: 'setScopeCustomNames', on });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, on });
+    expect(userUpdate).toHaveBeenCalledWith({ where: { id: 7 }, data: { scopeCustomNames: on } });
+  });
+
+  it('refuses anything but a boolean', async () => {
+    const res = await call({ action: 'setScopeCustomNames', on: 'yes' });
+    expect(res.status).toBe(400);
+    expect(userUpdate).not.toHaveBeenCalled();
   });
 });

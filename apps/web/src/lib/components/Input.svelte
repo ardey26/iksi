@@ -15,6 +15,13 @@
   /** When set, the alias row also offers a switch to a one-time link. */
   export let onOneTime = null;
 
+  /**
+   * A free `@handle/name` the server offered for a taken name, and what
+   * tapping it does (creates that link). Shown in place of the error.
+   */
+  export let suggestion = '';
+  export let onSuggestion = null;
+
   let shakeInput = false;
   let shakeAlias = false;
 
@@ -77,8 +84,18 @@
 <form on:submit|preventDefault={submit} class:space-y-3={compact} class:space-y-4={!compact}>
   <!-- Error message space (reserved on default; inline-only on compact so parent controls layout) -->
   {#if !compact}
-    <div class="h-5">
-      {#if error}
+    <div class="h-5" aria-live="polite">
+      {#if suggestion && onSuggestion}
+        <p class="text-sm fade-in truncate" style="color: var(--error);">
+          That name is taken.
+          <button
+            type="button"
+            class="underline decoration-1 underline-offset-2 hover:opacity-70 transition-opacity"
+            style="color: var(--accent);"
+            on:click={onSuggestion}
+          >Use iksi.app/{suggestion}?</button>
+        </p>
+      {:else if error}
         <p class="text-sm fade-in" style="color: var(--error);">{error}</p>
       {:else if longURL && !isURLValid}
         <p class="text-sm fade-in" style="color: var(--error);">That doesn't look like a valid link</p>

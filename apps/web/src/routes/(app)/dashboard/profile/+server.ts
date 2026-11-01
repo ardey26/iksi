@@ -105,6 +105,13 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
       invalidateUserCache(uid);
       return json({ ok: true, avatarUrl: mediaUrl(finalAvatarUrl) });
     }
+    case 'setScopeCustomNames': {
+      // "Use my handle for custom names": read by /api/shorten.
+      const { on } = body;
+      if (typeof on !== 'boolean') return json({ error: 'on must be true or false' }, { status: 400 });
+      await prisma.user.update({ where: { id: uid }, data: { scopeCustomNames: on } });
+      return json({ ok: true, on });
+    }
     case 'addRow': {
       const { linkId, title } = body;
       if (!Number.isInteger(linkId) || !title || title.length > 80) return json({ error: 'Invalid' }, { status: 400 });

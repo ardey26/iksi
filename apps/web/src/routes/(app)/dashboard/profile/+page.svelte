@@ -95,6 +95,28 @@
     }
   }
 
+  // "Use my handle for custom names" saves on its own, like Payments.
+  let scopeCustomNames: boolean = data.scopeCustomNames ?? false;
+  let scopeSaving = false;
+  let scopeError = '';
+  async function toggleScope() {
+    if (scopeSaving) return;
+    const on = !scopeCustomNames;
+    scopeCustomNames = on;
+    scopeSaving = true;
+    scopeError = '';
+    const ok = await fetch('/dashboard/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'setScopeCustomNames', on })
+    }).then((r) => r.ok, () => false);
+    scopeSaving = false;
+    if (!ok) {
+      scopeCustomNames = !on;
+      scopeError = 'Could not save. Try again.';
+    }
+  }
+
   // Palette derivation (must mirror /@handle logic exactly).
   // OKLCH-based: perceptually uniform lightness across all hues.
   $: paletteStyle = (() => {
@@ -232,6 +254,33 @@
     </section>
   {/if}
 
+  <!-- Short links: saved as it changes, outside the Save button below -->
+  <section class="d-section" aria-labelledby="p-links">
+    <h2 class="d-title" id="p-links">Short links</h2>
+    <p class="d-desc">Changes save right away.</p>
+    <div class="d-spec">
+      <div class="d-row">
+        <span class="d-label" id="p-scope-label">Use my handle for custom names</span>
+        <div class="d-control">
+          <div class="d-inline">
+            <button
+              type="button"
+              role="switch"
+              class="d-switch"
+              aria-checked={scopeCustomNames}
+              aria-labelledby="p-scope-label"
+              aria-describedby="p-scope-hint"
+              on:click={toggleScope}
+            ></button>
+            <span class="scope-readout">iksi.app/{scopeCustomNames ? `@${data.user.handle}/` : ''}name</span>
+          </div>
+          <p class="d-hint" id="p-scope-hint">New custom names go under iksi.app/@{data.user.handle}. Links with a random name stay as they are.</p>
+          <p class="d-hint scope-error" role={scopeError ? 'alert' : undefined}>{scopeError}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Live preview — mirrors the /@handle card layout -->
   <section class="d-section" aria-labelledby="p-preview">
     <h2 class="d-title" id="p-preview">Preview</h2>
@@ -299,6 +348,18 @@
 </section>
 
 <style>
+  .scope-readout {
+    min-width: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+  /* Keeps its height when empty, so an error never moves the page. */
+  .scope-error {
+    margin-top: 4px;
+    min-height: 18px;
+    color: var(--error);
+  }
   .swatch {
     position: relative;
     display: block;

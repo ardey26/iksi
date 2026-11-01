@@ -140,3 +140,69 @@ describe('links page one-time links', () => {
     expect(screen.getByRole('status')).toHaveTextContent('One-time link created');
   });
 });
+
+describe('links page custom names', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const reply = (status, body) => new Response(JSON.stringify(body), { status });
+  const created = (shortURL) =>
+    reply(200, { shortURL, link: { id: 50, shortURL, originalURL: 'https://example.com/sale', clickCount: 0, createdAt: new Date().toISOString(), safeVerdict: null } });
+  const renderAs = (extra = {}) =>
+    render(Page, { props: { data: { user: { handle: 'andre' }, links: [], ...extra } } });
+
+  async function addNamed(name) {
+    await fireEvent.input(screen.getByLabelText('New link URL'), { target: { value: 'example.com/sale' } });
+    await fireEvent.input(screen.getByLabelText('New link custom name'), { target: { value: name } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+  }
+  const sent = (fetchMock, i) => JSON.parse(fetchMock.mock.calls[i][1].body);
+
+  it('shows a scoped link with its full path', () => {
+    renderPage([link(1, { shortURL: '@andre/sale' })]);
+    expect(screen.getByText('iksi.app/@andre/sale')).toBeInTheDocument();
+  });
+
+  it('sends the custom name', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(created('sale'));
+    vi.stubGlobal('fetch', fetchMock);
+    renderAs();
+    await addNamed('sale');
+    await waitFor(() => expect(screen.getByText('iksi.app/sale')).toBeInTheDocument());
+    expect(sent(fetchMock, 0)).toEqual({ longURL: 'example.com/sale', customURL: 'sale' });
+  });
+
+  it('prefixes the name with the handle when names go under it', () => {
+    renderAs({ scopeCustomNames: true });
+    expect(screen.getByText('iksi.app/@andre/')).toBeInTheDocument();
+  });
+
+  it('offers the scoped name for a taken one and creates it in one tap', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(reply(409, { error: 'custom link alias already exists, pick another one', suggestion: '@andre/sale' }))
+      .mockResolvedValueOnce(created('@andre/sale'))
+      // Putting the new link on the page.
+      .mockResolvedValue(reply(200, { ok: true, row: { id: 3, title: 'example.com', enabled: true, position: 0 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderAs();
+    await addNamed('sale');
+
+    const use = await screen.findByRole('button', { name: 'Use iksi.app/@andre/sale?' });
+    expect(screen.getByText('That name is taken.')).toBeInTheDocument();
+    await fireEvent.click(use);
+
+    await waitFor(() => expect(screen.getByText('iksi.app/@andre/sale')).toBeInTheDocument());
+    expect(sent(fetchMock, 1)).toEqual({ longURL: 'example.com/sale', customURL: '@andre/sale' });
+    expect(screen.queryByRole('button', { name: /^Use iksi\.app/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('New link custom name')).toHaveValue('');
+  });
+
+  it('drops the offer once the name is edited', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(409, { error: 'taken', suggestion: '@andre/sale' })));
+    renderAs();
+    await addNamed('sale');
+    await screen.findByRole('button', { name: 'Use iksi.app/@andre/sale?' });
+    await fireEvent.input(screen.getByLabelText('New link custom name'), { target: { value: 'sale2' } });
+    expect(screen.queryByRole('button', { name: 'Use iksi.app/@andre/sale?' })).not.toBeInTheDocument();
+  });
+});
