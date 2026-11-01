@@ -408,24 +408,24 @@
     color: var(--text-muted);
   }
 
-  /* Condition and destination rows: name | values | remove. */
+  /* Condition and destination rows. The sheet is too narrow for a label
+     column, so the name is a small muted line above a full-width control,
+     with the remove icon at the end of that line. */
   .row {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr) 32px;
-    grid-template-areas: 'name values remove';
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'name remove' 'values values';
+    align-items: center;
     column-gap: 12px;
+    row-gap: 6px;
     padding: 12px 0;
     border-top: 1px solid var(--border);
   }
   .row .name {
     grid-area: name;
+    min-height: 32px;
     display: flex;
     align-items: center;
-    min-height: var(--d-ctl);
-    color: var(--text-primary);
-  }
-  .goto .name {
-    color: var(--text-muted);
   }
   .values {
     grid-area: values;
@@ -439,7 +439,7 @@
   }
   .remove {
     grid-area: remove;
-    margin-top: calc((var(--d-ctl) - 32px) / 2);
+    margin-right: -6px;
   }
   .days .d-key > span {
     padding: 0;
@@ -463,6 +463,11 @@
   .add {
     padding: 4px 0 8px;
   }
+  /* Text buttons start flush with the controls above them. */
+  .add .d-btn-text,
+  .split-foot .d-btn-text {
+    padding-left: 0;
+  }
   .picker {
     display: flex;
     flex-wrap: wrap;
@@ -483,12 +488,13 @@
     gap: 8px;
   }
   .split .url {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
   }
   .weight {
     flex: none;
-    width: 76px;
+    width: 72px;
     --d-unit-pad: 28px;
   }
   .split-foot {
@@ -519,16 +525,8 @@
   }
 
   @media (max-width: 639px) {
-    .row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: 'name remove' 'values values';
-      row-gap: 4px;
-    }
     .row .name {
       min-height: 44px;
-    }
-    .remove {
-      margin-top: 0;
     }
     .pick {
       height: 44px;
