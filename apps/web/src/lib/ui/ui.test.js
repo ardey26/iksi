@@ -11,6 +11,7 @@ import Textarea from './Textarea.svelte';
 import Switch from './Switch.svelte';
 import Segmented from './Segmented.svelte';
 import ChipGroup from './ChipGroup.svelte';
+import Logo from './Logo.svelte';
 import SheetHarness from './tests/SheetHarness.svelte';
 import ToastHarness from './tests/ToastHarness.svelte';
 import { toast, toasts, dismiss } from './toast.js';
@@ -272,5 +273,26 @@ describe('Toast', () => {
     await tick();
     await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.getByRole('status')).not.toHaveTextContent('Payment method removed');
+  });
+});
+
+describe('Logo', () => {
+  const box = (el) => [el.style.getPropertyValue('--w'), el.style.getPropertyValue('--h')];
+
+  it('is a square box by default', () => {
+    const { container } = render(Logo, { props: { src: '/brands/gcash.svg', alt: 'GCash' } });
+    expect(box(container.querySelector('.logo'))).toEqual(['40px', '40px']);
+    expect(screen.getByAltText('GCash')).toHaveAttribute('width', '40');
+  });
+
+  it.each([
+    [40, '64px', '24px'],
+    [32, '48px', '18px']
+  ])('is a wide box for a wordmark at %i', (size, w, h) => {
+    const { container } = render(Logo, { props: { src: '/brands/maya.svg', alt: 'Maya', size, wordmark: true } });
+    expect(box(container.querySelector('.logo'))).toEqual([w, h]);
+    const img = screen.getByAltText('Maya');
+    expect(img).toHaveAttribute('width', w.replace('px', ''));
+    expect(img).toHaveAttribute('height', h.replace('px', ''));
   });
 });

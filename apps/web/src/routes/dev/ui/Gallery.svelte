@@ -331,13 +331,14 @@
         <Badge variant="error">Flagged</Badge>
         <Badge>1,284</Badge>
       </Specimen>
-      <Specimen label="Logo (no chip) and Monogram, 40 and 32">
+      <Specimen label="Logo (no chip), wordmark (wide box) and Monogram, 40 and 32">
         <Logo src="/brands/gcash.svg" alt="GCash" />
-        <Logo src="/brands/maya.svg" alt="Maya" />
+        <Logo src="/brands/maya.svg" alt="Maya" wordmark />
         <Logo src="/brands/maribank.png" alt="MariBank" />
         <Monogram name="BPI" />
         <Monogram name="paypal" />
         <Logo src="/brands/gcash.svg" alt="GCash" size={32} />
+        <Logo src="/brands/maya.svg" alt="Maya" size={32} wordmark />
         <Monogram name="Union Bank" size={32} />
       </Specimen>
     </Stack>

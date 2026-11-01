@@ -24,7 +24,7 @@
 
   const START = [
     { id: 'gcash', name: 'GCash', detail: 'Pays to Maria Santos', logo: '/brands/gcash.svg' },
-    { id: 'maya', name: 'Maya', detail: 'Pays to Maria Santos', logo: '/brands/maya.svg' },
+    { id: 'maya', name: 'Maya', detail: 'Pays to Maria Santos', logo: '/brands/maya.svg', wordmark: true },
     { id: 'maribank', name: 'MariBank', detail: 'Pays to Maria Santos', logo: '/brands/maribank.png' },
     { id: 'bpi', name: 'BPI', detail: 'Pays to Maria Santos, savings' },
     { id: 'paypal', name: 'PayPal', detail: 'paypal.me/mariasantos' }
@@ -108,11 +108,13 @@
         </EmptyState>
       {:else}
         <SortableList label="Payment methods" name={(m) => m.name} bind:items={methods} on:reorder={saved} let:item={m} let:handle>
-          <Row title={m.name} subtitle={confirming === m.id ? 'Remove it from your Pay button?' : m.detail}>
+          <Row subtitle={confirming === m.id ? 'Remove it from your Pay button?' : m.detail}>
+            <!-- A wordmark already spells the name: kept for screen readers only. -->
+            <span class:sr-only={m.wordmark}>{m.name}</span>
             <svelte:fragment slot="leading">
               <DragHandle {handle} />
               {#if m.logo}
-                <Logo src={m.logo} />
+                <Logo src={m.logo} wordmark={m.wordmark} />
               {:else}
                 <Monogram name={m.name} />
               {/if}
