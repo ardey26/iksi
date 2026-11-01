@@ -32,7 +32,7 @@ const SPECS: Record<MediaKind, Spec[]> = {
 	background: [{ name: '1600', size: 1600, square: false }]
 };
 
-function open(input: Uint8Array) {
+export function openImage(input: Uint8Array) {
 	return sharp(input, {
 		failOn: 'error',
 		animated: false,
@@ -40,12 +40,12 @@ function open(input: Uint8Array) {
 	});
 }
 
-export async function processImage(input: Uint8Array, kind: MediaKind): Promise<Variant[]> {
+/** Throws a MediaError unless the bytes are an upload-sized image in an accepted format. */
+export async function checkImage(input: Uint8Array): Promise<void> {
 	if (input.byteLength === 0) throw new MediaError('empty');
 	if (input.byteLength > MAX_UPLOAD_BYTES) throw new MediaError('too_large');
-
 	try {
-		const meta = await open(input).metadata();
+		const meta = await openImage(input).metadata();
 		const allowed =
 			meta.format === 'jpeg' ||
 			meta.format === 'png' ||
@@ -56,10 +56,20 @@ export async function processImage(input: Uint8Array, kind: MediaKind): Promise<
 		if (meta.width > MAX_DIMENSION || meta.height > MAX_DIMENSION) {
 			throw new MediaError('too_many_pixels');
 		}
+	} catch (e) {
+		if (e instanceof MediaError) throw e;
+		console.error('media: image check failed', e);
+		throw new MediaError('unsupported');
+	}
+}
 
+export async function processImage(input: Uint8Array, kind: MediaKind): Promise<Variant[]> {
+	await checkImage(input);
+
+	try {
 		return await Promise.all(
 			SPECS[kind].map(async (spec) => {
-				const pipeline = open(input).rotate();
+				const pipeline = openImage(input).rotate();
 				pipeline.resize(
 					spec.square
 						? { width: spec.size, height: spec.size, fit: 'cover', position: 'centre' }
