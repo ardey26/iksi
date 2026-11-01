@@ -798,11 +798,23 @@
   .sheet-body {
     --ls-pad: 24px;
     --d-label: 136px;
+    /* Save row: 16px padding above and below a control, plus its hairline. */
+    --ls-footer-h: calc(var(--d-ctl) + 33px);
     flex: 1;
     min-height: 0;
-    padding: 4px 24px 0;
+    padding: 4px 24px calc(var(--ls-footer-h) + 24px);
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+  /* The Save row is pinned to the sheet's bottom edge, outside the scroll
+     flow; the padding above keeps the last control clear of it. */
+  .sheet-body :global(.ls-footer) {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--ls-footer-h);
+    margin: 0;
   }
   @keyframes sheet-in {
     from { transform: translateX(100%); }
@@ -816,7 +828,7 @@
     .sheet { width: 100%; border-left: none; }
     .sheet-head { padding: 12px 8px 12px 16px; }
     .sheet-head .d-icon { margin-top: -10px; }
-    .sheet-body { --ls-pad: 16px; padding: 0 16px; }
+    .sheet-body { --ls-pad: 16px; padding: 0 16px calc(var(--ls-footer-h) + 24px); }
   }
   @media (prefers-reduced-motion: reduce) {
     .sheet,

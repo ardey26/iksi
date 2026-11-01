@@ -200,7 +200,7 @@
     <RulesEditor bind:rules={ruleForms} />
   </section>
 
-  <div class="footer">
+  <div class="footer ls-footer">
     <p class="err" role="alert">{error}</p>
     <button type="button" class="d-btn d-btn-primary" disabled={!dirty || saving} on:click={save}>{saving ? 'Saving' : 'Save'}</button>
   </div>
