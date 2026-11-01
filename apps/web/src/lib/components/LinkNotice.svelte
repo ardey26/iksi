@@ -8,6 +8,13 @@
   <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
     This link has expired.
   </h1>
+{:else if view === 'opened'}
+  <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
+    This link was already opened.
+  </h1>
+  <p class="mt-2 text-sm" style="color: var(--text-muted);">
+    One-time links open once. Ask the sender for a new one.
+  </p>
 {:else}
   <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">Link disabled</h1>
   <p class="mt-2 text-sm" style="color: var(--text-muted);">

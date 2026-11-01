@@ -4,7 +4,13 @@
 
   let view = $derived(page.error?.view);
   let title = $derived(
-    view === 'expired' ? 'Link expired' : view === 'flagged' ? 'Link disabled' : 'Not found'
+    view === 'expired'
+      ? 'Link expired'
+      : view === 'opened'
+        ? 'Link opened'
+        : view === 'flagged'
+          ? 'Link disabled'
+          : 'Not found'
   );
 </script>
 
@@ -15,7 +21,7 @@
 
 <div class="flex-1 flex items-center justify-center">
   <div class="w-full max-w-[500px] text-center">
-    {#if view === 'expired' || view === 'flagged'}
+    {#if view === 'expired' || view === 'opened' || view === 'flagged'}
       <LinkNotice {view} verdict={page.error?.verdict} />
     {:else}
       <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">Nothing here</h1>

@@ -34,6 +34,13 @@ describe('+error.svelte', () => {
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex');
   });
 
+  it('renders the already opened view', () => {
+    const { container } = renderError(410, { message: 'x', view: 'opened' });
+    expect(screen.getByText('This link was already opened.')).toBeTruthy();
+    expect(container.querySelector('a[href="/AbC"]')).toBeNull();
+    expect(document.title).toBe('Link opened | iksi');
+  });
+
   it('keeps the 404 copy', () => {
     renderError(404, { message: 'not found' });
     expect(screen.getByText('Nothing here')).toBeTruthy();
@@ -67,5 +74,74 @@ describe('+page.svelte preview', () => {
   it('password input allows 128 characters', () => {
     const { container } = render(LinkPage, { data: { view: 'password', error: null }, form: null } as never);
     expect(container.querySelector('input[type=password]')!.getAttribute('maxlength')).toBe('128');
+  });
+});
+
+describe('+page.svelte one-time', () => {
+  const reveal = { view: 'reveal', kind: 'text', password: false, error: null };
+
+  it('shows a tap to reveal form that posts to the reveal action', () => {
+    const { container } = render(LinkPage, { data: reveal, form: null } as never);
+    expect(screen.getByRole('heading', { name: 'Tap to reveal' })).toBeTruthy();
+    const form = container.querySelector('form')!;
+    expect(form.getAttribute('method')).toBe('POST');
+    expect(form.getAttribute('action')).toBe('?/reveal');
+    expect(screen.getByRole('button', { name: 'Reveal message' })).toBeTruthy();
+    expect(container.querySelector('input[type=password]')).toBeNull();
+    expect(container.textContent).toContain('can be opened once');
+    expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex');
+  });
+
+  it('a URL secret says what the button does', () => {
+    render(LinkPage, { data: { ...reveal, kind: 'url' }, form: null } as never);
+    expect(screen.getByRole('button', { name: 'Open link' })).toBeTruthy();
+  });
+
+  it('asks for the password when the link has one', () => {
+    const { container } = render(LinkPage, { data: { ...reveal, password: true }, form: null } as never);
+    const input = container.querySelector('input[type=password]')!;
+    expect(input.getAttribute('name')).toBe('password');
+    expect(input.getAttribute('maxlength')).toBe('128');
+  });
+
+  it('shows a wrong password error', () => {
+    render(LinkPage, { data: { ...reveal, password: true }, form: { error: 'Wrong password' } } as never);
+    expect(screen.getByText('Wrong password')).toBeTruthy();
+  });
+
+  it('shows the revealed text once, as text, with a copy button and no form', () => {
+    const text = '<b>not html</b>\nsecond line';
+    const { container } = render(LinkPage, { data: { view: 'opened' }, form: { text } } as never);
+    expect(container.querySelector('b')).toBeNull();
+    expect(container.textContent).toContain('<b>not html</b>');
+    expect(screen.getByRole('button', { name: 'Copy text' })).toBeTruthy();
+    expect(container.querySelector('form')).toBeNull();
+    expect(container.textContent).toContain('no longer stored');
+  });
+
+  it('a lost reveal says it was already opened', () => {
+    const { container } = render(LinkPage, { data: reveal, form: { opened: true } } as never);
+    expect(container.textContent).toContain('This link was already opened.');
+    expect(container.querySelector('form')).toBeNull();
+  });
+
+  it('the preview of a one-time link hides the content and says what it is', () => {
+    page.url = new URL('https://www.iksi.app/AbC+');
+    const { container } = render(LinkPage, {
+      data: { view: 'preview', host: '', destination: null, hasRules: false, flagged: null, expired: false, oneTime: true, opened: false },
+      form: null
+    } as never);
+    expect(screen.getByRole('heading', { name: 'One-time link' })).toBeTruthy();
+    expect(container.querySelector('a[href="/AbC"]')).not.toBeNull();
+  });
+
+  it('the preview of an opened one-time link says so and has no Continue', () => {
+    page.url = new URL('https://www.iksi.app/AbC+');
+    const { container } = render(LinkPage, {
+      data: { view: 'preview', host: '', destination: null, hasRules: false, flagged: null, expired: false, oneTime: true, opened: true },
+      form: null
+    } as never);
+    expect(container.textContent).toContain('This link was already opened.');
+    expect(container.querySelector('a[href="/AbC"]')).toBeNull();
   });
 });

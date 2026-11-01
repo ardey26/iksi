@@ -5,9 +5,13 @@ const findUnique = vi.hoisted(() => vi.fn());
 const recordClick = vi.hoisted(() => vi.fn());
 const waitUntil = vi.hoisted(() => vi.fn());
 const rateLimit = vi.hoisted(() => vi.fn());
+const executeRaw = vi.hoisted(() => vi.fn());
 
-vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findUnique } } }));
-vi.mock('#lib/server/crypto.js', () => ({ decodeURL: vi.fn(async (s: string) => s) }));
+vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findUnique }, $executeRaw: executeRaw } }));
+// Ciphertext is modelled as an `enc:` prefix; anything else decodes to itself, as a legacy plain value does.
+vi.mock('#lib/server/crypto.js', () => ({
+  decodeURL: vi.fn(async (s: string) => (s.startsWith('enc:') ? s.slice(4) : s))
+}));
 vi.mock('#lib/server/tracking.js', () => ({ recordClick }));
 vi.mock('@vercel/functions', () => ({ waitUntil }));
 vi.mock('#lib/rateLimit.js', () => ({ rateLimit }));
@@ -26,7 +30,10 @@ const ROW = {
   passwordHash: null as string | null,
   permanent: false,
   clickCount: 0,
-  maxClicks: null as number | null
+  maxClicks: null as number | null,
+  oneTime: false,
+  secretKind: null as string | null,
+  openedAt: null as Date | null
 };
 
 function makeEvent(path: string, init: { headers?: Record<string, string>; method?: string; body?: FormData } = {}) {
@@ -257,7 +264,9 @@ describe('preview', () => {
       destination: 'https://example.com/a?b=1',
       hasRules: false,
       flagged: null,
-      expired: false
+      expired: false,
+      oneTime: false,
+      opened: false
     });
     expect(recordClick).not.toHaveBeenCalled();
   });
@@ -364,5 +373,310 @@ describe('unlock', () => {
     const { redirect } = await unlock('/AbC', 'x');
     expect(redirect).toEqual({ status: 303, location: '/AbC' });
     expect(recordClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('one-time links', () => {
+  const SECRET_TEXT = 'the vault code is 4521';
+  const SECRET_URL = 'https://secret.example/doc?k=1';
+  const FUTURE = () => new Date(Date.now() + 7 * 86400000);
+
+  /** One row shared by every lookup and claim, so a claim is visible to the next request. */
+  function oneTimeRow(over: Record<string, unknown> = {}) {
+    const state: Record<string, any> = {
+      ...ROW,
+      originalURL: '',
+      oneTime: true,
+      secretKind: 'text',
+      secret: `enc:${SECRET_TEXT}`,
+      openedAt: null,
+      expiresAt: FUTURE(),
+      ...over
+    };
+    findUnique.mockImplementation(async ({ select }: { select: Record<string, boolean> }) => {
+      const snap: Record<string, any> = {};
+      for (const k of Object.keys(select)) if (k in state) snap[k] = state[k];
+      return snap;
+    });
+    // Behaves like Postgres running the conditional UPDATE: the WHERE is checked
+    // against the row as it is when the statement runs.
+    executeRaw.mockImplementation(async (q: { values: unknown[] }) => {
+      await new Promise((r) => setTimeout(r, 0));
+      const [at, id, cutoff] = q.values as [Date, number, Date];
+      const live =
+        state.id === id &&
+        state.oneTime &&
+        state.openedAt === null &&
+        state.secret !== null &&
+        state.expiredAt === null &&
+        (state.expiresAt === null || state.expiresAt > cutoff);
+      if (!live) return 0;
+      state.openedAt = at;
+      state.secret = null;
+      return 1;
+    });
+    return state;
+  }
+
+  async function reveal(path: string, password: string | null = null) {
+    const body = new FormData();
+    if (password !== null) body.set('password', password);
+    const event = makeEvent(path, { method: 'POST', body });
+    try {
+      const result: any = await (actions as any).reveal(event as never);
+      return { result, event } as any;
+    } catch (e: any) {
+      if (e?.location) return { redirect: { status: e.status, location: e.location }, event } as any;
+      if (typeof e?.status === 'number') return { error: { status: e.status, body: e.body }, event } as any;
+      throw e;
+    }
+  }
+
+  describe('viewing never burns', () => {
+    it('GET shows the reveal page without the content and without reading it', async () => {
+      oneTimeRow();
+      const r = await run('/AbC');
+      expect(r.data).toEqual({ view: 'reveal', kind: 'text', password: false, error: null });
+      expect(JSON.stringify(r.data)).not.toContain('vault');
+      expect(findUnique.mock.calls[0][0].select.secret).toBeUndefined();
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(recordClick).not.toHaveBeenCalled();
+      expect(r.event.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('HEAD does not burn', async () => {
+      const state = oneTimeRow();
+      const r = await run('/AbC', {}, 'HEAD');
+      expect(r.data.view).toBe('reveal');
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(state.secret).toBe(`enc:${SECRET_TEXT}`);
+    });
+
+    it('a SvelteKit data request (hover preload) does not burn', async () => {
+      const state = oneTimeRow();
+      const event: any = makeEvent('/AbC');
+      event.isDataRequest = true;
+      const data: any = await load(event);
+      expect(data.view).toBe('reveal');
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(state.secret).toBe(`enc:${SECRET_TEXT}`);
+    });
+
+    it('a GET carrying the action query does not burn', async () => {
+      oneTimeRow();
+      const r = await run('/AbC?/reveal');
+      expect(r.data.view).toBe('reveal');
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('many GETs (link preview bots) leave it openable', async () => {
+      oneTimeRow();
+      for (let i = 0; i < 5; i++) await run('/AbC');
+      const { result } = await reveal('/AbC');
+      expect(result).toEqual({ text: SECRET_TEXT });
+    });
+
+    it('the preview hides the content and does not burn', async () => {
+      oneTimeRow({ secretKind: 'url', secret: `enc:${SECRET_URL}` });
+      const r = await run('/AbC+');
+      expect(r.data).toMatchObject({ view: 'preview', oneTime: true, destination: null, host: '', opened: false });
+      expect(JSON.stringify(r.data)).not.toContain('secret.example');
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('a URL secret says it opens a website', async () => {
+      oneTimeRow({ secretKind: 'url', secret: `enc:${SECRET_URL}` });
+      expect((await run('/AbC')).data).toMatchObject({ view: 'reveal', kind: 'url' });
+    });
+  });
+
+  describe('reveal', () => {
+    it('shows a text secret once and erases it from the row', async () => {
+      const state = oneTimeRow();
+      const { result, event } = await reveal('/AbC');
+      expect(result).toEqual({ text: SECRET_TEXT });
+      expect(executeRaw).toHaveBeenCalledTimes(1);
+      expect(state.secret).toBeNull();
+      expect(state.openedAt).toBeInstanceOf(Date);
+      expect(event.headers['cache-control']).toBe('private, no-store');
+      expect(recordClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('redirects a URL secret with 303 and erases it', async () => {
+      const state = oneTimeRow({ secretKind: 'url', secret: `enc:${SECRET_URL}` });
+      const { redirect, event } = await reveal('/AbC');
+      expect(redirect).toEqual({ status: 303, location: SECRET_URL });
+      expect(state.secret).toBeNull();
+      expect(event.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('two concurrent reveals: exactly one gets the content, the other sees already opened', async () => {
+      oneTimeRow();
+      const [a, b] = await Promise.all([reveal('/AbC'), reveal('/AbC')]);
+      // Both passed every check in code and reached the claim; the UPDATE decided.
+      expect(executeRaw).toHaveBeenCalledTimes(2);
+      const results = [a.result, b.result];
+      const winners = results.filter((r) => r?.text === SECRET_TEXT);
+      const losers = results.filter((r) => r?.status === 410);
+      expect(winners).toHaveLength(1);
+      expect(losers).toHaveLength(1);
+      expect(losers[0].data).toEqual({ opened: true });
+      expect(JSON.stringify(losers[0])).not.toContain('vault');
+      expect(recordClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('two concurrent URL reveals: exactly one is redirected', async () => {
+      oneTimeRow({ secretKind: 'url', secret: `enc:${SECRET_URL}` });
+      const [a, b] = await Promise.all([reveal('/AbC'), reveal('/AbC')]);
+      expect([a, b].filter((r) => r.redirect?.location === SECRET_URL)).toHaveLength(1);
+      expect([a, b].filter((r) => r.result?.status === 410)).toHaveLength(1);
+    });
+
+    it('after the reveal the link is a 410 already opened page', async () => {
+      oneTimeRow();
+      await reveal('/AbC');
+      const r = await run('/AbC');
+      expect(r.error.status).toBe(410);
+      expect(r.error.body).toMatchObject({ view: 'opened', message: 'This link was already opened.' });
+    });
+
+    it('a second reveal gets already opened and no content', async () => {
+      oneTimeRow();
+      await reveal('/AbC');
+      const { result } = await reveal('/AbC');
+      expect(result.status).toBe(410);
+      expect(result.data).toEqual({ opened: true });
+      expect(executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('the page rendered after a no-JS reveal POST shows the result, not an error', async () => {
+      oneTimeRow();
+      await reveal('/AbC');
+      // SvelteKit runs load after a non-enhanced action on the same POST.
+      const event: any = makeEvent('/AbC', { method: 'POST', body: new FormData() });
+      expect(await load(event)).toEqual({ view: 'opened' });
+    });
+
+    it('a row whose content is already gone is never claimed', async () => {
+      oneTimeRow({ secret: null });
+      const { result } = await reveal('/AbC');
+      expect(result.status).toBe(410);
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('content that cannot be decrypted is not burned', async () => {
+      const crypto = await import('#lib/server/crypto.js');
+      vi.mocked(crypto.decodeURL).mockImplementationOnce(async (s: string) => s);
+      const state = oneTimeRow({ secret: 'aa:bb:cc' });
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const r = await reveal('/AbC');
+      expect(r.error?.status).toBe(500);
+      expect(state.secret).toBe('aa:bb:cc');
+      expect(executeRaw).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('a normal link has no reveal: it goes back to the plain route', async () => {
+      findUnique.mockResolvedValue({ ...ROW });
+      const { redirect } = await reveal('/AbC');
+      expect(redirect).toEqual({ status: 303, location: '/AbC' });
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('the unlock action never reveals a one-time link', async () => {
+      oneTimeRow({ passwordHash: HASH });
+      const { redirect } = await unlock('/AbC', 'hunter2');
+      expect(redirect).toEqual({ status: 303, location: '/AbC' });
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(recordClick).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('with a password', () => {
+    it('the reveal page asks for the password', async () => {
+      oneTimeRow({ passwordHash: HASH });
+      const r = await run('/AbC');
+      expect(r.data).toEqual({ view: 'reveal', kind: 'text', password: true, error: null });
+    });
+
+    it('a wrong or missing password never claims the link', async () => {
+      const state = oneTimeRow({ passwordHash: HASH });
+      for (const pw of ['nope', null, 'a'.repeat(129)]) {
+        const { result } = await reveal('/AbC', pw);
+        expect(result.status).toBe(400);
+        expect(result.data).toEqual({ error: 'Wrong password' });
+      }
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(state.secret).toBe(`enc:${SECRET_TEXT}`);
+    });
+
+    it('the right password reveals it', async () => {
+      oneTimeRow({ passwordHash: HASH });
+      const { result } = await reveal('/AbC', 'hunter2');
+      expect(result).toEqual({ text: SECRET_TEXT });
+    });
+
+    it('reveal and unlock share one rate limit key, 10 per 10 minutes', async () => {
+      oneTimeRow({ passwordHash: HASH });
+      await reveal('/AbC', 'nope');
+      findUnique.mockResolvedValue({ ...ROW, passwordHash: HASH });
+      await unlock('/AbC', 'nope');
+      expect(rateLimit.mock.calls).toEqual([
+        ['unlock:AbC:1.2.3.4', 10, 10 * 60 * 1000],
+        ['unlock:AbC:1.2.3.4', 10, 10 * 60 * 1000]
+      ]);
+    });
+
+    it('a rate limited reveal is 429 without checking the password or claiming', async () => {
+      const state = oneTimeRow({ passwordHash: HASH });
+      rateLimit.mockResolvedValue({ allowed: false });
+      const { result } = await reveal('/AbC', 'hunter2');
+      expect(result.status).toBe(429);
+      expect(result.data).toEqual({ error: 'Too many attempts. Try again in a few minutes.' });
+      expect(findUnique).not.toHaveBeenCalled();
+      expect(state.secret).toBe(`enc:${SECRET_TEXT}`);
+    });
+  });
+
+  describe('expired and flagged', () => {
+    it('an expired unopened secret shows the expired page', async () => {
+      oneTimeRow({ expiresAt: new Date(Date.now() - 1000) });
+      const r = await run('/AbC');
+      expect(r.error.status).toBe(410);
+      expect(r.error.body).toMatchObject({ view: 'expired' });
+      expect(JSON.stringify(r.error.body)).not.toContain('vault');
+    });
+
+    it('an expired secret is never served by the reveal action', async () => {
+      const state = oneTimeRow({ expiresAt: new Date(Date.now() - 1000) });
+      const r = await reveal('/AbC');
+      expect(r.redirect).toEqual({ status: 303, location: '/AbC' });
+      expect(JSON.stringify(r)).not.toContain('vault');
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(state.openedAt).toBeNull();
+    });
+
+    it('a claim the database refuses (expired or opened meanwhile) serves nothing', async () => {
+      oneTimeRow();
+      executeRaw.mockImplementationOnce(async () => 0);
+      const { result } = await reveal('/AbC');
+      expect(result.status).toBe(410);
+      expect(JSON.stringify(result)).not.toContain('vault');
+    });
+
+    it('an opened link that is also past its expiry says already opened', async () => {
+      oneTimeRow({ openedAt: new Date(), secret: null, expiresAt: new Date(Date.now() - 1000) });
+      expect((await run('/AbC')).error.body).toMatchObject({ view: 'opened' });
+    });
+
+    it('a flagged secret is disabled and never served', async () => {
+      oneTimeRow({ safeVerdict: 'phishing', secretKind: 'url', secret: `enc:${SECRET_URL}` });
+      const r = await run('/AbC');
+      expect(r.error.status).toBe(403);
+      expect(JSON.stringify(r.error.body)).not.toContain('secret.example');
+      const rv = await reveal('/AbC');
+      expect(rv.redirect).toEqual({ status: 303, location: '/AbC' });
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
   });
 });
