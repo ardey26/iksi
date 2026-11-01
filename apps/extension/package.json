@@ -1,0 +1,16 @@
+{
+	"name": "@iksi/extension",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "iksi browser extension: shorten links from the right-click menu.",
+	"scripts": {
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"zip": "node scripts/zip.mjs",
+		"build": "node scripts/zip.mjs"
+	},
+	"devDependencies": {
+		"vitest": "^4.1.12"
+	}
+}
