@@ -77,3 +77,36 @@ describe('home page scoped suggestion', () => {
     expect(await screen.findByText('Custom link alias already exists, pick another one')).toBeInTheDocument();
   });
 });
+
+describe('home page layout', () => {
+  // The first screen is only the tool; the SEO copy and the one H1 sit
+  // below the fold, visible (never visually hidden).
+  it('has only the tool in the hero', () => {
+    const { container } = render(Home);
+    const hero = container.querySelector('section.hero');
+    expect(hero).toHaveAccessibleName('Shorten a link');
+    expect(hero.querySelector('h1, h2, p.lede')).toBeNull();
+    expect(hero.querySelectorAll('.paper')).toHaveLength(1);
+    expect(hero.querySelector('[role="radiogroup"][aria-label="Link type"]')).not.toBeNull();
+    expect(hero.querySelector('input')).not.toBeNull();
+    expect(screen.queryByText('Make long links short.')).toBeNull();
+  });
+
+  it('puts the one H1 in the first section below the hero, visible', () => {
+    const { container } = render(Home);
+    const h1s = container.querySelectorAll('h1');
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent('A free URL shortener that stays out of the way');
+    expect(h1s[0].closest('section')).toBe(container.querySelector('section.hero').nextElementSibling);
+    expect(h1s[0].closest('.sr-only, .visually-hidden')).toBeNull();
+  });
+
+  it('keeps the result inside the hero', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ shortURL: 'AbCdEf' }))));
+    const { container } = render(Home);
+    await fireEvent.input(screen.getByLabelText('URL to shorten'), { target: { value: 'example.com/a' } });
+    await fireEvent.submit(screen.getByLabelText('URL to shorten').closest('form'));
+    await screen.findByText(/AbCdEf/);
+    expect(container.querySelector('section.hero')).toHaveTextContent('AbCdEf');
+  });
+});

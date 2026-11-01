@@ -153,7 +153,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    height: 64px;
+    height: var(--site-header);
     padding: 0 var(--gutter);
   }
   .brand {

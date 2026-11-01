@@ -271,6 +271,8 @@ select[size]:not([size="1"]) {
   --width-narrow: 480px;
   --width-form: 720px;
   --width-wide: 960px;
+  /* The site header, in the page flow above every non-profile page. */
+  --site-header: 64px;
 
   /* Controls: 40px, 44px on phones so every target is tappable. */
   --control: 40px;

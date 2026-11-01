@@ -126,13 +126,9 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <div class="home">
-  <section class="hero" aria-labelledby="home-title">
+  <!-- The first screen is the tool and nothing else. The words are below the fold. -->
+  <section class="hero" aria-label="Shorten a link">
     <Container width="form" class="hero-inner">
-      <h1 id="home-title" class="t-display headline">Make long links short.</h1>
-      <p class="lede">
-        iksi is a free URL shortener. Paste a link, get a short one. No signup.
-      </p>
-
       <Paper class="tool">
         {#if shortURL}
           <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
@@ -164,7 +160,7 @@
   <section class="band" aria-labelledby="about-heading">
     <Container width="wide">
       <div class="about">
-        <h2 id="about-heading" class="about-title">A free URL shortener that stays out of the way</h2>
+        <h1 id="about-heading" class="about-title">A free URL shortener that stays out of the way</h1>
         <p class="about-body">
           Paste a long link, get a short one, no signup needed. No interstitial ads on your links, and
           redirects served from the edge. <em>Iksi</em> is Tagalog for "short".
@@ -203,37 +199,23 @@
     flex: 1;
   }
 
-  .hero { padding: 40px 0 64px; }
-  @media (min-width: 768px) {
-    .hero { padding: 72px 0 96px; }
+  /* Exactly the first screen under the site header, so the next band's
+     hairline sits at the fold. svh: the screen with the browser bars shown. */
+  .hero {
+    display: flex;
+    align-items: center;
+    min-height: calc(100vh - var(--site-header));
+    min-height: calc(100svh - var(--site-header));
+    padding: 24px 0 calc(24px + var(--site-header) / 2);
   }
   :global(.hero-inner) {
     display: flex;
     flex-direction: column;
     align-items: center;
-    text-align: center;
-  }
-  .headline {
-    margin: 0;
-    color: var(--text-primary);
-  }
-  @media (min-width: 768px) {
-    /* The one place a bigger display size earns its keep. */
-    .headline { font-size: 56px; line-height: 60px; }
-  }
-  .lede {
-    max-width: 520px;
-    margin: 16px 0 0;
-    font-size: 15px;
-    line-height: 22px;
-    color: var(--text-muted);
-    text-wrap: balance;
   }
   :global(.tool) {
     width: 100%;
     max-width: 560px;
-    margin-top: 32px;
-    text-align: left;
   }
   .mode { margin-bottom: 16px; }
 
