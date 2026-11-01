@@ -1,217 +1,195 @@
 <script lang="ts">
   import ApiKeys from '#lib/components/ApiKeys.svelte';
+  import {
+    Button,
+    Container,
+    Icon,
+    IconButton,
+    List,
+    Monogram,
+    PageHeader,
+    Paper,
+    Row,
+    Section,
+    Skeleton,
+    toast
+  } from '#lib/ui/index.js';
+  import { formatCount } from '#lib/format.js';
   import { profileHref, profileLabel, profileUrl } from '#lib/subdomains.js';
 
   export let data;
 
   $: subdomains = !!data.subdomains;
-  $: publicUrl = data.user.handle ? profileLabel(data.user.handle, subdomains) : null;
+  $: handle = data.user.handle as string | null;
+  $: publicUrl = handle ? profileLabel(handle, subdomains) : null;
 
-  let copied = false;
   async function copyPublicUrl() {
-    if (!data.user.handle) return;
+    if (!handle) return;
     try {
-      await navigator.clipboard.writeText(profileUrl(data.user.handle, subdomains));
-      copied = true;
-      setTimeout(() => (copied = false), 1400);
-    } catch {}
+      await navigator.clipboard.writeText(profileUrl(handle, subdomains));
+      toast('Link copied', { variant: 'success' });
+    } catch {
+      toast('Could not copy the link', { variant: 'error' });
+    }
   }
 
-  function fmt(n: number) {
-    return n.toLocaleString();
+  const STATS = ['Visits', 'Clicks', 'Clickthrough'];
+
+  function figures(s: { views: number; clicks: number; ctr: number }) {
+    return [formatCount(s.views), formatCount(s.clicks), `${(s.ctr * 100).toFixed(1)}%`];
   }
+
+  const MANAGE = [
+    { href: '/dashboard/links', title: 'Links', desc: 'Short links and one-time links', icon: 'link' },
+    { href: '/dashboard/profile', title: 'Profile', desc: 'Name, look and the Pay button', icon: 'settings' }
+  ] as const;
 </script>
 
 <svelte:head><title>Dashboard — iksi</title></svelte:head>
 
-<section class="w-full max-w-2xl mx-auto">
-  <header class="space-y-3 mb-12">
-    {#if publicUrl}
-      <div class="flex items-baseline gap-3 flex-wrap">
-        <a
-          href={profileHref(data.user.handle, subdomains)}
-          target="_blank"
-          rel="noopener"
-          class="text-3xl font-semibold tracking-tight hover:opacity-70 transition-opacity"
-          style="color: var(--text-primary);"
-        >
-          {publicUrl}
-        </a>
-        <button
-          type="button"
-          on:click={copyPublicUrl}
-          class="inline-flex items-center gap-1 text-xs hover:opacity-70 transition-opacity"
-          style="color: var(--text-muted); background: transparent; border: none; cursor: pointer; padding: 0;"
-          title="Copy link"
-          aria-label="Copy link"
-        >
-          {#if copied}
-            <span>copied</span>
-          {:else}
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-              <rect x="9" y="9" width="11" height="11" rx="2"/>
-              <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
-            </svg>
-            <span>Copy</span>
-          {/if}
-        </button>
-      </div>
-    {:else}
-      <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Your dashboard</h1>
-    {/if}
-  </header>
+<Container width="form">
+  <PageHeader title="Dashboard" description="Your public page, your links and the keys that use them.">
+    <svelte:fragment slot="actions">
+      <Button variant="primary" icon="plus" href="/dashboard/links#new">New link</Button>
+    </svelte:fragment>
+  </PageHeader>
 
-  <!-- SECTION: Traffic (streamed) -->
-  {#if data.streamed?.stats}
-    <section class="d-section" aria-labelledby="d-traffic">
-      <h2 class="d-title" id="d-traffic">Traffic</h2>
-      <p class="d-desc">All-time activity on your public page.</p>
-      {#await data.streamed.stats}
-        <!-- Skeleton: keeps layout stable, subtle pulse -->
-        <div class="stats" aria-hidden="true">
-          {#each [0, 1, 2] as _}
-            <div class="stat animate-pulse">
-              <div class="h-8 rounded" style="background-color: var(--border); width: 60%;"></div>
-              <div class="mt-3 h-3 rounded" style="background-color: var(--border); width: 40%;"></div>
-            </div>
-          {/each}
-        </div>
-      {:then s}
-        {#if s.views === 0}
-          <p class="stats empty">
-            No one's stopped by yet. Share <span style="color: var(--text-primary);">{publicUrl}</span> to get traffic.
-          </p>
-        {:else}
-          <div class="stats">
-            <div class="stat">
-              <div class="figure">{fmt(s.views)}</div>
-              <div class="caption">{s.views === 1 ? 'Visit' : 'Visits'}</div>
-            </div>
-            <div class="stat">
-              <div class="figure">{fmt(s.clicks)}</div>
-              <div class="caption">{s.clicks === 1 ? 'Click' : 'Clicks'}</div>
-            </div>
-            <div class="stat">
-              <div class="figure">{(s.ctr * 100).toFixed(1)}<span class="unit">%</span></div>
-              <div class="caption">Clickthrough</div>
-            </div>
+  {#if publicUrl && handle}
+    <Section title="Your page" description="Share it anywhere. Traffic counts every visit since you joined.">
+      <Paper padding="none">
+        <List label="Your page">
+          <Row>
+            <Monogram slot="leading" name={handle} />
+            <a class="address t-mono" href={profileHref(handle, subdomains)} target="_blank" rel="noopener">{publicUrl}</a>
+            <svelte:fragment slot="subtitle">Public page</svelte:fragment>
+            <svelte:fragment slot="actions">
+              <IconButton icon="copy" label="Copy link" on:click={copyPublicUrl} />
+            </svelte:fragment>
+          </Row>
+        </List>
+
+        {#if data.streamed?.stats}
+          <div class="traffic">
+            {#await data.streamed.stats}
+              <dl class="stats" aria-busy="true">
+                {#each STATS as label (label)}
+                  <div class="stat">
+                    <dt class="t-label t-muted">{label}</dt>
+                    <dd><Skeleton width="64px" height="26px" /></dd>
+                  </div>
+                {/each}
+              </dl>
+            {:then s}
+              {#if s.views === 0}
+                <p class="quiet t-body t-muted">No visits yet. Share your page to get some.</p>
+              {:else}
+                <dl class="stats">
+                  {#each figures(s) as figure, i (STATS[i])}
+                    <div class="stat">
+                      <dt class="t-label t-muted">{STATS[i]}</dt>
+                      <dd class="t-title t-tabular figure">{figure}</dd>
+                    </div>
+                  {/each}
+                </dl>
+              {/if}
+            {:catch}
+              <p class="quiet t-body t-muted">Traffic could not be loaded. Reload to try again.</p>
+            {/await}
           </div>
         {/if}
-      {/await}
-    </section>
+      </Paper>
+    </Section>
   {/if}
 
-  <!-- SECTION: Manage -->
-  <section class="d-section" aria-labelledby="d-manage">
-    <h2 class="d-title" id="d-manage">Manage</h2>
-    <p class="d-desc">Update your links and public page settings.</p>
-    <nav class="manage" aria-labelledby="d-manage">
-      {#each [
-        { href: '/dashboard/links', title: 'Links', desc: 'Edit or delete the short URLs you own.' },
-        { href: '/dashboard/profile', title: 'Profile', desc: 'Change how your public page looks.' }
-      ] as item}
-        <a href={item.href} class="group item">
-          <span class="flex flex-col min-w-0">
-            <span class="item-title">{item.title}</span>
-            <span class="item-desc">{item.desc}</span>
-          </span>
-          <svg class="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-          </svg>
-        </a>
-      {/each}
-    </nav>
-  </section>
+  <Section title="Manage">
+    <Paper padding="none">
+      <nav aria-label="Manage">
+        <List>
+          {#each MANAGE as item (item.href)}
+            <Row interactive style="position: relative;">
+              <span slot="leading" class="tile"><Icon name={item.icon} /></span>
+              <a class="stretch" href={item.href}>{item.title}</a>
+              <svelte:fragment slot="subtitle">{item.desc}</svelte:fragment>
+              <span slot="meta" class="chevron"><Icon name="chevron-right" /></span>
+            </Row>
+          {/each}
+        </List>
+      </nav>
+    </Paper>
+  </Section>
 
-  <!-- SECTION: API keys -->
-  <section class="d-section" aria-labelledby="d-api-keys">
-    <h2 class="d-title" id="d-api-keys">API keys</h2>
-    <p class="d-desc">Keys let the iksi browser extension shorten links as you.</p>
+  <Section title="API keys" description="Keys let the iksi browser extension shorten links as you.">
     <ApiKeys keys={data.apiKeys ?? []} />
-  </section>
-</section>
+  </Section>
+</Container>
 
 <style>
-  /* Readouts on a hairline strip: no box, vertical hairlines between. */
+  .address {
+    display: inline-block;
+    /* A 44px tall hit area on the one-line link, without moving the text. */
+    padding: 11px 0;
+    margin: -11px 0;
+    color: var(--text-primary);
+    text-decoration: none;
+    border-radius: 4px;
+  }
+  .address:hover { color: var(--accent); }
+  .address:focus-visible,
+  .stretch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .traffic { border-top: 1px solid var(--border); }
   .stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    min-height: 105px;
-    margin-top: 16px;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .stats.empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 16px;
-    font-size: 14px;
-    text-align: center;
-    color: var(--text-muted);
+    margin: 0;
   }
   .stat {
-    padding: 24px 20px 20px;
+    min-width: 0;
+    padding: 16px;
   }
-  .stat:first-child {
-    padding-left: 0;
-  }
-  .stat + .stat {
-    border-left: 1px solid var(--border);
-  }
+  .stat + .stat { border-left: 1px solid var(--border); }
+  .stat dd { margin: 4px 0 0; }
   .figure {
-    font-size: 30px;
-    line-height: 1;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
     color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
   }
-  .unit {
-    margin-left: 2px;
-    font-size: 18px;
-    color: var(--text-muted);
-  }
-  .caption {
-    margin-top: 10px;
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-  .manage {
-    margin-top: 16px;
-    border-top: 1px solid var(--border);
-  }
-  .item {
+  /* Same height as the figures, so the strip never changes size. */
+  .quiet {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    min-height: 72px;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--border);
+    min-height: 80px;
+    margin: 0;
+    padding: 0 16px;
   }
-  .item:hover {
-    opacity: 1;
-  }
-  .item-title {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text-primary);
-  }
-  .item-desc {
-    margin-top: 2px;
-    font-size: 13px;
+
+  .tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
     color: var(--text-muted);
+    background-color: var(--surface-2);
+    border-radius: var(--radius-control);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
-  .item:focus-visible {
-    outline: 1px solid var(--border-focus);
-    outline-offset: 2px;
+  .stretch {
+    color: inherit;
+    text-decoration: none;
+    border-radius: 4px;
   }
-  @media (max-width: 639px) {
-    .stat {
-      padding: 20px 12px 16px;
-    }
-    .figure {
-      font-size: 24px;
-    }
+  /* The whole row is the link's hit area. */
+  .stretch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .chevron {
+    display: inline-flex;
+    color: var(--text-faint);
   }
 </style>

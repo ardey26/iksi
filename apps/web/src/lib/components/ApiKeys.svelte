@@ -1,24 +1,32 @@
 <script lang="ts">
-  // Dashboard "API keys" section. A new key is shown once, right after it is
-  // created, and held only in this component until dismissed. The list shows
-  // each key's prefix, never the key.
+  // Dashboard "API keys" section body. A new key is shown once, right after it
+  // is created, and held only in this component until dismissed. The list
+  // shows each key's prefix, never the key.
+  import { tick } from 'svelte';
+  import { Button, EmptyState, IconButton, Input, List, Paper, Row, Stack, toast } from '#lib/ui/index.js';
   import { API_KEY_NAME_MAX, MAX_API_KEYS, type ApiKeyView } from '#lib/api-keys.js';
+  import { relativeDate } from '#lib/format.js';
 
   export let keys: ApiKeyView[] = [];
 
   let name = '';
   let busy = false;
   let createError = '';
-  let revokeError = '';
   let secret = '';
   let copied = false;
   let confirmId: number | null = null;
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
+  let root: HTMLElement;
 
   $: full = keys.length >= MAX_API_KEYS;
 
-  function fmt(iso: string) {
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  /** Mid-sentence, "Yesterday" reads "yesterday"; a date ("Oct 20") keeps its capital. */
+  const inSentence = (s: string) => (/^[A-Z][a-z]{2} \d/.test(s) ? s : s.toLowerCase());
+
+  /** "Created Oct 15, never used" or "Created 2 days ago, last used yesterday". */
+  function usage(k: ApiKeyView) {
+    const created = `Created ${inSentence(relativeDate(k.createdAt))}`;
+    return k.lastUsedAt ? `${created}, last used ${inSentence(relativeDate(k.lastUsedAt))}` : `${created}, never used`;
   }
 
   async function send(url: string, init: RequestInit): Promise<{ ok: boolean; body: any }> {
@@ -36,7 +44,6 @@
     if (busy || !name.trim()) return;
     busy = true;
     createError = '';
-    revokeError = '';
     const { ok, body } = await send('/api/keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -59,7 +66,7 @@
       clearTimeout(copyTimer);
       copyTimer = setTimeout(() => (copied = false), 1400);
     } catch {
-      createError = 'Could not copy. Select the key and copy it yourself.';
+      toast('Could not copy. Select the key and copy it yourself.', { variant: 'error' });
     }
   }
 
@@ -68,115 +75,125 @@
     copied = false;
   }
 
+  const focus = async (sel: string) => {
+    await tick();
+    root?.querySelector<HTMLElement>(sel)?.focus();
+  };
+
+  // Keyboard focus follows the inline confirm in and back out.
+  function ask(k: ApiKeyView) {
+    confirmId = k.id;
+    focus(`[data-key-cancel="${k.id}"]`);
+  }
+
+  function back(k: ApiKeyView) {
+    confirmId = null;
+    focus(`[data-key-revoke="${k.id}"]`);
+  }
+
   async function revoke(k: ApiKeyView) {
     if (busy) return;
     busy = true;
-    revokeError = '';
     const { ok } = await send(`/api/keys?id=${k.id}`, { method: 'DELETE' });
     busy = false;
     confirmId = null;
-    if (!ok) revokeError = 'Could not revoke that key.';
+    if (ok) toast(`${k.name} revoked`, { variant: 'success' });
+    else toast('Could not revoke that key.', { variant: 'error' });
   }
 </script>
 
-<div class="d-spec">
-  {#if secret}
-    <div class="d-row">
-      <label class="d-label" for="api-key-secret">New key</label>
-      <div class="d-control">
-        <div class="d-inline flex-nowrap">
-          <input id="api-key-secret" class="d-field mono" readonly value={secret}
-                 spellcheck="false" autocomplete="off" on:focus={(e) => e.currentTarget.select()} />
-          <button type="button" class="d-btn d-btn-secondary shrink-0 copy" on:click={copy}>{copied ? 'Copied' : 'Copy key'}</button>
-        </div>
-        <p class="d-hint">Paste it into the iksi extension's options. You won't see this key again.</p>
-        <button type="button" class="d-btn d-btn-text done" on:click={done}>Done</button>
-      </div>
-    </div>
-  {/if}
-
-  {#each keys as k (k.id)}
-    <div class="d-row">
-      <span class="d-label name">{k.name}</span>
-      <div class="d-control key">
-        <div class="min-w-0">
-          <p class="primary mono">{k.prefix}…</p>
-          <p class="meta">Created {fmt(k.createdAt)} · {k.lastUsedAt ? `Last used ${fmt(k.lastUsedAt)}` : 'Never used'}</p>
-        </div>
-        <div class="actions">
-          {#if confirmId === k.id}
-            <button type="button" class="d-btn d-btn-text d-btn-danger" disabled={busy} on:click={() => revoke(k)}>Revoke key</button>
-            <button type="button" class="d-btn d-btn-text" disabled={busy} on:click={() => (confirmId = null)}>Cancel</button>
-          {:else}
-            <button type="button" class="d-btn d-btn-text d-btn-danger" disabled={busy}
-                    aria-label="Revoke {k.name}" on:click={() => (confirmId = k.id)}>Revoke</button>
-          {/if}
-        </div>
-      </div>
-    </div>
-  {/each}
-
-  <div class="d-row">
-    {#if full}
-      <span class="d-label">Create a key</span>
-    {:else}
-      <label class="d-label" for="api-key-name">Create a key</label>
+<div bind:this={root}>
+  <Stack gap={16}>
+    {#if secret}
+      <Paper>
+        <Stack gap={12}>
+          <Input
+            label="New key"
+            mono
+            readonly
+            value={secret}
+            spellcheck="false"
+            autocomplete="off"
+            hint="Paste it into the iksi extension's options. You won't see this key again."
+            on:focus={(e) => e.currentTarget.select()}
+          />
+          <Stack direction="row" gap={8} justify="flex-end" wrap>
+            <Button variant="ghost" on:click={done}>Done</Button>
+            <Button icon={copied ? 'check' : 'copy'} on:click={copy}>{copied ? 'Copied' : 'Copy key'}</Button>
+          </Stack>
+        </Stack>
+      </Paper>
     {/if}
-    <div class="d-control">
-      {#if full}
-        <p class="meta limit">You have {MAX_API_KEYS} keys, the most you can have. Revoke one to create another.</p>
+
+    <Paper padding="none">
+      {#if keys.length === 0}
+        <EmptyState icon="lock" title="No API keys yet" description="Create one for each browser you use the extension in." />
       {:else}
-        <form class="d-inline flex-nowrap" on:submit|preventDefault={create}>
-          <input id="api-key-name" class="d-field" bind:value={name} maxlength={API_KEY_NAME_MAX}
-                 placeholder="Chrome on my laptop" autocomplete="off" />
-          <button type="submit" class="d-btn d-btn-secondary shrink-0" disabled={busy || !name.trim()}>Create key</button>
-        </form>
-        <p class="d-hint">Name it after where you'll use it. Anyone with a key can shorten links as you, so revoke keys you no longer use.</p>
+        <List label="API keys">
+          {#each keys as k (k.id)}
+            <Row muted={busy && confirmId === k.id}>
+              <span class="clip">{k.name}</span>
+              <svelte:fragment slot="subtitle">
+                {#if confirmId === k.id}
+                  <span class="line">Revoke it? Anything using it stops working.</span>
+                {:else}
+                  <span class="line t-mono">{k.prefix}…</span>
+                  <span class="line">{usage(k)}</span>
+                {/if}
+              </svelte:fragment>
+              <svelte:fragment slot="actions">
+                {#if confirmId === k.id}
+                  <Button size="sm" variant="ghost" data-key-cancel={k.id} disabled={busy} on:click={() => back(k)}>Cancel</Button>
+                  <Button size="sm" variant="danger" loading={busy} on:click={() => revoke(k)}>Revoke key</Button>
+                {:else}
+                  <IconButton icon="trash" variant="danger" label="Revoke {k.name}" data-key-revoke={k.id} disabled={busy} on:click={() => ask(k)} />
+                {/if}
+              </svelte:fragment>
+            </Row>
+          {/each}
+        </List>
       {/if}
-      <p class="err" role={createError || revokeError ? 'alert' : undefined}>{createError || revokeError}</p>
-    </div>
-  </div>
+    </Paper>
+
+    {#if full}
+      <p class="t-label t-muted">You have {MAX_API_KEYS} keys, the most you can have. Revoke one to create another.</p>
+    {:else}
+      <form class="create" on:submit|preventDefault={create}>
+        <Input
+          label="Key name"
+          bind:value={name}
+          maxlength={API_KEY_NAME_MAX}
+          placeholder="Chrome on my laptop"
+          autocomplete="off"
+          error={createError}
+          hint="Name it after where you'll use it. Anyone with a key can shorten links as you."
+        />
+        <Button type="submit" icon="plus" loading={busy && confirmId === null} disabled={!name.trim()}>Create key</Button>
+      </form>
+    {/if}
+  </Stack>
 </div>
 
 <style>
-  .mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px;
+  .clip {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .d-field.mono { flex: 1 1 auto; min-width: 0; }
-  form .d-field { flex: 1 1 auto; min-width: 0; }
-  .copy { min-width: 96px; }
-  .done { margin-top: 4px; padding-left: 0; padding-right: 0; }
-  .name { overflow-wrap: anywhere; }
-  .key {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    min-height: var(--d-ctl);
-    padding-top: calc((var(--d-ctl) - 20px) / 2);
+  .line {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .actions {
-    display: flex;
-    flex: none;
+  .create {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: 12px;
-    margin-top: calc((20px - var(--d-ctl)) / 2);
   }
-  .primary {
-    line-height: 20px;
-    color: var(--text-primary);
-  }
-  .meta {
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--text-muted);
-  }
-  .limit { padding-top: calc((var(--d-ctl) - 18px) / 2); }
-  .err {
-    min-height: 18px;
-    margin-top: 8px;
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--error);
+  /* The button lines up with the field box, under the label (18px + 8px). */
+  .create > :global(button) { margin-top: 26px; }
+  @media (max-width: 639px) {
+    .create { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .create > :global(button) { margin-top: 0; justify-self: start; }
   }
 </style>
