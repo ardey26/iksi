@@ -6,6 +6,7 @@ import { createURLHash } from '#lib/utils/urlHash.js';
 import { encodeURL } from '#lib/server/crypto.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
+import { classifyPath } from '@iksi/core';
 import { clientOf } from '#lib/server/client.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
@@ -158,6 +159,15 @@ export const POST = async (event) => {
 
 			if (!isValidAlias(trimmedCustomURL)) {
 				return new Response(JSON.stringify({ error: 'you provided an invalid alias' }), {
+					status: 400,
+					headers: { 'Content-Type': 'application/json' }
+				});
+			}
+
+			// A name the app already routes (dashboard, api, login...) would be
+			// created but could never resolve, so refuse it up front.
+			if (classifyPath(`/${trimmedCustomURL}`).kind !== 'slug') {
+				return new Response(JSON.stringify({ error: 'that name is reserved, pick another one' }), {
 					status: 400,
 					headers: { 'Content-Type': 'application/json' }
 				});

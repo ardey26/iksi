@@ -135,3 +135,26 @@ describe('anonymous dedupe', () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('reserved custom names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findFirst.mockResolvedValue(null);
+    create.mockImplementation(async ({ data }: { data: { shortURL: string } }) => ({ shortURL: data.shortURL, settingsVersion: 0 }));
+  });
+
+  it.each(['dashboard', 'api', 'login', 'logout', 'auth', 'admin', 'internal', '_app'])(
+    'refuses %s because the app owns that path',
+    async (name) => {
+      const r = await shorten({ longURL: URL_IN, customURL: name });
+      expect(r.status).toBe(400);
+      expect((await r.json()).error).toMatch(/reserved/i);
+      expect(create).not.toHaveBeenCalled();
+    }
+  );
+
+  it('still allows media, which only reserves paths below it', async () => {
+    const r = await shorten({ longURL: URL_IN, customURL: 'media' });
+    expect(r.status).toBe(200);
+  });
+});
