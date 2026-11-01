@@ -84,3 +84,24 @@ Expect within about 30 ms of the baseline in `perf/reports/`. If any request tak
 - Worker misbehaving: `pnpm --filter @iksi/redirect exec wrangler delete`, or remove its routes in the dashboard. Traffic goes straight to Vercel through the proxy.
 - Proxy misbehaving: set the three records to **DNS only** (grey cloud). Traffic goes straight to Vercel.
 - Everything: point the nameservers back to `ns1/ns2.vercel-dns.com`. Vercel still holds the original zone.
+
+## Edge on and off
+
+The edge layer is **off** in production. Converge (AS17639), the largest Philippine ISP, times out HTTPS to `iksi.app` and `www.iksi.app` when they are proxied through Cloudflare. Other hostnames on the same Cloudflare IPs, including `cdn.iksi.app`, work, and the site works through Cloudflare on Globe, Smart and from abroad. With the proxy off, Vercel serves pages and short links directly, and the app records clicks itself.
+
+Off means:
+- the `@`, `www` and `admin` DNS records are **DNS only** (grey)
+- the repository variable `EDGE_ENABLED` is unset, so the deploy workflow skips the Worker
+- the Vercel env var `EDGE_ENABLED` is unset, so link edits skip the edge purge
+
+To turn it back on:
+1. Confirm from a Converge connection, **without a VPN**, that `www.iksi.app` loads through Cloudflare: proxy the two `www` records, test, and switch them back off if it fails. A VPN test says nothing about Converge.
+2. Re-subscribe to Workers Paid if it was cancelled, and recreate the `iksi-clicks` and `iksi-clicks-dlq` queues if they were deleted.
+3. Clear the `iksi-links` KV namespace. Records cached before the edge went off were never purged on later edits:
+   ```sh
+   npx wrangler kv key list --namespace-id 0bf0d92c44cf4fd997d4359696c91996 --remote \
+     | jq '[.[].name]' > keys.json
+   npx wrangler kv bulk delete keys.json --namespace-id 0bf0d92c44cf4fd997d4359696c91996 --remote
+   ```
+4. Set `EDGE_ENABLED=true` as a GitHub repository variable and as a Vercel env var (production), then re-run the Deploy workflow.
+5. Proxy the `@`, `www` and `admin` records and re-test from Converge.

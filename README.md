@@ -13,6 +13,8 @@ Short links resolve at the edge, close to whoever clicks them. Everything else (
 
 ## Architecture
 
+> **Production status:** the edge layer below is built and deployed but switched off. Converge, the largest Philippine ISP, can't reach the site through Cloudflare, so Vercel serves pages and short links directly. See [infra/cloudflare](infra/cloudflare/README.md#edge-on-and-off).
+
 ```mermaid
 flowchart LR
   subgraph Clients
