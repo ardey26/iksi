@@ -15,7 +15,8 @@ const RESERVED_DIRECTORIES = [
 	'/_app',
 	'/fonts',
 	'/internal',
-	'/_edge'
+	'/_edge',
+	'/media'
 ] as const;
 
 /** Single files served by the app; matched on equality only. */
