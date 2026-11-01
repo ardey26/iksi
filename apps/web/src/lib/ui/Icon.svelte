@@ -26,6 +26,7 @@
   import Settings from 'lucide-svelte/icons/settings';
   import Sun from 'lucide-svelte/icons/sun';
   import Trash from 'lucide-svelte/icons/trash-2';
+  import Type from 'lucide-svelte/icons/type';
   import Wallet from 'lucide-svelte/icons/wallet';
   import X from 'lucide-svelte/icons/x';
 
@@ -55,6 +56,7 @@
     'settings': Settings,
     'sun': Sun,
     'trash': Trash,
+    'type': Type,
     'wallet': Wallet,
     'x': X
   };

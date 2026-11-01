@@ -2,7 +2,9 @@
   import { Input, ShortenedURL } from '#lib/components/index.js';
   import OneTimeForm from '#lib/components/OneTimeForm.svelte';
   import { Button, Container, Paper, Segmented } from '#lib/ui/index.js';
+  import { motion } from '#lib/ui/motion.js';
   import { onMount, tick } from 'svelte';
+  import { fade } from 'svelte/transition';
 
   const FEATURES = [
     { title: 'Custom aliases', body: 'Pick the slug yourself: iksi.app/your-name instead of a random string.' },
@@ -26,6 +28,9 @@
   let inputRef;
   // 'link' is the regular shortener; 'oneTime' creates a burn-after-reading link.
   let mode = 'link';
+  // One-time content: 'url' or 'text'. Chosen in the mode row, on the same
+  // line as the mode switch, so the field below never moves.
+  let kind = 'url';
   let oneTimeRef;
   let createdOneTime = false;
 
@@ -38,10 +43,18 @@
     { value: 'link', label: 'Short link' },
     { value: 'oneTime', label: 'One-time link' }
   ];
+  // Icons show only on the narrowest phones, where both labels do not fit.
+  const KINDS = [
+    { value: 'url', label: 'URL', icon: 'link' },
+    { value: 'text', label: 'Text', icon: 'type' }
+  ];
+  // The result and the form fade in over each other; no layout moves.
+  const swapIn = () => motion({ duration: 150 });
 
   // The mode switch moves focus into the form it shows.
   const switchMode = (e) => {
     error = '';
+    kind = 'url';
     if (e.detail.value === 'oneTime') focusLater(() => oneTimeRef);
     else focusLater(() => inputRef);
   };
@@ -102,6 +115,7 @@
     suggestion = '';
     isLoading = false;
     mode = 'link';
+    kind = 'url';
     createdOneTime = false;
     // Refocus input after reset
     setTimeout(() => {
@@ -131,26 +145,33 @@
     <Container width="form" class="hero-inner">
       <Paper class="tool">
         {#if shortURL}
-          <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
-        {:else}
-          <div class="mode">
-            <Segmented size="sm" label="Link type" bind:value={mode} options={MODES} on:change={switchMode} />
+          <div in:fade={swapIn()}>
+            <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
           </div>
-          {#if mode === 'oneTime'}
-            <OneTimeForm bind:inputRef={oneTimeRef} on:created={oneTimeCreated} />
-          {:else}
-            <Input
-              bind:longURL
-              bind:customURL
-              bind:showCustomAlias
-              bind:inputRef
-              {isLoading}
-              {error}
-              {handleSubmit}
-              {suggestion}
-              onSuggestion={() => handleSubmit(suggestion)}
-            />
-          {/if}
+        {:else}
+          <div in:fade={swapIn()}>
+            <div class="mode">
+              <Segmented size="sm" label="Link type" bind:value={mode} options={MODES} on:change={switchMode} />
+              {#if mode === 'oneTime'}
+                <Segmented size="sm" label="Content" bind:value={kind} options={KINDS} />
+              {/if}
+            </div>
+            {#if mode === 'oneTime'}
+              <OneTimeForm bind:inputRef={oneTimeRef} {kind} on:created={oneTimeCreated} />
+            {:else}
+              <Input
+                bind:longURL
+                bind:customURL
+                bind:showCustomAlias
+                bind:inputRef
+                {isLoading}
+                {error}
+                {handleSubmit}
+                {suggestion}
+                onSuggestion={() => handleSubmit(suggestion)}
+              />
+            {/if}
+          </div>
         {/if}
       </Paper>
     </Container>
@@ -208,13 +229,28 @@
   }
 
   /* Exactly the first screen under the site header, so the next band's
-     hairline sits at the fold. svh: the screen with the browser bars shown. */
+     hairline sits at the fold. svh: the screen with the browser bars shown.
+     The tool's top edge is pinned, never centered by flex: centering would
+     move everything each time the card grows (custom name, one-time,
+     messages). The offset is worked out once, in CSS, from the card's
+     resting height, so on first paint it sits where centering put it, and
+     every change after that grows downward. */
   .hero {
+    /* The resting card: mode row 32 + 16, field, 12 + 20 + 12 message line,
+       buttons (84 + 2 controls), plus padding and border: 214 at every width
+       (phones trade 4px of padding for 44px controls). Only the first-paint
+       position depends on it; if it drifts, nothing moves, it is just a few
+       px off center. */
+    --tool-rest: 214px;
+    --hero-pad: 24px;
+    --hero-pad-end: calc(24px + var(--site-header) / 2);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     min-height: calc(100vh - var(--site-header));
     min-height: calc(100svh - var(--site-header));
-    padding: 24px 0 calc(24px + var(--site-header) / 2);
+    padding-bottom: var(--hero-pad-end);
+    padding-top: max(var(--hero-pad), calc(var(--hero-pad) + (100vh - var(--site-header) - var(--hero-pad) - var(--hero-pad-end) - var(--tool-rest)) / 2));
+    padding-top: max(var(--hero-pad), calc(var(--hero-pad) + (100svh - var(--site-header) - var(--hero-pad) - var(--hero-pad-end) - var(--tool-rest)) / 2));
   }
   :global(.hero-inner) {
     display: flex;
@@ -225,7 +261,32 @@
     width: 100%;
     max-width: 560px;
   }
-  .mode { margin-bottom: 16px; }
+  /* Mode switch left; in one-time mode, URL or Text on the right of the same
+     row. Too narrow for both, the labels truncate rather than wrap, so the
+     field below never moves. */
+  .mode {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .mode > :global(*) { min-width: 0; }
+  .mode > :global(:first-child) { flex: none; }
+  /* URL or Text: labels where they fit, icons (labels kept for screen
+     readers) under 360px, so the row never wraps onto the field. */
+  .mode :global([aria-label='Content'] .ui-icon) { display: none; }
+  @media (max-width: 359px) {
+    .mode :global([aria-label='Content'] .ui-icon) { display: block; }
+    .mode :global([aria-label='Content'] .opt > span) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+  }
 
   /* Bands: full-bleed hairlines between major sections. */
   .band { border-top: 1px solid var(--border); }

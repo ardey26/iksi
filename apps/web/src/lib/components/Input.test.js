@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import Input from './Input.svelte';
 
 describe('Input Component', () => {
@@ -98,5 +98,45 @@ describe('Input Component', () => {
     render(Input, { props: { ...defaultProps, handleSubmit, longURL: 'https://example.com' } });
     await fireEvent.click(screen.getByLabelText('Shorten link'));
     expect(handleSubmit).toHaveBeenCalled();
+  });
+
+  it('opens the custom name under the button row and keeps the toggle in place', async () => {
+    const { container } = render(Input, { props: defaultProps });
+    const toggle = screen.getByRole('button', { name: 'Custom name' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'Custom name' })).toBe(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const url = screen.getByLabelText('URL to shorten');
+    const alias = screen.getByPlaceholderText('your-name');
+    const status = container.querySelector('#shorten-status');
+    // URL field, message line, toggle, then the name: everything above the
+    // name stays where it was.
+    expect(url.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(toggle.compareDocumentPosition(alias) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Tab reaches the name before Shorten.
+    expect(alias.compareDocumentPosition(screen.getByLabelText('Shorten link')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('closes the custom name from the same toggle and drops the name', async () => {
+    render(Input, { props: { ...defaultProps, showCustomAlias: true, customURL: 'sale' } });
+    const toggle = screen.getByRole('button', { name: 'Custom name' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => expect(screen.queryByPlaceholderText('your-name')).not.toBeInTheDocument());
+  });
+
+  it('keeps one message line in place whatever it says', async () => {
+    const { container, rerender } = render(Input, { props: defaultProps });
+    const status = container.querySelector('#shorten-status');
+    expect(status).toBeEmptyDOMElement();
+    await rerender({ error: 'Something went wrong' });
+    expect(container.querySelector('#shorten-status')).toBe(status);
+    await rerender({ error: '', suggestion: '@andre/sale', onSuggestion: () => {} });
+    expect(container.querySelector('#shorten-status')).toBe(status);
+    expect(status.querySelectorAll('p')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Use iksi.app/@andre/sale?' })).toBeInTheDocument();
   });
 });

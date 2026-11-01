@@ -78,6 +78,49 @@ describe('home page scoped suggestion', () => {
   });
 });
 
+describe('home page without layout shift', () => {
+  it('puts URL or Text on the mode row, so the field below never moves', async () => {
+    const { container } = render(Home);
+    const mode = container.querySelector('.mode');
+    const field = () => mode.nextElementSibling.querySelector('input, textarea');
+    expect(screen.queryByRole('radiogroup', { name: 'Content' })).not.toBeInTheDocument();
+    expect(field()).toBe(screen.getByLabelText('URL to shorten'));
+
+    await fireEvent.click(screen.getByRole('radio', { name: 'One-time link' }));
+    const content = screen.getByRole('radiogroup', { name: 'Content' });
+    expect(content.parentElement).toBe(mode);
+    expect(screen.getByRole('radio', { name: 'URL' })).toBeChecked();
+    // The first field is still the first thing under the mode row.
+    expect(field()).toBe(screen.getByLabelText('URL to share once'));
+
+    await fireEvent.click(screen.getByRole('radio', { name: 'Text' }));
+    expect(field()).toBe(screen.getByLabelText('Text to share once'));
+
+    // Back to a short link: the URL or Text choice goes, and starts on URL next time.
+    await fireEvent.click(screen.getByRole('radio', { name: 'Short link' }));
+    expect(screen.queryByRole('radiogroup', { name: 'Content' })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('radio', { name: 'One-time link' }));
+    expect(screen.getByRole('radio', { name: 'URL' })).toBeChecked();
+  });
+
+  it('swaps the result into the same paper and back', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ shortURL: 'AbCdEf' }))));
+    const { container } = render(Home);
+    const tool = container.querySelector('.tool');
+    await fireEvent.input(screen.getByLabelText('URL to shorten'), { target: { value: 'example.com/a' } });
+    await fireEvent.click(screen.getByLabelText('Shorten link'));
+    await screen.findByText(/AbCdEf/);
+    expect(container.querySelector('.tool')).toBe(tool);
+    expect(tool.querySelector('form')).toBeNull();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Shorten another' }));
+    expect(container.querySelector('.tool')).toBe(tool);
+    expect(tool.querySelectorAll('form')).toHaveLength(1);
+    expect(screen.getByLabelText('URL to shorten')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Custom name' })).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
 describe('home page layout', () => {
   // The first screen is only the tool; the SEO copy and the one H1 sit
   // below the fold, visible (never visually hidden).
