@@ -6,7 +6,7 @@ import { createURLHash } from '#lib/utils/urlHash.js';
 import { encodeURL } from '#lib/server/crypto.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
-import { classifyPath } from '@iksi/core';
+import { classifyPath, parseScopedSlug, scopedSlug } from '@iksi/core';
 import { clientOf } from '#lib/server/client.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
@@ -150,6 +150,68 @@ const jsonError = (status, error, extra = {}) =>
 		headers: { 'Content-Type': 'application/json' }
 	});
 
+const TAKEN = 'custom link alias already exists, pick another one';
+
+/**
+ * The handle a user's custom names can go under (`@handle/name`), and whether
+ * they go there by default. Null for anonymous requests and users without one.
+ */
+async function scopeOf(uid) {
+	if (uid === null) return null;
+	const user = await prisma.user.findUnique({
+		where: { id: uid },
+		select: { scopeCustomNames: true, handle: { select: { handle: true } } }
+	});
+	const handle = user?.handle?.handle;
+	return handle ? { handle, auto: user.scopeCustomNames } : null;
+}
+
+const nameTaken = async (shortURL) =>
+	(await prisma.longURL.findFirst({ where: { shortURL }, select: { id: true } })) !== null;
+
+/** For a name refused globally: `@handle/name` when the user has a handle and that is free. */
+async function suggestionFor(scope, name) {
+	if (!scope) return {};
+	const scoped = scopedSlug(scope.handle, name);
+	return (await nameTaken(scoped)) ? {} : { suggestion: scoped };
+}
+
+/**
+ * Picks the stored name for a custom name, or the refusal to send. `@handle/name`
+ * asks for a scoped name directly, which only that handle's owner may use. A
+ * plain name goes under the owner's handle when they switched that on, and is
+ * global otherwise. Random names never come through here, so they stay global.
+ */
+async function customName(requested, uid) {
+	if (requested.startsWith('@')) {
+		const parsed = parseScopedSlug(requested);
+		if (!parsed || !isValidAlias(parsed.name)) return { response: jsonError(400, 'you provided an invalid alias') };
+		const scope = await scopeOf(uid);
+		if (scope?.handle !== parsed.handle) return { response: jsonError(403, 'You can only use your own handle') };
+		const shortURL = scopedSlug(parsed.handle, parsed.name);
+		if (await nameTaken(shortURL)) return { response: jsonError(409, TAKEN) };
+		return { shortURL };
+	}
+
+	if (requested.length > 50) return { response: jsonError(400, 'Custom alias is too long (max 50 characters)') };
+	if (!isValidAlias(requested)) return { response: jsonError(400, 'you provided an invalid alias') };
+
+	const scope = await scopeOf(uid);
+	if (scope?.auto) {
+		const shortURL = scopedSlug(scope.handle, requested);
+		if (await nameTaken(shortURL)) return { response: jsonError(409, TAKEN) };
+		return { shortURL };
+	}
+
+	// A name the app already routes (dashboard, api, login...) would be
+	// created but could never resolve, so refuse it up front.
+	if (classifyPath(`/${requested}`).kind !== 'slug') {
+		return { response: jsonError(400, 'that name is reserved, pick another one', await suggestionFor(scope, requested)) };
+	}
+	if (await nameTaken(requested)) return { response: jsonError(409, TAKEN, await suggestionFor(scope, requested)) };
+	return { shortURL: requested };
+}
+
 /**
  * Who is shortening: an API key's owner, the signed-in user, or nobody.
  * A request that sends an Authorization header is judged by that header
@@ -225,6 +287,7 @@ const shorten = async (event) => {
 		}
 
 		let shortURL;
+		let isCustom = false;
 		// Only store a urlHash for auto-generated shortens (so dedup-by-hash works).
 		// Custom aliases intentionally store NULL so the user can have multiple
 		// custom shorts pointing at the same long URL without tripping the unique constraint.
@@ -246,50 +309,10 @@ const shorten = async (event) => {
 		}
 
 		if (customURL) {
-			const trimmedCustomURL = customURL.trim();
-
-			if (trimmedCustomURL.length > 50) {
-				return new Response(JSON.stringify({ error: 'Custom alias is too long (max 50 characters)' }), {
-					status: 400,
-					headers: { 'Content-Type': 'application/json' }
-				});
-			}
-
-			if (!isValidAlias(trimmedCustomURL)) {
-				return new Response(JSON.stringify({ error: 'you provided an invalid alias' }), {
-					status: 400,
-					headers: { 'Content-Type': 'application/json' }
-				});
-			}
-
-			// A name the app already routes (dashboard, api, login...) would be
-			// created but could never resolve, so refuse it up front.
-			if (classifyPath(`/${trimmedCustomURL}`).kind !== 'slug') {
-				return new Response(JSON.stringify({ error: 'that name is reserved, pick another one' }), {
-					status: 400,
-					headers: { 'Content-Type': 'application/json' }
-				});
-			}
-
-			const customURLExists = await prisma.longURL.findFirst({
-				where: {
-					shortURL: trimmedCustomURL
-				},
-				select: {
-					id: true
-				}
-			});
-
-			if (customURLExists) {
-				return new Response(
-					JSON.stringify({ error: 'custom link alias already exists, pick another one' }), {
-						status: 409,
-						headers: { 'Content-Type': 'application/json' }
-					}
-				);
-			}
-
-			shortURL = trimmedCustomURL;
+			const named = await customName(customURL.trim(), uid);
+			if (named.response) return named.response;
+			shortURL = named.shortURL;
+			isCustom = true;
 		} else {
 			const urlHash = await createURLHash(prefixedURL);
 
@@ -352,6 +375,10 @@ const shorten = async (event) => {
 		try {
 			url = await insert(urlHashForStore);
 		} catch (err) {
+			// Two requests for the same custom name: the unique index lets one win.
+			if (err.code === 'P2002' && isCustom && err.meta?.target?.includes?.('shortURL')) {
+				return jsonError(409, TAKEN);
+			}
 			// Concurrent insert race: another request claimed this urlHash a moment ago.
 			// Reuse what they got when it is plain; otherwise store this link without the hash.
 			if (err.code !== 'P2002' || !urlHashForStore || !err.meta?.target?.includes?.('urlHash')) throw err;

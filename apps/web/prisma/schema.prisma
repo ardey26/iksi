@@ -10,16 +10,18 @@ datasource db {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
-  twitterId     String?   @unique
-  twitterHandle String?
-  googleId      String?   @unique
-  googleEmail   String?
-  createdAt     DateTime  @default(now())
-  handle        Handle?
-  profile       Profile?
-  links         LongURL[]
-  apiKeys       ApiKey[]
+  id               Int       @id @default(autoincrement())
+  twitterId        String?   @unique
+  twitterHandle    String?
+  googleId         String?   @unique
+  googleEmail      String?
+  createdAt        DateTime  @default(now())
+  /// "Use my handle for custom names": custom names become iksi.app/@handle/name.
+  scopeCustomNames Boolean   @default(false)
+  handle           Handle?
+  profile          Profile?
+  links            LongURL[]
+  apiKeys          ApiKey[]
 }
 
 model Handle {
