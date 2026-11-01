@@ -36,19 +36,21 @@ describe('PaymentMethods', () => {
       render(PaymentMethods, { props: { methods: [qr, paypal], label: 'pay' } });
       expect(screen.getByText('Pays to Juan Dela Cruz')).toBeInTheDocument();
       expect(screen.getByText('Mandaluyong, Philippines')).toBeInTheDocument();
-      expect(screen.getByText('Pays in PHP')).toBeInTheDocument();
+      expect(screen.getByTitle('Pays in PHP')).toHaveTextContent('PHP');
       expect(screen.getByText('Bank QR')).toBeInTheDocument();
       expect(screen.getByText('PayPal')).toBeInTheDocument();
-      expect(screen.getByText('https://paypal.me/ana')).toBeInTheDocument();
+      // A link shows without its scheme; the full URL is its title.
+      expect(screen.getByText('paypal.me/ana')).toHaveAttribute('title', 'https://paypal.me/ana');
     });
 
     it("marks a known bank's QR with its logo and an unknown bank's with a monogram", () => {
       const { container } = render(PaymentMethods, { props: { methods: [gcash, qr], label: 'pay' } });
-      const [first, second] = container.querySelectorAll('.d-row');
+      const [first, second] = container.querySelectorAll('li');
       expect(first.querySelector('img')).toHaveAttribute('src', '/brands/gcash.svg');
       expect(first).toHaveTextContent('Pays to Ana Reyes');
       expect(second.querySelector('img')).toBeNull();
-      expect(second.querySelector('.pay-monogram')).toHaveTextContent('B');
+      // A monogram, not a logo: the label's first letter on its own tile.
+      expect(second.querySelector('[aria-hidden="true"]:not(svg)')).toHaveTextContent(/^B$/);
       expect(screen.getByRole('button', { name: 'Remove GCash' })).toBeInTheDocument();
     });
 
@@ -63,7 +65,8 @@ describe('PaymentMethods', () => {
     it('offers one button that picks several images', () => {
       const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
       const button = screen.getByRole('button', { name: 'Add payment QR' });
-      expect(button).toHaveClass('d-btn-primary');
+      // With nothing added yet, it is the section's primary action.
+      expect(button).toHaveClass('primary');
       const input = container.querySelector('input[type="file"]');
       expect(input).toHaveAttribute('multiple');
       expect(input.getAttribute('accept')).toContain('image/png');
@@ -146,7 +149,7 @@ describe('PaymentMethods', () => {
     it('keeps the link field behind a secondary button', async () => {
       render(PaymentMethods, { props: { methods: [], label: 'pay' } });
       const more = screen.getByRole('button', { name: 'Add payment link' });
-      expect(more).toHaveClass('d-btn-secondary');
+      expect(more).toHaveClass('secondary');
       expect(more).toHaveAttribute('aria-expanded', 'false');
       await openLink();
       expect(more).toHaveAttribute('aria-expanded', 'true');
@@ -159,7 +162,7 @@ describe('PaymentMethods', () => {
       await openLink();
       await fireEvent.input(screen.getByLabelText('Payment link'), { target: { value: 'https://paypal.me/ana' } });
       await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
-      expect(await screen.findByText('https://paypal.me/ana')).toBeInTheDocument();
+      expect(await screen.findByText('paypal.me/ana')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent('Added PayPal');
       const init = fetchMock.mock.calls[0][1];
       expect(init.body.get('kind')).toBe('link');
@@ -173,7 +176,7 @@ describe('PaymentMethods', () => {
       await openLink();
       await fireEvent.input(screen.getByLabelText('Payment link'), { target: { value: 'https://evil.example/' } });
       await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
-      expect(await screen.findByRole('alert')).toHaveTextContent(/^Use a link from PayPal/);
+      expect(await screen.findByText(/^Use a link from PayPal/)).toBeInTheDocument();
       expect(screen.getByLabelText('Payment link')).toHaveValue('https://evil.example/');
     });
   });
@@ -216,7 +219,7 @@ describe('PaymentMethods', () => {
       const field = screen.getByRole('textbox', { name: 'Name for GCash' });
       await fireEvent.input(field, { target: { value: '<b>' } });
       await fireEvent.submit(field.closest('form'));
-      expect(await screen.findByRole('alert')).toHaveTextContent('Names can be up to 24 characters of plain text.');
+      expect(await screen.findByText('Names can be up to 24 characters of plain text.')).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'Name for GCash' })).toHaveValue('<b>');
     });
 
@@ -230,6 +233,10 @@ describe('PaymentMethods', () => {
     fetchMock.mockResolvedValue(ok({ methods: [paypal], label: 'pay' }));
     render(PaymentMethods, { props: { methods: [qr, paypal], label: 'pay' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Remove Bank QR' }));
+    // Removing asks first, in the row.
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText('Remove it from your Pay button?')).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(screen.queryByText('Pays to Juan Dela Cruz')).toBeNull());
     expect(fetchMock).toHaveBeenCalledWith('/api/pay-methods?id=q1', { method: 'DELETE' });
   });
@@ -249,37 +256,40 @@ describe('PaymentMethods', () => {
     expect(screen.getByRole('button', { name: 'Add payment QR' })).toBeInTheDocument();
   });
 
-  it('moves a method up and saves the new order', async () => {
+  const reorder = async (name, ...keys) => {
+    const grip = screen.getByRole('button', { name: `Reorder ${name}` });
+    grip.focus();
+    await fireEvent.keyDown(grip, { key: ' ' });
+    for (const key of keys) await fireEvent.keyDown(grip, { key });
+    await fireEvent.keyDown(grip, { key: ' ' });
+  };
+  const order = () => screen.getAllByRole('button', { name: /^Remove / }).map((b) => b.getAttribute('aria-label'));
+
+  it('reorders on the grip and saves the new order', async () => {
     fetchMock.mockResolvedValue(ok({ methods: [qr, gcash, paypal], label: 'pay' }));
     render(PaymentMethods, { props: { methods: [gcash, qr, paypal], label: 'pay' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Move Bank QR up' }));
+    expect(screen.queryByRole('button', { name: /^Move / })).toBeNull();
+    await reorder('Bank QR', 'ArrowUp');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/pay-methods');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body)).toEqual({ order: ['q1', 'q2', 'l1'] });
-    const rows = () => screen.getAllByRole('button', { name: /^Remove / }).map((b) => b.getAttribute('aria-label'));
-    await waitFor(() => expect(rows()).toEqual(['Remove Bank QR', 'Remove GCash', 'Remove PayPal']));
+    await waitFor(() => expect(order()).toEqual(['Remove Bank QR', 'Remove GCash', 'Remove PayPal']));
   });
 
-  it('cannot move the first up or the last down', () => {
+  it('saves nothing when a lifted method is dropped where it was', async () => {
     render(PaymentMethods, { props: { methods: [gcash, paypal], label: 'pay' } });
-    expect(screen.getByRole('button', { name: 'Move GCash up' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Move GCash down' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Move PayPal down' })).toBeDisabled();
+    await reorder('GCash', 'ArrowUp');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('puts the order back when saving it fails', async () => {
     fetchMock.mockResolvedValue(bad(409, 'Your payment methods changed in another tab. Reload and try again.'));
     render(PaymentMethods, { props: { methods: [gcash, paypal], label: 'pay' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Move PayPal up' }));
+    await reorder('PayPal', 'ArrowUp');
     expect(await screen.findByRole('alert')).toHaveTextContent('changed in another tab');
-    const rows = screen.getAllByRole('button', { name: /^Remove / }).map((b) => b.getAttribute('aria-label'));
-    expect(rows).toEqual(['Remove GCash', 'Remove PayPal']);
-  });
-
-  it('shows no order buttons for a single method', () => {
-    render(PaymentMethods, { props: { methods: [gcash], label: 'pay' } });
-    expect(screen.queryByRole('button', { name: /^Move / })).toBeNull();
+    expect(order()).toEqual(['Remove GCash', 'Remove PayPal']);
   });
 
   it('saves the button label when switched', async () => {

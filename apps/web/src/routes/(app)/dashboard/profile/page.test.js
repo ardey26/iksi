@@ -29,7 +29,7 @@ describe('profile editor payments', () => {
     };
     render(Page, { props: { data: d } });
     expect(screen.getByRole('heading', { name: 'Payments' })).toBeInTheDocument();
-    expect(screen.getByText('https://ko-fi.com/me')).toBeInTheDocument();
+    expect(screen.getByText('ko-fi.com/me')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Send a tip' })).toBeChecked();
   });
 
@@ -105,10 +105,10 @@ describe('use my handle for custom names', () => {
 
   const toggle = () => screen.getByRole('switch', { name: 'Use my handle for custom names' });
 
-  it('is a spec row, off by default, reading out the address a custom name gets', () => {
+  it('is a setting row, off by default, reading out the address a custom name gets', () => {
     render(Page, { props: { data: data() } });
     expect(toggle()).toHaveAttribute('aria-checked', 'false');
-    expect(toggle().closest('.d-row')).not.toBeNull();
+    expect(toggle()).toHaveAccessibleDescription(/New custom names go under iksi\.app\/@me/);
     expect(screen.getByText('iksi.app/name')).toBeInTheDocument();
   });
 
@@ -134,5 +134,38 @@ describe('use my handle for custom names', () => {
     await fireEvent.click(toggle());
     await waitFor(() => expect(toggle()).toHaveAttribute('aria-checked', 'false'));
     expect(screen.getByText('Could not save. Try again.')).toBeInTheDocument();
+  });
+});
+
+describe('profile editor save', () => {
+  let fetchMock;
+  beforeEach(() => {
+    invalidateAll.mockReset().mockResolvedValue(undefined);
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('says when there are unsaved changes and toasts a failed save', async () => {
+    const { get } = await import('svelte/store');
+    const { toasts } = await import('#lib/ui/toast.js');
+    render(Page, { props: { data: data() } });
+    expect(screen.getByText('Identity and appearance save together.')).toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText('Display name'), { target: { value: 'Other' } });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Name is too long' }) });
+    await fireEvent.click(save());
+    await waitFor(() => expect(get(toasts).map((t) => t.message)).toContain('Name is too long'));
+    expect(save()).not.toBeDisabled();
+  });
+});
+
+describe('profile editor accent', () => {
+  it('does not count the color input lowercasing the accent as a change', async () => {
+    render(Page, { props: { data: data() } });
+    await fireEvent.input(screen.getByLabelText('Accent color'), { target: { value: '#3b82f6' } });
+    expect(save()).toBeDisabled();
+    await fireEvent.input(screen.getByLabelText('Accent color'), { target: { value: '#ff0000' } });
+    expect(save()).not.toBeDisabled();
   });
 });
