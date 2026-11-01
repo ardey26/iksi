@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/svelte';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 const toDataURL = vi.hoisted(() => vi.fn());
@@ -114,12 +114,74 @@ describe('PayButton', () => {
   });
 
   it('shows a link method as a button that opens the service in a new tab', async () => {
-    render(PayButton, { props: props() });
+    render(PayButton, { props: props({ methods: [paypal] }) });
     await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
     const link = screen.getByRole('link', { name: 'Pay with PayPal' });
     expect(link).toHaveAttribute('href', 'https://paypal.me/ana');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
+  it("shows the wallet's logo next to who it pays", async () => {
+    render(PayButton, { props: props({ methods: [{ ...qr, provider: 'gcash' }] }) });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    const logo = screen.getByRole('img', { name: 'GCash' });
+    expect(logo).toHaveAttribute('src', '/brands/gcash.svg');
+    expect(logo.closest('.pay-who')).toHaveTextContent('Pays to JUAN DELA CRUZ');
+  });
+
+  it('shows no logo for a QR from another bank', async () => {
+    render(PayButton, { props: props({ methods: [qr] }) });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    await screen.findByAltText('Payment QR for JUAN DELA CRUZ');
+    expect(screen.queryByRole('img', { name: /GCash|Maya|MariBank/ })).toBeNull();
+  });
+
+  it('shows no picker with one method', async () => {
+    render(PayButton, { props: props({ methods: [qr] }) });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+  });
+
+  describe('with several methods', () => {
+    const gcash = { ...qr, id: 'q2', provider: 'gcash', name: 'ANA REYES' };
+    const many = () => props({ methods: [gcash, qr, paypal] });
+    beforeEach(() => fetchMock.mockResolvedValue(ok({ payloads: { q1: PAYLOAD, q2: 'GCASHPAYLOAD' } })));
+
+    it('offers a picker named by wallet logo, QR name or service', async () => {
+      render(PayButton, { props: many() });
+      await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+      const picker = screen.getByRole('radiogroup', { name: 'Payment method' });
+      const radios = within(picker).getAllByRole('radio');
+      expect(radios.map((r) => r.labels[0].textContent.trim() || r.labels[0].querySelector('img').alt)).toEqual([
+        'GCash',
+        'JUAN DELA CRUZ',
+        'PayPal'
+      ]);
+      expect(within(picker).getByRole('radio', { name: 'GCash' })).toBeInTheDocument();
+    });
+
+    it('shows the first method in the owner order by default, and only it', async () => {
+      render(PayButton, { props: many() });
+      await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+      expect(screen.getByRole('radio', { name: 'GCash' })).toBeChecked();
+      expect(await screen.findByAltText('Payment QR for ANA REYES')).toBeInTheDocument();
+      expect(screen.queryByText('Pays to JUAN DELA CRUZ')).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Pay with PayPal' })).toBeNull();
+    });
+
+    it('switches the visible method when another is picked', async () => {
+      render(PayButton, { props: many() });
+      await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+      await screen.findByAltText('Payment QR for ANA REYES');
+      await fireEvent.click(screen.getByRole('radio', { name: 'JUAN DELA CRUZ' }));
+      expect(await screen.findByAltText('Payment QR for JUAN DELA CRUZ')).toBeInTheDocument();
+      expect(screen.queryByAltText('Payment QR for ANA REYES')).toBeNull();
+      await fireEvent.click(screen.getByRole('radio', { name: 'PayPal' }));
+      expect(screen.getByRole('link', { name: 'Pay with PayPal' })).toBeInTheDocument();
+      expect(screen.queryByAltText('Payment QR for JUAN DELA CRUZ')).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('closes on Escape and returns focus to the button', async () => {
