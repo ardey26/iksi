@@ -37,14 +37,14 @@ describe('layout on a profile subdomain', () => {
 
   it('sends home and sign in to www from a subdomain link page', () => {
     const { container, canonical } = at('https://andre.iksi.app/sale', '/@[handle]/[name]');
-    expect(container.querySelector('a.fixed')?.getAttribute('href')).toBe('https://www.iksi.app/');
+    expect(container.querySelector('a.brand')?.getAttribute('href')).toBe('https://www.iksi.app/');
     expect(container.querySelector('a[href$="/login"]')?.getAttribute('href')).toBe('https://www.iksi.app/login');
     expect(canonical).toBe('https://andre.iksi.app/sale');
   });
 
   it('keeps relative links and www canonicals on www', () => {
     const { container, canonical } = at('https://www.iksi.app/@andre/sale', '/@[handle]/[name]');
-    expect(container.querySelector('a.fixed')?.getAttribute('href')).toBe('/');
+    expect(container.querySelector('a.brand')?.getAttribute('href')).toBe('/');
     expect(container.querySelector('a[href$="/login"]')?.getAttribute('href')).toBe('/login');
     expect(canonical).toBe('https://www.iksi.app/@andre/sale');
   });

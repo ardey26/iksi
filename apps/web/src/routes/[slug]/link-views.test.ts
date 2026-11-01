@@ -22,7 +22,7 @@ function renderError(status: number, error: Record<string, unknown>) {
 describe('+error.svelte', () => {
   it('renders the expired view', () => {
     const { container } = renderError(410, { message: 'x', view: 'expired' });
-    expect(screen.getByText('This link has expired.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'This link has expired' })).toBeTruthy();
     expect(container.querySelector('a[href="/AbC"]')).toBeNull();
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex');
   });
@@ -36,7 +36,7 @@ describe('+error.svelte', () => {
 
   it('renders the already opened view', () => {
     const { container } = renderError(410, { message: 'x', view: 'opened' });
-    expect(screen.getByText('This link was already opened.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'This link was already opened' })).toBeTruthy();
     expect(container.querySelector('a[href="/AbC"]')).toBeNull();
     expect(document.title).toBe('Link opened | iksi');
   });
@@ -67,7 +67,7 @@ describe('+page.svelte preview', () => {
 
   it('expired preview says so and has no Continue', () => {
     const { container } = render(LinkPage, { data: { ...base, destination: null, expired: true }, form: null } as never);
-    expect(container.textContent).toContain('This link has expired.');
+    expect(container.textContent).toContain('This link has expired');
     expect(container.querySelector('a[href="/AbC"]')).toBeNull();
   });
 
@@ -82,7 +82,7 @@ describe('+page.svelte one-time', () => {
 
   it('shows a tap to reveal form that posts to the reveal action', () => {
     const { container } = render(LinkPage, { data: reveal, form: null } as never);
-    expect(screen.getByRole('heading', { name: 'Tap to reveal' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Someone sent you a one-time link' })).toBeTruthy();
     const form = container.querySelector('form')!;
     expect(form.getAttribute('method')).toBe('POST');
     expect(form.getAttribute('action')).toBe('?/reveal');
@@ -121,7 +121,7 @@ describe('+page.svelte one-time', () => {
 
   it('a lost reveal says it was already opened', () => {
     const { container } = render(LinkPage, { data: reveal, form: { opened: true } } as never);
-    expect(container.textContent).toContain('This link was already opened.');
+    expect(container.textContent).toContain('This link was already opened');
     expect(container.querySelector('form')).toBeNull();
   });
 
@@ -141,7 +141,7 @@ describe('+page.svelte one-time', () => {
       data: { view: 'preview', host: '', destination: null, hasRules: false, flagged: null, expired: false, oneTime: true, opened: true },
       form: null
     } as never);
-    expect(container.textContent).toContain('This link was already opened.');
+    expect(container.textContent).toContain('This link was already opened');
     expect(container.querySelector('a[href="/AbC"]')).toBeNull();
   });
 });

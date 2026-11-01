@@ -65,11 +65,4 @@ describe('OneTimeForm', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Create one-time link' }));
     expect(await screen.findByText('Enter a valid URL')).toBeInTheDocument();
   });
-
-  it('goes back to a regular link', async () => {
-    const events = { cancel: vi.fn() };
-    render(OneTimeForm, { events });
-    await fireEvent.click(screen.getByRole('button', { name: 'Back to a regular link' }));
-    expect(events.cancel).toHaveBeenCalled();
-  });
 });

@@ -2,6 +2,8 @@
   // A short link's page (password, preview, one-time reveal) at /[slug] and /@[handle]/[name].
   import { applyAction, enhance } from '$app/forms';
   import { page } from '$app/state';
+  import { Button, IconButton, Input } from '#lib/ui/index.js';
+  import Interstitial from '#lib/components/Interstitial.svelte';
   import LinkNotice from '#lib/components/LinkNotice.svelte';
   import { PASSWORD_MAX } from '#lib/password-limits.js';
   import { copyToClipboard } from '#lib/utils/clipboard.js';
@@ -10,6 +12,7 @@
 
   let submitting = $state(false);
   let copied = $state(false);
+  let showPassword = $state(false);
 
   // A one-time result lives only in this page's form state: the server has
   // already erased it, so it is gone once the visitor leaves.
@@ -37,6 +40,25 @@
   );
   let error = $derived(form?.error ?? data.error ?? null);
 
+  // Preview copy: what the visitor is about to open.
+  let preview = $derived(
+    data.view !== 'preview'
+      ? null
+      : data.oneTime
+        ? {
+            icon: 'eye',
+            title: 'One-time link',
+            body: 'The content stays hidden until someone opens it, and it can be opened once.'
+          }
+        : data.destination === null
+          ? { icon: 'lock', title: 'Password protected', body: 'The destination is hidden until you unlock the link.' }
+          : {
+              icon: 'link',
+              title: data.host,
+              body: data.hasRules ? 'This link may send some visitors elsewhere' : 'This short link opens the address below.'
+            }
+  );
+
   async function copyText() {
     if (revealed === null) return;
     if (await copyToClipboard(revealed)) {
@@ -55,6 +77,14 @@
       submitting = false;
     };
   };
+
+  const unlockEnhance = () => {
+    submitting = true;
+    return async ({ update }) => {
+      await update({ reset: false });
+      submitting = false;
+    };
+  };
 </script>
 
 <svelte:head>
@@ -62,155 +92,133 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<div class="flex-1 flex items-center justify-center">
-  <div class="w-full max-w-[500px] text-center">
-    {#if revealed !== null}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">One-time message</h1>
+{#snippet passwordField()}
+  <Input
+    label="Password"
+    type={showPassword ? 'text' : 'password'}
+    name="password"
+    autocomplete="current-password"
+    maxlength={PASSWORD_MAX}
+    required
+    error={error ?? ''}
+  >
+    <IconButton
+      slot="end"
+      icon={showPassword ? 'eye-off' : 'eye'}
+      label={showPassword ? 'Hide password' : 'Show password'}
+      on:click={() => (showPassword = !showPassword)}
+    />
+  </Input>
+{/snippet}
+
+{#snippet shared()}<span>Shared with iksi</span>{/snippet}
+
+{#if revealed !== null}
+  <Interstitial
+    icon="check"
+    title="One-time message"
+    description="This message is no longer stored on iksi. Copy it now if you need it."
+  >
+    <div class="stack">
       <!-- A long message scrolls, so keyboard users must be able to focus it. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <div
-        class="secret mt-6 px-5 py-4 rounded-xl text-left"
-        role="region"
-        aria-label="Message"
-        tabindex="0"
-      >{revealed}</div>
-      <p class="mt-2 text-sm" style="color: var(--text-muted); min-height: 20px;">
-        This message is no longer stored on iksi. Copy it now if you need it.
-      </p>
-      <button
-        type="button"
-        onclick={copyText}
-        class="mt-6 px-5 text-sm font-medium rounded-lg transition-opacity hover:opacity-90"
-        style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer; height: 44px; min-width: 120px;"
-      >
+      <div class="secret" role="region" aria-label="Message" tabindex="0">{revealed}</div>
+      <Button variant="primary" size="lg" full icon={copied ? 'check' : 'copy'} on:click={copyText}>
         <span aria-live="polite">{copied ? 'Copied' : 'Copy text'}</span>
-      </button>
-    {:else if opened}
-      <LinkNotice view="opened" />
-    {:else if data.view === 'preview' && (data.flagged || data.expired)}
-      <LinkNotice view={data.flagged ? 'flagged' : 'expired'} verdict={data.flagged} host={data.host} />
-    {:else if data.view === 'preview'}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
-        {data.oneTime ? 'One-time link' : data.destination === null ? 'Password protected' : data.host}
-      </h1>
+      </Button>
+    </div>
+    <svelte:fragment slot="below">{@render shared()}</svelte:fragment>
+  </Interstitial>
+{:else if opened}
+  <LinkNotice view="opened" />
+{:else if data.view === 'preview' && (data.flagged || data.expired)}
+  <LinkNotice view={data.flagged ? 'flagged' : 'expired'} verdict={data.flagged} host={data.host} />
+{:else if preview}
+  <Interstitial icon={preview.icon} title={preview.title} description={preview.body}>
+    <div class="stack">
       {#if data.destination !== null}
-        <p
-          class="mt-4 px-4 py-3 rounded-xl text-sm text-left break-all"
-          style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;"
-        >
-          {data.destination}
-        </p>
+        <p class="destination t-mono">{data.destination}</p>
       {/if}
-      <p class="mt-2 text-sm" style="color: var(--text-muted); min-height: 20px;">
-        {#if data.oneTime}
-          The content stays hidden until someone opens it, and it can be opened once.
-        {:else if data.destination === null}
-          The destination is hidden until you unlock the link.
-        {:else if data.hasRules}
-          This link may send some visitors elsewhere
-        {/if}
-      </p>
-      <a
-        href={page.url.pathname.replace(/\+$/, '')}
-        data-sveltekit-reload
-        class="inline-flex items-center justify-center mt-6 px-5 text-sm font-medium rounded-lg transition-opacity hover:opacity-90"
-        style="background: var(--text-primary); color: var(--bg); height: 44px;"
-      >
+      <Button variant="primary" size="lg" full href={page.url.pathname.replace(/\+$/, '')} data-sveltekit-reload>
         Continue
-      </a>
-    {:else if data.view === 'reveal'}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">Tap to reveal</h1>
-      <p class="mt-2 text-sm" style="color: var(--text-muted);">
-        {data.kind === 'url' ? 'This one-time link opens a website.' : 'This one-time link holds a message.'}
-        It can be opened once, then it is gone.
-      </p>
-      <form method="POST" action="?/reveal" class="mt-6 space-y-4" use:enhance={revealEnhance}>
-        <div class="h-5">
-          {#if error}
-            <p class="text-sm fade-in" style="color: var(--error);">{error}</p>
-          {/if}
-        </div>
-        {#if data.password}
-          <input
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            placeholder="Password"
-            maxlength={PASSWORD_MAX}
-            required
-            class="w-full outline-none transition-all py-4 px-5 text-lg rounded-xl"
-            style="background: var(--surface); border: 1px solid {error ? 'var(--error)' : 'var(--border)'}; color: var(--text-primary); transition-duration: var(--duration-normal); min-height: 60px;"
-            aria-label="Password"
-          />
-        {/if}
-        <button
-          type="submit"
-          disabled={submitting}
-          class="w-full text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-          style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer; height: 44px;"
-        >
-          {data.kind === 'url' ? 'Open link' : 'Reveal message'}
-        </button>
-      </form>
-    {:else if data.view === 'password'}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">
-        This link is protected
-      </h1>
-      <form
-        method="POST"
-        action="?/unlock"
-        class="mt-6 space-y-4"
-        use:enhance={() => {
-          submitting = true;
-          return async ({ update }) => {
-            await update({ reset: false });
-            submitting = false;
-          };
-        }}
-      >
-        <div class="h-5">
-          {#if error}
-            <p class="text-sm fade-in" style="color: var(--error);">{error}</p>
-          {/if}
-        </div>
-        <input
-          type="password"
-          name="password"
-          autocomplete="current-password"
-          placeholder="Password"
-          maxlength={PASSWORD_MAX}
-          required
-          class="w-full outline-none transition-all py-4 px-5 text-lg rounded-xl"
-          style="background: var(--surface); border: 1px solid {error ? 'var(--error)' : 'var(--border)'}; color: var(--text-primary); transition-duration: var(--duration-normal); min-height: 60px;"
-          aria-label="Password"
-        />
-        <button
-          type="submit"
-          disabled={submitting}
-          class="w-full text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-          style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer; height: 44px;"
-        >
-          Continue
-        </button>
-      </form>
-    {/if}
-  </div>
-</div>
+      </Button>
+    </div>
+    <svelte:fragment slot="below">{@render shared()}</svelte:fragment>
+  </Interstitial>
+{:else if data.view === 'reveal'}
+  <Interstitial
+    icon="eye"
+    title="Someone sent you a one-time link"
+    description="{data.kind === 'url'
+      ? 'It opens a website.'
+      : 'It holds a message.'} It can be opened once, then it is gone."
+  >
+    <form method="POST" action="?/reveal" class="stack" use:enhance={revealEnhance}>
+      {#if data.password}
+        {@render passwordField()}
+      {:else}
+        <p class="status" aria-live="polite">{error ?? ''}</p>
+      {/if}
+      <Button type="submit" variant="primary" size="lg" full loading={submitting}>
+        {data.kind === 'url' ? 'Open link' : 'Reveal message'}
+      </Button>
+    </form>
+    <svelte:fragment slot="below">{@render shared()}</svelte:fragment>
+  </Interstitial>
+{:else if data.view === 'password'}
+  <Interstitial icon="lock" title="This link is protected" description="Enter the password to continue.">
+    <form method="POST" action="?/unlock" class="stack" use:enhance={unlockEnhance}>
+      {@render passwordField()}
+      <Button type="submit" variant="primary" size="lg" full loading={submitting}>Continue</Button>
+    </form>
+    <svelte:fragment slot="below">{@render shared()}</svelte:fragment>
+  </Interstitial>
+{/if}
 
 <style>
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: left;
+  }
+  /* The password field's message line already gives the gap above the button. */
+  .stack > :global(.field) { margin-bottom: -8px; }
   .secret {
     max-height: 50vh;
+    padding: 12px 16px;
     overflow-y: auto;
-    font-size: 16px;
-    line-height: 1.5;
+    font-size: 15px;
+    line-height: 22px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--text-primary);
-    background-color: var(--surface);
+    background-color: var(--surface-2);
     border: 1px solid var(--border);
+    border-radius: var(--radius-control);
   }
   .secret:focus-visible {
-    outline: 1px solid var(--border-focus);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+  .destination {
+    margin: -8px 0 0;
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+  }
+  /* Reserved, so an error never moves the button. */
+  .status {
+    min-height: 16px;
+    margin: -8px 0 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--error);
+    text-align: center;
   }
 </style>

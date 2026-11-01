@@ -29,15 +29,15 @@ describe('Input Component', () => {
     const props = { ...defaultProps, showCustomAlias: true };
     render(Input, { props });
 
-    expect(screen.getByPlaceholderText('your-alias')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('your-name')).toBeInTheDocument();
   });
 
   it('should hide custom alias input when showCustomAlias is false', () => {
     render(Input, { props: defaultProps });
 
     // Alias input is only rendered when toggle is open
-    expect(screen.queryByPlaceholderText('your-alias')).not.toBeInTheDocument();
-    expect(screen.getByText('Want a custom link?')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('your-name')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Custom name' })).toBeInTheDocument();
   });
 
   it('should show loading spinner during submission', () => {
@@ -61,19 +61,19 @@ describe('Input Component', () => {
     render(Input, { props });
 
     const urlInput = screen.getByPlaceholderText('Paste a link');
-    const aliasInput = screen.getByPlaceholderText('your-alias');
+    const aliasInput = screen.getByPlaceholderText('your-name');
 
     expect(urlInput).toHaveAttribute('type', 'text');
-    expect(urlInput).toHaveAttribute('aria-label', 'URL to shorten');
+    expect(screen.getByLabelText('URL to shorten')).toBe(urlInput);
     expect(aliasInput).toHaveAttribute('type', 'text');
     expect(aliasInput).toHaveAttribute('maxlength', '50');
-    expect(aliasInput).toHaveAttribute('aria-label', 'Custom alias');
+    expect(screen.getByLabelText('Custom name')).toBe(aliasInput);
   });
 
-  it('should show no inline action when input is empty', () => {
+  it('should not submit or offer to clear when input is empty', () => {
     render(Input, { props: defaultProps });
 
-    expect(screen.queryByLabelText('Shorten link')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Shorten link')).toBeDisabled();
     expect(screen.queryByLabelText('Clear input')).not.toBeInTheDocument();
   });
 
@@ -84,20 +84,19 @@ describe('Input Component', () => {
     expect(screen.getByLabelText('Clear input')).toBeInTheDocument();
   });
 
-  it('offers a one-time link when the page supports it', async () => {
-    const onOneTime = vi.fn();
-    render(Input, { props: { ...defaultProps, onOneTime } });
-    await fireEvent.click(screen.getByRole('button', { name: 'One-time link' }));
-    expect(onOneTime).toHaveBeenCalled();
+  it('marks an invalid link and does not submit it', async () => {
+    const handleSubmit = vi.fn();
+    render(Input, { props: { ...defaultProps, handleSubmit, longURL: 'not a url' } });
+    expect(screen.getByLabelText('URL to shorten')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText("That doesn't look like a valid link")).toBeInTheDocument();
+    await fireEvent.click(screen.getByLabelText('Shorten link'));
+    expect(handleSubmit).not.toHaveBeenCalled();
   });
 
-  it('has no one-time option without a handler, or while a custom alias is open', () => {
-    render(Input, { props: defaultProps });
-    expect(screen.queryByRole('button', { name: 'One-time link' })).not.toBeInTheDocument();
-  });
-
-  it('hides the one-time option while the custom alias field is open', () => {
-    render(Input, { props: { ...defaultProps, showCustomAlias: true, onOneTime: vi.fn() } });
-    expect(screen.queryByRole('button', { name: 'One-time link' })).not.toBeInTheDocument();
+  it('submits a valid link', async () => {
+    const handleSubmit = vi.fn();
+    render(Input, { props: { ...defaultProps, handleSubmit, longURL: 'https://example.com' } });
+    await fireEvent.click(screen.getByLabelText('Shorten link'));
+    expect(handleSubmit).toHaveBeenCalled();
   });
 });

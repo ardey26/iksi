@@ -219,4 +219,17 @@ describe('PayButton', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
+
+  it("keeps the profile's palette in the sheet, which is moved to <body>", async () => {
+    const host = document.createElement('div');
+    host.setAttribute('data-palette', '');
+    host.style.setProperty('--surface', 'rgb(1, 2, 3)');
+    document.body.append(host);
+    render(PayButton, { target: host, props: props() });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    const root = screen.getByRole('dialog').parentElement;
+    expect(host.contains(root)).toBe(false);
+    expect(root.style.getPropertyValue('--surface')).toBe('rgb(1, 2, 3)');
+    host.remove();
+  });
 });

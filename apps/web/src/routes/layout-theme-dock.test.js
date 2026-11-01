@@ -1,6 +1,6 @@
-// The fixed bottom-right theme toggle covered row actions (such as Revoke) on
-// narrow dashboard screens. There it now sits in the page flow, after the
-// content, so nothing can scroll under it. The 640px switch itself is CSS.
+// A fixed corner theme toggle covered page content on phones (row actions on
+// the dashboard, buttons on public pages). It now sits in the site header, in
+// the page flow, on every page, so nothing can scroll under it.
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
@@ -20,26 +20,24 @@ import Layout from './+layout.svelte';
 
 const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
 
-function dockAt(path) {
+function at(path) {
   page.url = new URL(`https://www.iksi.app${path}`);
   const { container } = render(Layout, { props: { data: { user: null }, children } });
   const toggle = container.querySelector('button[aria-label="Toggle theme"]');
-  const main = container.querySelector('main');
-  return { dock: toggle.parentElement, main };
+  return { toggle, header: container.querySelector('header'), main: container.querySelector('main') };
 }
 
 const follows = (a, b) => (b.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
 describe('theme toggle placement', () => {
-  it.each(['/dashboard', '/dashboard/links', '/dashboard/profile'])('sits after the content on %s', (path) => {
-    const { dock, main } = dockAt(path);
-    expect(dock.classList.contains('in-flow')).toBe(true);
-    expect(follows(dock, main)).toBe(true);
+  it.each(['/', '/AbC', '/@andre/sale', '/dashboard', '/dashboard/links', '/login'])('sits in the header, before the content, on %s', (path) => {
+    const { toggle, header, main } = at(path);
+    expect(header.contains(toggle)).toBe(true);
+    expect(follows(main, header)).toBe(true);
   });
 
-  it.each(['/', '/AbC', '/@andre/sale'])('stays a fixed corner button on %s', (path) => {
-    const { dock } = dockAt(path);
-    expect(dock.classList.contains('theme-dock')).toBe(true);
-    expect(dock.classList.contains('in-flow')).toBe(false);
+  it('is never a fixed overlay', () => {
+    const { toggle } = at('/');
+    expect(toggle.closest('.fixed, .theme-dock')).toBeNull();
   });
 });

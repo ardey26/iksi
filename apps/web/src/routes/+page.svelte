@@ -1,6 +1,7 @@
 <script>
-  import { Input, ShortenedURL } from '#lib/components//index.js';
+  import { Input, ShortenedURL } from '#lib/components/index.js';
   import OneTimeForm from '#lib/components/OneTimeForm.svelte';
+  import { Button, Container, Paper, Segmented } from '#lib/ui/index.js';
   import { onMount, tick } from 'svelte';
 
   const FEATURES = [
@@ -33,15 +34,16 @@
     get()?.focus();
   };
 
-  const startOneTime = () => {
-    mode = 'oneTime';
-    error = '';
-    focusLater(() => oneTimeRef);
-  };
+  const MODES = [
+    { value: 'link', label: 'Short link' },
+    { value: 'oneTime', label: 'One-time link' }
+  ];
 
-  const stopOneTime = () => {
-    mode = 'link';
-    focusLater(() => inputRef);
+  // The mode switch moves focus into the form it shows.
+  const switchMode = (e) => {
+    error = '';
+    if (e.detail.value === 'oneTime') focusLater(() => oneTimeRef);
+    else focusLater(() => inputRef);
   };
 
   const oneTimeCreated = (e) => {
@@ -123,54 +125,202 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="w-full flex flex-col items-center">
-  <!-- The tool fills the first screen exactly as before; the copy below is for
-       people who scroll and for search engines, which had no text to read. -->
-  <div class="w-full max-w-[500px] min-h-[100svh] flex flex-col justify-center">
-    <h1 class="sr-only">iksi — free URL shortener</h1>
-    {#if shortURL}
-      <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
-    {:else if mode === 'oneTime'}
-      <OneTimeForm bind:inputRef={oneTimeRef} on:created={oneTimeCreated} on:cancel={stopOneTime} />
-    {:else}
-      <Input
-        bind:longURL
-        bind:customURL
-        bind:showCustomAlias
-        bind:inputRef
-        {isLoading}
-        {error}
-        {handleSubmit}
-        {suggestion}
-        onSuggestion={() => handleSubmit(suggestion)}
-        onOneTime={startOneTime}
-      />
-    {/if}
-  </div>
-
-  <section aria-labelledby="about-heading" class="w-full max-w-[500px] pb-24 space-y-10">
-    <div class="space-y-2">
-      <h2 id="about-heading" class="text-base font-medium" style="color: var(--text-primary);">
-        A free URL shortener that stays out of the way
-      </h2>
-      <p class="text-sm leading-relaxed" style="color: var(--text-muted);">
-        Paste a long link, get a short one, no signup needed. No interstitial ads on your
-        links, and redirects served from the edge. <em>Iksi</em> is Tagalog for "short".
+<div class="home">
+  <section class="hero" aria-labelledby="home-title">
+    <Container width="form" class="hero-inner">
+      <h1 id="home-title" class="t-display headline">Make long links short.</h1>
+      <p class="lede">
+        iksi is a free URL shortener. Paste a link, get a short one. No signup.
       </p>
-    </div>
 
-    <dl class="grid gap-6 sm:grid-cols-2">
-      {#each FEATURES as f}
-        <div class="space-y-1">
-          <dt class="text-sm font-medium" style="color: var(--text-primary);">{f.title}</dt>
-          <dd class="text-sm leading-relaxed" style="color: var(--text-muted);">{f.body}</dd>
-        </div>
-      {/each}
-    </dl>
+      <Paper class="tool">
+        {#if shortURL}
+          <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
+        {:else}
+          <div class="mode">
+            <Segmented size="sm" label="Link type" bind:value={mode} options={MODES} on:change={switchMode} />
+          </div>
+          {#if mode === 'oneTime'}
+            <OneTimeForm bind:inputRef={oneTimeRef} on:created={oneTimeCreated} />
+          {:else}
+            <Input
+              bind:longURL
+              bind:customURL
+              bind:showCustomAlias
+              bind:inputRef
+              {isLoading}
+              {error}
+              {handleSubmit}
+              {suggestion}
+              onSuggestion={() => handleSubmit(suggestion)}
+            />
+          {/if}
+        {/if}
+      </Paper>
+    </Container>
+  </section>
 
-    <p class="text-sm" style="color: var(--text-muted);">
-      <a href="/login" class="underline decoration-1 underline-offset-2 hover:opacity-70 transition-opacity" style="color: var(--text-primary);">Sign in</a>
-      for routing, passwords, expiry and your own page.
-    </p>
+  <!-- For people who scroll and for search engines. Hairline grid, after Composer. -->
+  <section class="band" aria-labelledby="about-heading">
+    <Container width="wide">
+      <div class="about">
+        <h2 id="about-heading" class="about-title">A free URL shortener that stays out of the way</h2>
+        <p class="about-body">
+          Paste a long link, get a short one, no signup needed. No interstitial ads on your links, and
+          redirects served from the edge. <em>Iksi</em> is Tagalog for "short".
+        </p>
+      </div>
+    </Container>
+  </section>
+
+  <section class="band grid-band" aria-label="Features">
+    <Container width="wide">
+      <dl class="features">
+        {#each FEATURES as f}
+          <div class="feature">
+            <dt class="feature-title">{f.title}</dt>
+            <dd class="feature-body">{f.body}</dd>
+          </div>
+        {/each}
+      </dl>
+    </Container>
+  </section>
+
+  <section class="band cta" aria-label="Sign in">
+    <Container width="wide">
+      <div class="cta-inner">
+        <p class="cta-text">Sign in for routing, passwords, expiry and your own page.</p>
+        <Button href="/login">Sign in</Button>
+      </div>
+    </Container>
   </section>
 </div>
+
+<style>
+  .home {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .hero { padding: 40px 0 64px; }
+  @media (min-width: 768px) {
+    .hero { padding: 72px 0 96px; }
+  }
+  :global(.hero-inner) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .headline {
+    margin: 0;
+    color: var(--text-primary);
+  }
+  @media (min-width: 768px) {
+    /* The one place a bigger display size earns its keep. */
+    .headline { font-size: 56px; line-height: 60px; }
+  }
+  .lede {
+    max-width: 520px;
+    margin: 16px 0 0;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--text-muted);
+    text-wrap: balance;
+  }
+  :global(.tool) {
+    width: 100%;
+    max-width: 560px;
+    margin-top: 32px;
+    text-align: left;
+  }
+  .mode { margin-bottom: 16px; }
+
+  /* Bands: full-bleed hairlines between major sections. */
+  .band { border-top: 1px solid var(--border); }
+  .band:last-child { border-bottom: 0; }
+  .about {
+    display: grid;
+    gap: 12px;
+    padding: 48px 0;
+  }
+  @media (min-width: 768px) {
+    .about {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 48px;
+      padding: 64px 0;
+    }
+  }
+  .about-title {
+    margin: 0;
+    font-size: 28px;
+    line-height: 32px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+    text-wrap: balance;
+  }
+  .about-body {
+    margin: 0;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--text-muted);
+  }
+  .about-body em { color: var(--text-primary); }
+
+  /* Feature grid: cells drawn by hairlines that meet the band's edges. */
+  .features {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+  }
+  .feature {
+    padding: 24px 0;
+  }
+  .feature + .feature { border-top: 1px solid var(--border); }
+  @media (min-width: 640px) {
+    .features {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border-left: 1px solid var(--border);
+    }
+    .feature {
+      padding: 32px 24px;
+      border-right: 1px solid var(--border);
+    }
+    .feature + .feature { border-top: 0; }
+    .feature:nth-child(n + 3) { border-top: 1px solid var(--border); }
+  }
+  @media (min-width: 960px) {
+    .features { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .feature:nth-child(n + 3) { border-top: 0; }
+    .feature:nth-child(n + 4) { border-top: 1px solid var(--border); }
+  }
+  .feature-title {
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .feature-body {
+    margin: 4px 0 0;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--text-muted);
+  }
+
+  .cta-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 32px 0 48px;
+  }
+  .cta-text {
+    margin: 0;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--text-muted);
+  }
+</style>
