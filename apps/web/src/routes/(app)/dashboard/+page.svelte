@@ -20,8 +20,8 @@
 
 <svelte:head><title>Dashboard — iksi</title></svelte:head>
 
-<section class="w-full max-w-2xl mx-auto space-y-12">
-  <header class="space-y-3">
+<section class="w-full max-w-2xl mx-auto">
+  <header class="space-y-3 mb-12">
     {#if publicUrl}
       <div class="flex items-baseline gap-3 flex-wrap">
         <a
@@ -59,73 +59,148 @@
 
   <!-- SECTION: Traffic (streamed) -->
   {#if data.streamed?.stats}
-    <div class="space-y-4">
-      <div>
-        <h2 class="text-base font-medium" style="color: var(--text-primary);">Traffic</h2>
-        <p class="text-sm mt-1" style="color: var(--text-muted);">All-time activity on your public page.</p>
-      </div>
-      <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
-        {#await data.streamed.stats}
-          <!-- Skeleton: keeps layout stable, subtle pulse -->
-          <div class="grid grid-cols-3 divide-x" style="--tw-divide-opacity: 1;">
-            {#each [0, 1, 2] as _}
-              <div class="px-6 py-5 animate-pulse" style="border-color: var(--border);">
-                <div class="h-8 rounded" style="background: var(--border); width: 60%;"></div>
-                <div class="mt-3 h-3 rounded" style="background: var(--border); width: 40%;"></div>
-              </div>
-            {/each}
-          </div>
-        {:then s}
-          {#if s.views === 0}
-            <p class="px-6 py-8 text-sm text-center" style="color: var(--text-muted);">
-              No one's stopped by yet. Share <span style="color: var(--text-primary);">iksi.app/@{data.user.handle}</span> to get traffic.
-            </p>
-          {:else}
-            <div class="grid grid-cols-3 divide-x" style="--tw-divide-opacity: 1;">
-              <div class="px-6 py-5" style="border-color: var(--border);">
-                <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(s.views)}</div>
-                <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{s.views === 1 ? 'Visit' : 'Visits'}</div>
-              </div>
-              <div class="px-6 py-5" style="border-color: var(--border);">
-                <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{fmt(s.clicks)}</div>
-                <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">{s.clicks === 1 ? 'Click' : 'Clicks'}</div>
-              </div>
-              <div class="px-6 py-5" style="border-color: var(--border);">
-                <div class="text-3xl font-semibold tabular-nums leading-none" style="color: var(--text-primary);">{(s.ctr * 100).toFixed(1)}<span class="text-xl" style="color: var(--text-muted);">%</span></div>
-                <div class="mt-2 text-xs uppercase tracking-wide" style="color: var(--text-muted);">Clickthrough</div>
-              </div>
+    <section class="d-section" aria-labelledby="d-traffic">
+      <h2 class="d-title" id="d-traffic">Traffic</h2>
+      <p class="d-desc">All-time activity on your public page.</p>
+      {#await data.streamed.stats}
+        <!-- Skeleton: keeps layout stable, subtle pulse -->
+        <div class="stats" aria-hidden="true">
+          {#each [0, 1, 2] as _}
+            <div class="stat animate-pulse">
+              <div class="h-8 rounded" style="background-color: var(--border); width: 60%;"></div>
+              <div class="mt-3 h-3 rounded" style="background-color: var(--border); width: 40%;"></div>
             </div>
-          {/if}
-        {/await}
-      </div>
-    </div>
+          {/each}
+        </div>
+      {:then s}
+        {#if s.views === 0}
+          <p class="stats empty">
+            No one's stopped by yet. Share <span style="color: var(--text-primary);">iksi.app/@{data.user.handle}</span> to get traffic.
+          </p>
+        {:else}
+          <div class="stats">
+            <div class="stat">
+              <div class="figure">{fmt(s.views)}</div>
+              <div class="caption">{s.views === 1 ? 'Visit' : 'Visits'}</div>
+            </div>
+            <div class="stat">
+              <div class="figure">{fmt(s.clicks)}</div>
+              <div class="caption">{s.clicks === 1 ? 'Click' : 'Clicks'}</div>
+            </div>
+            <div class="stat">
+              <div class="figure">{(s.ctr * 100).toFixed(1)}<span class="unit">%</span></div>
+              <div class="caption">Clickthrough</div>
+            </div>
+          </div>
+        {/if}
+      {/await}
+    </section>
   {/if}
 
   <!-- SECTION: Manage -->
-  <div class="space-y-4">
-    <div>
-      <h2 class="text-base font-medium" style="color: var(--text-primary);">Manage</h2>
-      <p class="text-sm mt-1" style="color: var(--text-muted);">Update your links and public page settings.</p>
-    </div>
-    <nav class="rounded-xl overflow-hidden divide-y" style="background: var(--surface); border: 1px solid var(--border);" aria-label="Manage">
+  <section class="d-section" aria-labelledby="d-manage">
+    <h2 class="d-title" id="d-manage">Manage</h2>
+    <p class="d-desc">Update your links and public page settings.</p>
+    <nav class="manage" aria-labelledby="d-manage">
       {#each [
         { href: '/dashboard/links', title: 'Links', desc: 'Edit or delete the short URLs you own.' },
         { href: '/dashboard/profile', title: 'Profile', desc: 'Change how your public page looks.' }
       ] as item}
-        <a
-          href={item.href}
-          class="group flex items-center justify-between px-5 py-4 hover:bg-[color-mix(in_srgb,var(--text-primary)_3%,transparent)] transition-colors"
-          style="border-color: var(--border);"
-        >
-          <span class="flex flex-col">
-            <span class="text-base font-medium" style="color: var(--text-primary);">{item.title}</span>
-            <span class="text-sm mt-0.5" style="color: var(--text-muted);">{item.desc}</span>
+        <a href={item.href} class="group item">
+          <span class="flex flex-col min-w-0">
+            <span class="item-title">{item.title}</span>
+            <span class="item-desc">{item.desc}</span>
           </span>
-          <svg class="w-4 h-4 opacity-40 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);">
+          <svg class="w-4 h-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
           </svg>
         </a>
       {/each}
     </nav>
-  </div>
+  </section>
 </section>
+
+<style>
+  /* Readouts on a hairline strip: no box, vertical hairlines between. */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: 105px;
+    margin-top: 16px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stats.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    font-size: 14px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+  .stat {
+    padding: 24px 20px 20px;
+  }
+  .stat:first-child {
+    padding-left: 0;
+  }
+  .stat + .stat {
+    border-left: 1px solid var(--border);
+  }
+  .figure {
+    font-size: 30px;
+    line-height: 1;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+  .unit {
+    margin-left: 2px;
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+  .caption {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .manage {
+    margin-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 72px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .item:hover {
+    opacity: 1;
+  }
+  .item-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .item-desc {
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .item:focus-visible {
+    outline: 1px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+  @media (max-width: 639px) {
+    .stat {
+      padding: 20px 12px 16px;
+    }
+    .figure {
+      font-size: 24px;
+    }
+  }
+</style>
