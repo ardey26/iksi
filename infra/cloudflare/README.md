@@ -105,3 +105,53 @@ To turn it back on:
    ```
 4. Set `EDGE_ENABLED=true` as a GitHub repository variable and as a Vercel env var (production), then re-run the Deploy workflow.
 5. Proxy the `@`, `www` and `admin` records and re-test from Converge.
+
+## Subdomains go-live
+
+Gives every handle `https://<handle>.iksi.app/`. The code is already deployed and does nothing until `SUBDOMAINS_ENABLED=true`: subdomain requests are a 404 and `www.iksi.app/@handle` serves the profile as before. Vercel issues the `*.iksi.app` certificate only when Vercel runs the DNS, so the nameservers move off Cloudflare first. The proxy is already off, so no visitor traffic depends on Cloudflare.
+
+Before you start:
+- In Cloudflare, export the zone (DNS > Records > Export) and note every record that is not `@`, `www` or `admin`: MX, SPF/DKIM/DMARC TXT, site-verification TXT. Each one must exist in Vercel DNS before step 2, or mail and verification break.
+- `cdn.iksi.app` is an R2 custom domain and only works on Cloudflare DNS. Confirm `MEDIA_BASE_URL` is set in Vercel production so pages serve images from `/media`; old links straight to `cdn.iksi.app` stop working after the move.
+- Check existing handles (read-only, Supabase SQL editor). Rows in the first result now count as reserved and can no longer be claimed, but their owners keep them; rows in the second get no subdomain and stay on `www.iksi.app/@handle`:
+  ```sql
+  select handle from "Handle" where handle in ('www','admin','api','cdn','app','mail','email','webmail','smtp','imap','pop','ftp','ns1','ns2','ns3','ns4','mta-sts','autodiscover','autoconfig','status','blog','docs','static','assets','media','dev','staging','test','beta','internal','root','help','support','about','terms','privacy','auth','login','signup','logout','dashboard','settings','links','account');
+  select handle from "Handle" where handle !~ '^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$' or substr(handle, 3, 2) = '--';
+  ```
+  The list is `RESERVED_HANDLES` in `apps/web/src/lib/subdomains.ts`; keep the query in step with it. If a reserved handle has a real owner, sort it out with them before step 6, because `<that>.iksi.app` will not serve their profile.
+
+Steps:
+1. In Vercel, open the project's DNS for `iksi.app` (Domains > iksi.app > DNS records). Confirm records exist for `@`, `www` and `admin` pointing at the project (Vercel creates them for domains attached to the project), and add every extra record noted above.
+2. In Squarespace (Domains > iksi.app > DNS > Nameservers), switch to custom nameservers `ns1.vercel-dns.com` and `ns2.vercel-dns.com`.
+3. Wait for the move, then check that every hostname still works:
+   ```sh
+   dig +short NS iksi.app                       # ns1/ns2.vercel-dns.com
+   curl -sI https://www.iksi.app/ | head -1     # 200
+   curl -sI https://iksi.app/QdM2whH | grep -iE "^HTTP|location"   # 302 to the destination
+   curl -sI https://admin.iksi.app/ | grep -iE "^HTTP|location"    # 302, /admin
+   ```
+4. In the Vercel project, Settings > Domains, add `*.iksi.app` (production).
+5. Wait until Vercel shows the wildcard certificate as issued. Then a subdomain answers over valid TLS with the 404 that means "flag off":
+   ```sh
+   curl -sI https://andre.iksi.app/ | head -1   # HTTP/2 404, and no certificate error
+   ```
+6. Set `SUBDOMAINS_ENABLED=true` in Vercel (Settings > Environment Variables, Production only).
+7. Redeploy production (env changes only apply to new deployments).
+8. Verify:
+   ```sh
+   curl -sI https://andre.iksi.app/ | head -1                                         # 200
+   curl -sI https://www.iksi.app/@andre | grep -iE "^HTTP|location|cache-control"     # 301, https://andre.iksi.app/, public, max-age=86400
+   curl -sI https://www.iksi.app/@andre/<name> | grep -iE "^HTTP|location"            # 301, https://andre.iksi.app/<name>
+   curl -sI https://andre.iksi.app/<name> | grep -iE "^HTTP|location"                 # 302 to that link's destination
+   curl -sI https://iksi.app/QdM2whH | grep -iE "^HTTP|location"                      # unchanged: 302, no subdomain
+   curl -sI https://admin.iksi.app/ | grep -iE "^HTTP|location"                       # unchanged: 302, /admin
+   curl -s https://andre.iksi.app/ | grep -o '<link rel="canonical"[^>]*>'           # href="https://andre.iksi.app/"
+   ```
+   Then open `https://andre.iksi.app/` in a browser, click a row and the Pay button, and confirm signing in still works on `www.iksi.app`.
+
+### Rollback
+
+1. Remove `SUBDOMAINS_ENABLED` in Vercel (Production).
+2. Redeploy production.
+
+`www.iksi.app/@handle` serves profiles again and subdomains go back to 404. Browsers that already followed the 301 keep it for up to a day (`max-age=86400`) and land on the 404 until it expires; nothing on our side clears that. Leave `*.iksi.app` and the Vercel DNS in place; with the flag off they do nothing.
