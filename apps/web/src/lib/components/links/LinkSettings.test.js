@@ -22,6 +22,7 @@ function mockFetch(response) {
 }
 
 const sent = (fn) => JSON.parse(fn.mock.calls[0][1].body);
+const open = (props, extra = {}) => render(LinkSettings, { props: { open: true, short: 'iksi.app/s7', ...props }, ...extra });
 const saveBtn = () => screen.getByRole('button', { name: 'Save' });
 const addCondition = async (label) => {
   await fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
@@ -33,17 +34,18 @@ describe('LinkSettings', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('shows every setting as a row without expanding anything', () => {
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     expect(screen.getByLabelText('Destination')).toHaveValue('https://example.com/start');
     expect(screen.getByLabelText('Expiry')).toHaveValue('');
     expect(screen.getByLabelText('Click limit')).toHaveValue('');
-    expect(screen.getByLabelText('New password')).toHaveValue('');
-    expect(screen.getByRole('switch', { name: 'Permanent redirect' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByLabelText(/^Password/)).toHaveValue('');
+    expect(screen.getByRole('radio', { name: 'Temporary' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Permanent' })).not.toBeChecked();
     expect(screen.getByRole('heading', { name: 'Routing rules' })).toBeInTheDocument();
   });
 
   it('keeps Save disabled with no changes', async () => {
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     expect(saveBtn()).toBeDisabled();
     await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: 'https://example.com/new' } });
     expect(saveBtn()).toBeEnabled();
@@ -57,7 +59,7 @@ describe('LinkSettings', () => {
       rules: [{ id: 'zzzzzzz1', when: { countries: ['SG'] }, destination: 'https://sg.example.com' }]
     };
     const fetchFn = mockFetch({ body: { ok: true, settings: saved } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    const view = open({ id: 7, settings: base });
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     await addCondition('Country');
     await fireEvent.input(screen.getByLabelText('Countries'), { target: { value: 'sg' } });
@@ -70,8 +72,10 @@ describe('LinkSettings', () => {
       id: 7,
       rules: [{ id: expect.stringMatching(/^[A-Za-z0-9_-]{8}$/), when: { countries: ['SG'] }, destination: 'https://sg.example.com' }]
     });
-    // State now follows the response, not the typed edits.
-    await waitFor(() => expect(saveBtn()).toBeDisabled());
+    // Saving closes the sheet; reopened, it shows the response, not the typed edits.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await view.rerender({ open: true });
+    expect(saveBtn()).toBeDisabled();
     expect(screen.getByLabelText('Countries')).toHaveValue('SG');
     expect(screen.getByRole('button', { name: 'Remove rule 1' })).toBeInTheDocument();
     expect(screen.getByText('1 rule')).toBeInTheDocument();
@@ -79,7 +83,7 @@ describe('LinkSettings', () => {
 
   it('keeps rule edits after a 400', async () => {
     mockFetch({ status: 400, body: { error: 'Rule 1: destination is not allowed' } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     await fireEvent.input(screen.getByLabelText('Go to'), { target: { value: 'https://x.example.com' } });
     await fireEvent.click(saveBtn());
@@ -91,8 +95,8 @@ describe('LinkSettings', () => {
     const saved = { ...base, permanent: true };
     mockFetch({ body: { ok: true, settings: saved } });
     const events = { saved: vi.fn() };
-    render(LinkSettings, { props: { id: 7, settings: base }, events });
-    await fireEvent.click(screen.getByRole('switch', { name: 'Permanent redirect' }));
+    open({ id: 7, settings: base }, { events });
+    await fireEvent.click(screen.getByRole('radio', { name: 'Permanent' }));
     await fireEvent.click(saveBtn());
     await waitFor(() => expect(events.saved).toHaveBeenCalled());
     expect(events.saved.mock.calls[0][0].detail ?? events.saved.mock.calls[0][0]).toEqual(saved);
@@ -100,7 +104,7 @@ describe('LinkSettings', () => {
 
   it('builds a time condition with days, start, end and zone', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     await addCondition('Time of day');
     await fireEvent.click(screen.getByLabelText('Fri'));
@@ -116,7 +120,7 @@ describe('LinkSettings', () => {
 
   it('enters an A/B split with a live total', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     expect(screen.getByRole('radiogroup', { name: 'Rule 1 destination type' })).toBeInTheDocument();
     const one = screen.getByRole('radio', { name: 'One URL' });
@@ -141,13 +145,13 @@ describe('LinkSettings', () => {
   });
 
   it('hints that https:// is added', async () => {
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     expect(screen.getByText('https:// is added if missing')).toBeInTheDocument();
   });
 
   it('shows the server error and keeps the edits', async () => {
     mockFetch({ status: 400, body: { error: 'Rule 1: weights must add up to 100' } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: 'https://example.com/new' } });
     await fireEvent.click(saveBtn());
     expect(await screen.findByText('Rule 1: weights must add up to 100')).toBeInTheDocument();
@@ -157,7 +161,7 @@ describe('LinkSettings', () => {
 
   it('shows a rule error without calling the server', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
+    open({ id: 7, settings: base });
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     await fireEvent.click(saveBtn());
     expect(await screen.findByText('Rule 1: add a destination')).toBeInTheDocument();
@@ -166,7 +170,7 @@ describe('LinkSettings', () => {
 
   it('removes a password', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: { ...base, hasPassword: false } } });
-    render(LinkSettings, { props: { id: 7, settings: { ...base, hasPassword: true } } });
+    open({ id: 7, settings: { ...base, hasPassword: true } });
     expect(screen.getByText('Password set')).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('button', { name: 'Remove password' }));
     await fireEvent.click(saveBtn());
@@ -176,8 +180,8 @@ describe('LinkSettings', () => {
 
   it('sets a password and max clicks', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
-    await fireEvent.input(screen.getByLabelText('New password'), { target: { value: 'hunter22' } });
+    open({ id: 7, settings: base });
+    await fireEvent.input(screen.getByLabelText(/^Password/), { target: { value: 'hunter22' } });
     await fireEvent.input(screen.getByLabelText('Click limit'), { target: { value: '50' } });
     await fireEvent.click(saveBtn());
     await waitFor(() => expect(fetchFn).toHaveBeenCalled());
@@ -187,12 +191,66 @@ describe('LinkSettings', () => {
   it('sends permanent and resets the baseline after saving', async () => {
     const saved = { ...base, permanent: true };
     const fetchFn = mockFetch({ body: { ok: true, settings: saved } });
-    render(LinkSettings, { props: { id: 7, settings: base } });
-    expect(screen.getByText(/Browsers cache 301s/)).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole('switch', { name: 'Permanent redirect' }));
+    const view = open({ id: 7, settings: base });
+    expect(screen.getByText(/Browsers cache permanent redirects/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('radio', { name: 'Permanent' }));
     await fireEvent.click(saveBtn());
     await waitFor(() => expect(fetchFn).toHaveBeenCalled());
     expect(sent(fetchFn)).toEqual({ id: 7, permanent: true });
-    await waitFor(() => expect(saveBtn()).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await view.rerender({ open: true });
+    expect(screen.getByRole('radio', { name: 'Permanent' })).toBeChecked();
+    expect(saveBtn()).toBeDisabled();
+  });
+
+  it('hands a changed page title to the page and closes', async () => {
+    const fetchFn = mockFetch({ body: { ok: true, settings: base } });
+    const events = { title: vi.fn(), close: vi.fn() };
+    open({ id: 7, settings: base, pageTitle: 'Shop' }, { events });
+    await fireEvent.input(screen.getByLabelText('Title on your page'), { target: { value: 'My shop' } });
+    await fireEvent.click(saveBtn());
+    await waitFor(() => expect(events.title).toHaveBeenCalled());
+    expect(events.title.mock.calls[0][0].detail).toBe('My shop');
+    // Only the title changed: no settings request.
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('confirms a delete inline before asking the page to delete', async () => {
+    const events = { delete: vi.fn() };
+    open({ id: 7, settings: base, deletable: true }, { events });
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete link' }));
+    expect(events.delete).not.toHaveBeenCalled();
+    expect(screen.getByText('Delete iksi.app/s7? Its clicks and settings go with it.')).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(events.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves the rule order after a reorder on the grip', async () => {
+    const rules = [
+      { id: 'aaaaaaa1', when: {}, destination: 'https://one.example.com' },
+      { id: 'aaaaaaa2', when: {}, destination: 'https://two.example.com' }
+    ];
+    const fetchFn = mockFetch({ body: { ok: true, settings: base } });
+    open({ id: 7, settings: { ...base, rules } });
+    // The sheet takes focus as it opens; the grip is focused after that.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('dialog')));
+    const grip = screen.getByRole('button', { name: 'Reorder Rule 2' });
+    grip.focus();
+    await fireEvent.keyDown(grip, { key: ' ' });
+    await fireEvent.keyDown(grip, { key: 'ArrowUp' });
+    await fireEvent.keyDown(grip, { key: ' ' });
+    await fireEvent.click(saveBtn());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+    expect(sent(fetchFn).rules.map((r) => r.id)).toEqual(['aaaaaaa2', 'aaaaaaa1']);
+  });
+
+  it('closes on Escape and discards edits', async () => {
+    const view = open({ id: 7, settings: base });
+    await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: 'https://example.com/new' } });
+    await fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await view.rerender({ open: true });
+    expect(screen.getByLabelText('Destination')).toHaveValue(base.destination);
   });
 });

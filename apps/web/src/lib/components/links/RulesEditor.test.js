@@ -8,26 +8,39 @@ const click = (name) => fireEvent.click(screen.getByRole('button', { name }));
 const focused = () => document.activeElement;
 
 describe('RulesEditor', () => {
-  it('moves rules up and down', async () => {
+  const grip = (n) => screen.getByRole('button', { name: `Reorder Rule ${n}` });
+  async function moveWithKeys(n, ...keys) {
+    const g = grip(n);
+    g.focus();
+    await fireEvent.keyDown(g, { key: ' ' });
+    for (const key of keys) await fireEvent.keyDown(g, { key });
+    await fireEvent.keyDown(g, { key: ' ' });
+  }
+
+  it('reorders rules on the grip, not with arrow buttons', async () => {
     render(RulesEditor, { props: { rules: [mk('aaaaaaa1'), mk('aaaaaaa2'), mk('aaaaaaa3')] } });
-    await click('Move rule 2 up');
-    expect(ids()).toEqual(['aaaaaaa2', 'aaaaaaa1', 'aaaaaaa3']);
-    await click('Move rule 2 down');
-    expect(ids()).toEqual(['aaaaaaa2', 'aaaaaaa3', 'aaaaaaa1']);
+    expect(screen.queryByRole('button', { name: /^Move rule/ })).toBeNull();
+    await moveWithKeys(2, 'ArrowUp');
+    await waitFor(() => expect(ids()).toEqual(['aaaaaaa2', 'aaaaaaa1', 'aaaaaaa3']));
+    await moveWithKeys(2, 'ArrowDown');
+    await waitFor(() => expect(ids()).toEqual(['aaaaaaa2', 'aaaaaaa3', 'aaaaaaa1']));
   });
 
-  it('keeps focus on a move button when the rule lands at an edge', async () => {
+  it('keeps focus on the moved rule\'s grip after a keyboard drop', async () => {
     render(RulesEditor, { props: { rules: [mk('aaaaaaa1'), mk('aaaaaaa2')] } });
-    await click('Move rule 2 up');
-    await waitFor(() => expect(focused()).toBe(screen.getByRole('button', { name: 'Move rule 1 down' })));
-    await click('Move rule 1 down');
-    await waitFor(() => expect(focused()).toBe(screen.getByRole('button', { name: 'Move rule 2 up' })));
+    await moveWithKeys(2, 'ArrowUp');
+    await waitFor(() => expect(focused()).toBe(grip(1)));
+    expect(ids()).toEqual(['aaaaaaa2', 'aaaaaaa1']);
   });
 
-  it('keeps focus on the same move button when it stays enabled', async () => {
-    render(RulesEditor, { props: { rules: [mk('aaaaaaa1'), mk('aaaaaaa2'), mk('aaaaaaa3')] } });
-    await click('Move rule 3 up');
-    await waitFor(() => expect(focused()).toBe(screen.getByRole('button', { name: 'Move rule 2 up' })));
+  it('puts a rule back when the move is cancelled with Escape', async () => {
+    render(RulesEditor, { props: { rules: [mk('aaaaaaa1'), mk('aaaaaaa2')] } });
+    const g = grip(2);
+    g.focus();
+    await fireEvent.keyDown(g, { key: ' ' });
+    await fireEvent.keyDown(g, { key: 'ArrowUp' });
+    await fireEvent.keyDown(g, { key: 'Escape' });
+    expect(ids()).toEqual(['aaaaaaa1', 'aaaaaaa2']);
   });
 
   it('removes a rule and focuses the next rule, else Add rule', async () => {

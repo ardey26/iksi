@@ -4,6 +4,31 @@
   import LinkSettings from '#lib/components/links/LinkSettings.svelte';
   import OneTimeLinkForm from '#lib/components/links/OneTimeLinkForm.svelte';
   import type { LinkSettingsData } from '#lib/rules-form.js';
+  import {
+    Badge,
+    Button,
+    Container,
+    DragHandle,
+    EmptyState,
+    Field,
+    IconButton,
+    Input,
+    List,
+    Logo,
+    Monogram,
+    PageHeader,
+    Paper,
+    Row,
+    Section,
+    Skeleton,
+    SortableList,
+    Stack,
+    Switch,
+    toast
+  } from '#lib/ui/index.js';
+  import { uid } from '#lib/ui/uid.js';
+  import { displayUrl, formatCount, hostOf, relativeDate } from '#lib/format.js';
+  import { ONE_TIME_TTL_DAYS } from '#lib/one-time.js';
 
   export let data;
 
@@ -18,8 +43,8 @@
     settings?: LinkSettingsData;
     // Set for burn-after-reading links: no settings, never on the page, content never sent here.
     oneTime?: { kind: 'url' | 'text'; state: 'unopened' | 'opened' | 'expired' } | null;
-    // Set true on optimistic rows while the server call is in flight; used to
-    // dim the row visually. Never persisted by the loader.
+    // Set true on optimistic rows while the server call is in flight; the row
+    // is muted and its controls wait. Never persisted by the loader.
     pending?: boolean;
   };
 
@@ -34,131 +59,90 @@
     links = [...data.links];
   }
 
-  let copiedId: number | null = null;
+  const isPublic = (l: Link) => !l.oneTime && !!l.profileRow?.enabled;
+  const time = (l: Link) => new Date(l.createdAt).getTime();
+  const shortLabel = (l: Link) => `iksi.app/${l.shortURL}`;
 
-  // --- Per-link settings sheet (one open at a time) ---
-  // The sheet is a modal dialog: focus moves into it on open, Tab stays
-  // inside it, Escape or a backdrop click closes it, and focus returns to
-  // the gear that opened it.
-  let sheetId: number | null = null;
-  let sheetEl: HTMLElement | undefined;
-  let sheetTrigger: HTMLElement | null = null;
-  $: sheetLink = sheetId === null ? null : links.find((l) => l.id === sheetId && l.settings) ?? null;
+  // Three groups: the page's links in their page order, the rest newest
+  // first, and one-time links.
+  $: onPage = links.filter(isPublic);
+  $: others = links.filter((l) => !l.oneTime && !isPublic(l)).sort((a, b) => time(b) - time(a));
+  $: oneTimes = links.filter((l) => l.oneTime);
+  $: regularCount = onPage.length + others.length;
 
-  async function openSheet(l: Link, e: MouseEvent) {
-    sheetTrigger = e.currentTarget as HTMLElement;
-    sheetId = l.id;
-    await tick();
-    sheetEl?.focus();
+  const ONE_TIME_STATE = {
+    unopened: { label: 'Unopened', variant: 'success' },
+    opened: { label: 'Opened', variant: 'neutral' },
+    expired: { label: 'Expired', variant: 'warning' }
+  } as const;
+
+  function states(s: LinkSettingsData) {
+    return [
+      s.hasPassword && 'Password',
+      (s.expiresAt !== null || s.maxClicks !== null) && 'Expiry',
+      s.rules.length > 0 && (s.rules.length === 1 ? '1 rule' : `${s.rules.length} rules`)
+    ].filter(Boolean) as string[];
   }
-  async function closeSheet() {
-    if (sheetId === null) return;
-    sheetId = null;
-    await tick();
-    sheetTrigger?.focus();
-    sheetTrigger = null;
+
+  function verdictLabel(v: string | null | undefined) {
+    if (!v || v === 'safe' || v === 'pending') return null;
+    return v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ').toLowerCase();
   }
-  function onWindowKeydown(e: KeyboardEvent) {
-    if (sheetId === null || e.key !== 'Escape') return;
-    e.preventDefault();
-    closeSheet();
+
+  // Favicon URLs are memoized per host (and the browser's HTTP cache dedupes
+  // requests for the same host). A host whose icon fails gets a monogram.
+  const _faviconByHost = new Map<string, string | null>();
+  let brokenHosts = new Set<string>();
+  function faviconOf(u: string): string | null {
+    const host = hostOf(u);
+    if (!host || !host.includes('.') || brokenHosts.has(host)) return null;
+    const cached = _faviconByHost.get(host);
+    if (cached !== undefined) return cached;
+    const url = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+    _faviconByHost.set(host, url);
+    return url;
   }
-  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-  function trapFocus(e: KeyboardEvent) {
-    if (e.key !== 'Tab' || !sheetEl) return;
-    const items = [...sheetEl.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest('[hidden]'));
-    if (items.length === 0) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && (active === first || active === sheetEl)) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && active === last) {
-      e.preventDefault();
-      first.focus();
+  function onFaviconError(u: string) {
+    brokenHosts = new Set([...brokenHosts, hostOf(u)]);
+  }
+
+  async function copy(l: Link) {
+    try {
+      await navigator.clipboard.writeText(`https://iksi.app/${l.shortURL}`);
+      toast('Link copied', { variant: 'success' });
+    } catch {
+      toast('Could not copy', { variant: 'error' });
     }
   }
 
-  const ONE_TIME_STATE = { unopened: 'Unopened', opened: 'Opened', expired: 'Expired' } as const;
+  const focusSoon = async (selector: string) => {
+    await tick();
+    document.querySelector<HTMLElement>(selector)?.focus();
+  };
 
-  function onOneTimeCreated(e: CustomEvent<Record<string, unknown>>) {
-    links = [{ ...(e.detail as unknown as Link), profileRow: null }, ...links];
-    toast('One-time link created');
+  // --- Settings sheet (one at a time) ---
+  let sheetOpen = false;
+  let sheetLinkId: number | null = null;
+  let sheetOpener: HTMLElement | null = null;
+  $: sheetLink = sheetLinkId === null ? null : links.find((l) => l.id === sheetLinkId && l.settings) ?? null;
+
+  function openSheet(l: Link, e: MouseEvent) {
+    sheetOpener = e.currentTarget as HTMLElement;
+    sheetLinkId = l.id;
+    sheetOpen = true;
+  }
+  // The page is inert while the sheet is open; focus goes back to the gear
+  // once it is not.
+  async function onSheetClose() {
+    sheetOpen = false;
+    await tick();
+    if (sheetOpener?.isConnected) sheetOpener.focus({ preventScroll: true });
+    sheetOpener = null;
   }
 
   function onSettingsSaved(id: number, s: LinkSettingsData) {
     links = links.map((l) => (l.id === id ? { ...l, originalURL: s.destination, settings: s } : l));
-    toast('Settings saved');
-  }
-
-  function states(s: LinkSettingsData) {
-    return [
-      { label: 'Password', on: s.hasPassword },
-      { label: 'Expiry', on: s.expiresAt !== null || s.maxClicks !== null },
-      { label: 'Rules', on: s.rules.length > 0 }
-    ];
-  }
-
-  // --- Lightweight toast (single message, auto-dismiss) ---
-  let toastMessage: string | null = null;
-  let toastKind: 'success' | 'error' = 'success';
-  let _toastTimer: ReturnType<typeof setTimeout> | null = null;
-  function toast(message: string, kind: 'success' | 'error' = 'success') {
-    toastMessage = message;
-    toastKind = kind;
-    if (_toastTimer) clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => { toastMessage = null; }, 2200);
-  }
-
-  function hostOf(u: string) {
-    try { return new URL(u).hostname.replace(/^www\./, ''); }
-    catch { return u; }
-  }
-
-  // Favicon URLs are memoized per-hostname so re-renders don't recompute
-  // (and the browser's HTTP cache dedupes network requests for the same host).
-  // sz=32 = 2x for a 16px display, retina-crisp without wasting bytes.
-  const _faviconByHost = new Map<string, string | null>();
-  function faviconOf(u: string): string | null {
-    const host = hostOf(u);
-    if (!host || !host.includes('.')) return null;
-    const cached = _faviconByHost.get(host);
-    if (cached !== undefined) return cached;
-    const url = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`;
-    _faviconByHost.set(host, url);
-    return url;
-  }
-
-  function relDate(d: string | Date) {
-    const dt = new Date(d);
-    const diff = Date.now() - dt.getTime();
-    const day = 86400000;
-    if (diff < day) return 'today';
-    if (diff < 2 * day) return 'yesterday';
-    if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`;
-    if (diff < 30 * day) return `${Math.floor(diff / (7 * day))}w ago`;
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: dt.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
-  }
-  function verdictLabel(v: string | null | undefined) {
-    if (!v || v === 'safe' || v === 'pending') return null;
-    return v;
-  }
-  function fmtClicks(n: number) {
-    if (n < 1000) return n.toString();
-    if (n < 10000) return (n / 1000).toFixed(1) + 'k';
-    if (n < 1000000) return Math.round(n / 1000) + 'k';
-    return (n / 1000000).toFixed(1) + 'M';
-  }
-  async function copy(id: number, short: string) {
-    try {
-      await navigator.clipboard.writeText(`https://iksi.app/${short}`);
-      copiedId = id;
-      setTimeout(() => { if (copiedId === id) copiedId = null; }, 1400);
-      toast('Copied to clipboard');
-    } catch {
-      toast('Could not copy', 'error');
-    }
+    toast('Settings saved', { variant: 'success' });
   }
 
   // --- Mutations ---
@@ -171,27 +155,37 @@
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      toast(body.error || 'Something went wrong', 'error');
+      toast(body.error || 'Something went wrong', { variant: 'error' });
       return null;
     }
     const body = await res.json();
     return body.row as { id: number; title: string; enabled: boolean; position: number };
   }
 
+  /** Puts a link that just went on the page at the end of the page's links. */
+  function toEndOfPage(id: number, next: Link) {
+    const rest = links.filter((l) => l.id !== id);
+    links = [...rest.filter(isPublic), next, ...rest.filter((l) => !isPublic(l))];
+  }
+
   async function togglePublish(link: Link) {
     const currentTitle = link.profileRow?.title?.trim() || hostOf(link.originalURL) || link.shortURL;
     const nextEnabled = !(link.profileRow?.enabled ?? false);
-    links = links.map((l) =>
-      l.id === link.id
-        ? { ...l, profileRow: { id: l.profileRow?.id ?? -1, position: l.profileRow?.position ?? Number.MAX_SAFE_INTEGER, title: currentTitle, enabled: nextEnabled } }
-        : l
-    );
+    const optimistic = {
+      ...link,
+      profileRow: { id: link.profileRow?.id ?? -1, position: link.profileRow?.position ?? Number.MAX_SAFE_INTEGER, title: currentTitle, enabled: nextEnabled }
+    };
+    if (nextEnabled) toEndOfPage(link.id, optimistic);
+    else links = links.map((l) => (l.id === link.id ? optimistic : l));
+    // The row moved to the other list; its switch keeps the focus.
+    focusSoon(`[data-switch="${link.id}"]`);
     const row = await apiUpsertRow(link, currentTitle, nextEnabled);
     if (!row) {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: link.profileRow } : l));
+      focusSoon(`[data-switch="${link.id}"]`);
     } else {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: row } : l));
-      toast(nextEnabled ? 'Published to your page' : 'Removed from your page');
+      toast(nextEnabled ? 'Published to your page' : 'Removed from your page', { variant: 'success' });
     }
   }
 
@@ -206,9 +200,9 @@
       });
       if (res.ok) {
         links = links.map((l) => (l.id === link.id ? { ...l, profileRow: null } : l));
-        toast('Removed from your page');
+        toast('Removed from your page', { variant: 'success' });
       } else {
-        toast('Could not update', 'error');
+        toast('Could not update', { variant: 'error' });
       }
       return;
     }
@@ -217,12 +211,11 @@
     const row = await apiUpsertRow(link, title, enabled);
     if (row) {
       links = links.map((l) => (l.id === link.id ? { ...l, profileRow: row } : l));
-      toast('Title saved');
+      toast('Title saved', { variant: 'success' });
     }
   }
 
   async function del(link: Link) {
-    if (!confirm(`Delete iksi.app/${link.shortURL}?`)) return;
     const prev = links;
     links = links.filter((l) => l.id !== link.id);
     const res = await fetch('/dashboard/links', {
@@ -232,13 +225,41 @@
     });
     if (!res.ok) {
       links = prev;
-      toast('Could not delete link', 'error');
+      toast('Could not delete link', { variant: 'error' });
     } else {
-      toast('Link deleted');
+      toast('Link deleted', { variant: 'success' });
     }
   }
 
+  async function deleteFromSheet(link: Link) {
+    sheetOpen = false;
+    sheetOpener = null;
+    await del(link);
+    focusSoon('[data-act="new-url"]');
+  }
+
+  // One-time rows confirm a delete inline.
+  let confirmingId: number | null = null;
+  function askDelete(l: Link) {
+    confirmingId = l.id;
+    focusSoon(`[data-confirm-cancel="${l.id}"]`);
+  }
+  function keep(l: Link) {
+    confirmingId = null;
+    focusSoon(`[data-delete="${l.id}"]`);
+  }
+  function confirmDelete(l: Link) {
+    confirmingId = null;
+    del(l);
+  }
+
+  function onOneTimeCreated(e: CustomEvent<Record<string, unknown>>) {
+    links = [{ ...(e.detail as unknown as Link), profileRow: null }, ...links];
+    toast('One-time link created', { variant: 'success' });
+  }
+
   // --- Add link ---
+  const ids = { publish: uid('publish'), name: uid('name') };
   let newURL = '';
   let newTitle = '';
   let newPublish = true;
@@ -257,18 +278,17 @@
       return !!u.hostname && u.hostname.includes('.');
     } catch { return false; }
   }
-  // Form stays enabled during in-flight adds — the optimistic prepend
-  // makes the operation feel instant, and the user can queue another add
-  // right away.
+  // The form stays enabled during in-flight adds: the optimistic row makes the
+  // operation feel instant, and another add can be queued right away.
   $: nameOk = /^[A-Za-z0-9_-]{0,50}$/.test(newName.trim());
   $: canAdd = isValidUrl(newURL) && nameOk;
+  $: nameError = addSuggestion ? 'That name is taken.' : nameOk ? '' : 'Names use letters, numbers, - and _, up to 50.';
 
   /** `name` overrides the typed custom name; the suggestion button passes the scoped one. */
   async function add(name: string = newName.trim()) {
     if (!canAdd) return;
 
-    // Snapshot form values, clear the form immediately so the user can
-    // keep adding.
+    // Snapshot the form and clear it, so the next link can be typed.
     const url = newURL.trim();
     const typedTitle = newTitle.trim();
     const typedName = newName;
@@ -278,15 +298,14 @@
     newName = '';
     addError = '';
 
-    // Prepend an optimistic row so it appears in the list instantly.
-    // Muted (pending) until the server confirms.
+    // An optimistic row shows at once, muted until the server confirms.
     const tempId = nextTempId();
     const optimisticTitle = typedTitle || hostOf(url) || '';
     const shouldPublish = wantsPublic || typedTitle.length > 0;
     const optimistic: Link = {
       id: tempId,
-      shortURL: '···',
-      originalURL: url,
+      shortURL: '',
+      originalURL: /^https?:\/\//i.test(url) ? url : `https://${url}`,
       clickCount: 0,
       createdAt: new Date().toISOString(),
       safeVerdict: null,
@@ -295,8 +314,11 @@
         : null,
       pending: true
     };
-    links = [optimistic, ...links];
+    links = isPublic(optimistic)
+      ? [...links.filter(isPublic), optimistic, ...links.filter((l) => !isPublic(l))]
+      : [optimistic, ...links];
 
+    let addedId: number | null = null;
     try {
       const res = await fetch('/api/shorten', {
         method: 'POST',
@@ -305,7 +327,7 @@
       });
       const body = await res.json();
       if (!res.ok) {
-        // Roll back the optimistic entry, restore the form so user can retry.
+        // Roll back the optimistic row and restore the form for a retry.
         links = links.filter((l) => l.id !== tempId);
         newURL = url;
         newTitle = typedTitle;
@@ -317,7 +339,7 @@
           return;
         }
         addError = body.error || 'Could not shorten.';
-        toast(body.error || 'Could not shorten', 'error');
+        toast(body.error || 'Could not shorten', { variant: 'error' });
         return;
       }
 
@@ -332,639 +354,370 @@
 
       if (!addedLink) {
         links = links.filter((l) => l.id !== tempId);
-        toast('Something went wrong', 'error');
+        toast('Something went wrong', { variant: 'error' });
         return;
       }
 
-      // Replace the optimistic entry with the real link data — keep pending
-      // true if we still have an upsert to do.
+      addedId = addedLink.id;
+      // Swap in the real link; it stays pending while the page row is saved.
       const needsUpsert = optimisticTitle && (wantsPublic || typedTitle.length > 0);
       links = links.map((l) =>
-        l.id === tempId
-          ? { ...addedLink!, profileRow: l.profileRow, pending: needsUpsert }
-          : l
+        l.id === tempId ? { ...addedLink!, profileRow: l.profileRow, pending: !!needsUpsert } : l
       );
 
       if (needsUpsert) {
         const row = await apiUpsertRow(addedLink, optimisticTitle, wantsPublic);
         links = links.map((l) =>
-          l.id === addedLink!.id
-            ? { ...l, profileRow: row ?? l.profileRow, pending: false }
-            : l
+          l.id === addedLink!.id ? { ...l, profileRow: row ?? l.profileRow, pending: false } : l
         );
       }
 
-      toast(wasDedupe ? 'Already had this — updated' : 'Link added');
+      toast(wasDedupe ? 'Already had this, updated' : 'Link added', { variant: 'success' });
     } catch {
-      // Roll back the optimistic entry on network error.
-      links = links.filter((l) => l.id !== tempId);
+      // A link that was made stays; only its wait ends.
+      links = links.filter((l) => l.id !== tempId).map((l) => (l.id === addedId ? { ...l, pending: false } : l));
       newURL = url;
       newTitle = typedTitle;
       newName = typedName;
       addError = 'Network error.';
-      toast('Network error', 'error');
+      toast('Network error', { variant: 'error' });
     }
   }
 
-  // --- Drag reorder (public rows only) ---
-  let dragId: number | null = null;
-  let dragOverId: number | null = null;
-
-  function isPublic(l: Link) { return !!l.profileRow?.enabled; }
-
-  function onDragStart(e: DragEvent, l: Link) {
-    if (!isPublic(l)) { e.preventDefault(); return; }
-    dragId = l.id;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(l.id));
-    }
-  }
-  function onDragOver(e: DragEvent, l: Link) {
-    if (dragId === null || !isPublic(l)) return;
-    e.preventDefault();
-    dragOverId = l.id;
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-  }
-  function onDragEnd() { dragId = null; dragOverId = null; }
-  async function onDrop(e: DragEvent, target: Link) {
-    e.preventDefault();
-    const from = dragId;
-    dragId = null; dragOverId = null;
-    if (from === null || from === target.id || !isPublic(target)) return;
-
-    const publicLinks = links.filter(isPublic);
-    const privateLinks = links.filter((l) => !isPublic(l));
-    const fromIdx = publicLinks.findIndex((l) => l.id === from);
-    const toIdx = publicLinks.findIndex((l) => l.id === target.id);
-    if (fromIdx < 0 || toIdx < 0) return;
-
-    const moving = publicLinks[fromIdx];
-    const reordered = publicLinks.slice();
-    reordered.splice(fromIdx, 1);
-    reordered.splice(toIdx, 0, moving);
-    links = [...reordered, ...privateLinks];
-
+  // --- Page order ---
+  // SortableList has already moved the row; this saves the new order.
+  async function onReorder(e: CustomEvent<{ ids: number[] }>) {
+    const byId = new Map(links.map((l) => [l.id, l]));
+    const reordered = e.detail.ids.map((id) => byId.get(id)!).filter(Boolean);
+    links = [...reordered, ...links.filter((l) => !e.detail.ids.includes(l.id))];
     const orderedIds = reordered.map((l) => l.profileRow!.id);
     const res = await fetch('/dashboard/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reorderRows', orderedIds })
-    });
-    if (!res.ok) {
+    }).catch(() => null);
+    if (!res?.ok) {
       invalidateAll();
-      toast('Could not save order', 'error');
+      toast('Could not save the order', { variant: 'error' });
     } else {
-      toast('Order updated');
+      toast('Order saved', { variant: 'success' });
     }
   }
+
+  $: anyPending = links.some((l) => l.pending);
 </script>
 
-
 <svelte:head><title>Links — iksi</title></svelte:head>
-<svelte:window on:keydown={onWindowKeydown} />
 
-{#if toastMessage}
-  <div class="toast-wrap">
-    <div role="status" aria-live="polite" class="toast toast-anim" class:error={toastKind === 'error'}>
-      <span class="d-dot on" class:err-dot={toastKind === 'error'}></span>
-      <span>{toastMessage}</span>
-    </div>
-  </div>
-{/if}
+{#snippet leading(l: Link, handle: unknown)}
+  {#if handle}<DragHandle {handle} />{/if}
+  <span class="mark" on:error|capture={() => onFaviconError(l.originalURL)}>
+    {#if l.oneTime}
+      <Monogram size={32} name={l.oneTime.kind === 'url' ? 'URL' : 'Text'} />
+    {:else if faviconOf(l.originalURL)}
+      <Logo size={32} inset={0.2} src={faviconOf(l.originalURL)} />
+    {:else}
+      <Monogram size={32} name={hostOf(l.originalURL) || l.shortURL} />
+    {/if}
+  </span>
+{/snippet}
 
-<section class="w-full max-w-2xl mx-auto d-scope" inert={sheetId !== null}>
-  <header class="mb-10">
-    <p class="text-sm mb-8" style="color: var(--text-muted);">
-      <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
-    </p>
-    <div class="flex items-baseline justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Links</h1>
-        <p class="d-desc mt-2">Everything you've shortened. Switch one on to show it on your public page.</p>
-      </div>
-      {#if data.user.handle}
-        <a href={`/@${data.user.handle}`} target="_blank" rel="noopener"
-           class="text-sm shrink-0 hover:opacity-70 transition-opacity flex items-center gap-1"
-           style="color: var(--text-muted);">
-          View public
-          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M9 7h8v8"/>
-          </svg>
-        </a>
-      {/if}
-    </div>
-  </header>
+{#snippet clicks(l: Link)}
+  {#if !l.shortURL}
+    <Skeleton width="32px" height="20px" />
+  {:else}
+    <span class="clicks" title="{formatCount(l.clickCount)} {l.clickCount === 1 ? 'click' : 'clicks'}">{formatCount(l.clickCount)}</span>
+    <span class="when t-caption t-faint">{relativeDate(l.createdAt)}</span>
+  {/if}
+{/snippet}
 
-  <table class="links w-full">
-    <thead>
-      <tr>
-        <th class="handle-col"><span class="sr-only">Reorder</span></th>
-        <th class="text-left">Link</th>
-        <th class="toggle-col">On page</th>
-        <th class="clicks-col">Clicks</th>
-        <th class="icon-col"><span class="sr-only">Settings</span></th>
-        <th class="icon-col"><span class="sr-only">Delete</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each links as l (l.id)}
-        <tr
-          draggable={isPublic(l) && !l.pending}
-          on:dragstart={(e) => onDragStart(e, l)}
-          on:dragover={(e) => onDragOver(e, l)}
-          on:dragend={onDragEnd}
-          on:drop={(e) => onDrop(e, l)}
-          class="row group"
-          class:drop-target={dragOverId === l.id && dragId !== l.id}
-          style="opacity: {dragId === l.id ? '0.35' : l.pending ? '0.5' : '1'};"
-        >
-          <!-- Drag handle (public only) -->
-          <td class="handle-col" style="cursor: {isPublic(l) ? 'grab' : 'default'};">
-            {#if isPublic(l)}
-              <svg class="w-3 h-3 opacity-25 group-hover:opacity-60 transition-opacity"
-                   viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
-                <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-                <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-              </svg>
-            {/if}
-          </td>
+{#snippet badges(l: Link)}
+  {#if verdictLabel(l.safeVerdict)}<Badge variant="error">{verdictLabel(l.safeVerdict)}</Badge>{/if}
+  {#if l.settings}
+    <span class="states" role="list" aria-label="Link state">
+      {#each states(l.settings) as s (s)}<span role="listitem"><Badge>{s}</Badge></span>{/each}
+    </span>
+  {/if}
+{/snippet}
 
-          <!-- Favicon + title + meta -->
-          <td class="link-col">
-            <div class="flex items-center gap-3 min-w-0">
-              {#if faviconOf(l.originalURL)}
-                <img src={faviconOf(l.originalURL)} alt="" width="16" height="16"
-                     class="shrink-0 rounded-sm" loading="lazy" decoding="async"
-                     on:error={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
-              {:else}
-                <div class="w-4 h-4 shrink-0"></div>
-              {/if}
-              <div class="min-w-0 flex-1">
-                {#if l.oneTime}
-                  <p class="one-time-title">One-time {l.oneTime.kind === 'url' ? 'URL' : 'text'}</p>
-                {:else}
+{#snippet controls(l: Link)}
+  <Switch
+    checked={isPublic(l)}
+    disabled={l.pending}
+    label="Show {shortLabel(l)} on your page"
+    data-switch={l.id}
+    on:change={() => togglePublish(l)}
+  />
+  <IconButton icon="copy" label="Copy {shortLabel(l)}" disabled={l.pending} on:click={() => copy(l)} />
+  <IconButton
+    icon="settings"
+    label="Settings for {shortLabel(l)}"
+    disabled={l.pending || !l.settings}
+    aria-haspopup="dialog"
+    aria-expanded={sheetOpen && sheetLinkId === l.id}
+    on:click={(e) => openSheet(l, e)}
+  />
+{/snippet}
+
+{#snippet destination(l: Link)}
+  <span class="line" title={l.originalURL}>{displayUrl(l.originalURL)}</span>
+{/snippet}
+
+<div class="page" data-page inert={sheetOpen}>
+  <Container width="wide">
+    <PageHeader back="/dashboard" backLabel="Dashboard" title="Links" description="Everything you've shortened. Switch one on to show it on your public page.">
+      <svelte:fragment slot="actions">
+        {#if data.user.handle}
+          <Button icon="external" href={`/@${data.user.handle}`} target="_blank" rel="noopener">View page</Button>
+        {/if}
+      </svelte:fragment>
+    </PageHeader>
+
+    <Section title="New link" id="new">
+      <Paper as="form" on:submit={(e) => { e.preventDefault(); add(); }}>
+        <Stack gap={8}>
+          <Input
+            label="Long URL"
+            icon="link"
+            inputmode="url"
+            maxlength="2048"
+            placeholder="Paste a long URL"
+            autocomplete="off"
+            data-act="new-url"
+            error={addError}
+            bind:value={newURL}
+          />
+          <div class="pair">
+            <Input label="Title" optional maxlength="80" placeholder="Shown on your page" bind:value={newTitle} />
+            <Field label="Custom name" optional error={nameError} hint="Letters, numbers, - and _" let:id let:describedby let:invalid>
+              <div class="ui-box" data-invalid={invalid || undefined}>
+                <span class="ui-affix prefix">{namePrefix}</span>
                 <input
+                  data-ui
+                  class="ui-native"
+                  {id}
                   type="text"
-                  value={l.profileRow?.title ?? ''}
-                  placeholder={isPublic(l) ? 'Untitled' : 'Add a title…'}
-                  maxlength="80"
-                  aria-label="Title"
-                  on:blur={(e) => saveTitle(l, e.currentTarget.value)}
-                  on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                  class="title-input"
-                  class:untitled={!l.profileRow?.title}
-                />
-                {/if}
-                <div class="meta">
-                  <button on:click={() => copy(l.id, l.shortURL)} class="short" title="Copy short link"
-                  >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
-                  {#if l.oneTime}
-                    <span class="sep" aria-hidden="true">·</span>
-                    <span class="d-dot" class:on={l.oneTime.state === 'unopened'} aria-hidden="true"></span>
-                    <span>{ONE_TIME_STATE[l.oneTime.state]}</span>
-                  {/if}
-                  {#if l.originalURL}
-                    <span class="sep" aria-hidden="true">·</span>
-                    <span class="truncate" title={l.originalURL}>{hostOf(l.originalURL)}</span>
-                  {/if}
-                  {#if verdictLabel(l.safeVerdict)}
-                    <span class="sep" aria-hidden="true">·</span>
-                    <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
-                  {/if}
-                  {#if l.settings}
-                    <span class="dots" role="list" aria-label="Link state">
-                      {#each states(l.settings) as st}
-                        <span role="listitem" class="d-dot" class:on={st.on} title={`${st.label}: ${st.on ? 'on' : 'off'}`}>
-                          <span class="sr-only">{st.label} {st.on ? 'on' : 'off'}</span>
-                        </span>
-                      {/each}
-                    </span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </td>
-
-          <!-- On page -->
-          <td class="toggle-col">
-            {#if !l.oneTime}
-            <button
-              type="button"
-              role="switch"
-              class="d-switch"
-              aria-checked={l.profileRow?.enabled ?? false}
-              aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
-              on:click={() => togglePublish(l)}
-            ></button>
-            {/if}
-          </td>
-
-          <!-- Clicks -->
-          <td class="clicks-col">
-            <span class="d-readout" title={relDate(l.createdAt)}>{fmtClicks(l.clickCount)}</span>
-          </td>
-
-          <!-- Settings -->
-          <td class="icon-col">
-            {#if l.settings}
-              <button
-                type="button"
-                class="d-icon"
-                on:click={(e) => openSheet(l, e)}
-                aria-label="Link settings"
-                aria-haspopup="dialog"
-                aria-expanded={sheetId === l.id}
-                title="Link settings"
-              >
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              </button>
-            {/if}
-          </td>
-
-          <!-- Delete -->
-          <td class="icon-col">
-            <button type="button" on:click={() => del(l)} aria-label="Delete link" title="Delete link" class="d-icon delete">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
-              </svg>
-            </button>
-          </td>
-        </tr>
-      {/each}
-
-      <!-- Add row -->
-      <tr class="row add-row">
-        <td class="handle-col">
-          <span class="text-sm" style="color: var(--text-muted); opacity: 0.5;" aria-hidden="true">+</span>
-        </td>
-        <td class="link-col">
-          <div class="flex items-center gap-3">
-            <!-- Spacer to align inputs with body-row favicons -->
-            <div class="w-4 h-4 shrink-0" aria-hidden="true"></div>
-            <div class="min-w-0 flex-1">
-              <input
-                type="url"
-                bind:value={newURL}
-                placeholder="Paste a URL…"
-                maxlength="2048"
-                aria-label="New link URL"
-                on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                class="title-input"
-              />
-              <input
-                type="text"
-                bind:value={newTitle}
-                placeholder="Title (optional)"
-                maxlength="80"
-                aria-label="New link title"
-                on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                class="title-input sub"
-              />
-              <div class="name-field">
-                <span class="name-prefix" aria-hidden="true">{namePrefix}</span>
-                <input
-                  type="text"
-                  bind:value={newName}
-                  placeholder="custom name (optional)"
                   maxlength="50"
-                  aria-label="New link custom name"
-                  aria-invalid={!nameOk}
+                  placeholder="name"
                   autocomplete="off"
                   spellcheck="false"
-                  on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                  class="title-input sub name-input"
+                  aria-describedby={describedby}
+                  aria-invalid={invalid || undefined}
+                  bind:value={newName}
                 />
               </div>
-            </div>
+            </Field>
           </div>
-        </td>
-        <td class="toggle-col">
-          <button
-            type="button"
-            role="switch"
-            class="d-switch"
-            aria-checked={newPublish}
-            aria-label={newPublish ? 'Will publish' : 'Will not publish'}
-            on:click={() => (newPublish = !newPublish)}
-          ></button>
-        </td>
-        <td class="add-col" colspan="3">
-          <button type="button" on:click={() => add()} disabled={!canAdd} class="d-btn d-btn-primary">Add link</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+          {#if addSuggestion}
+            <div class="suggest">
+              <Button size="sm" variant="secondary" on:click={() => add(addSuggestion)}>Use iksi.app/{addSuggestion}?</Button>
+            </div>
+          {/if}
+          <div class="submit">
+            <span class="publish">
+              <Switch labelledby={ids.publish} bind:checked={newPublish} />
+              <span id={ids.publish} class="t-label">Show on your page</span>
+            </span>
+            <Button type="submit" variant="primary" icon="plus" disabled={!canAdd}>Add link</Button>
+          </div>
+        </Stack>
+      </Paper>
+    </Section>
 
-  <p class="add-error" role={addError ? 'alert' : undefined} aria-live="polite">
-    {#if addSuggestion}
-      <span>That name is taken.</span>
-      <button type="button" class="d-btn d-btn-text suggest" on:click={() => add(addSuggestion)}
-      >Use iksi.app/{addSuggestion}?</button>
-    {:else if !nameOk}
-      Names use letters, numbers, - and _, up to 50.
+    {#if regularCount === 0}
+      <Section title="Your links">
+        <Paper padding="none">
+          <EmptyState icon="link" title="No links yet" description="Paste a long URL above to make your first short link." />
+        </Paper>
+      </Section>
     {:else}
-      {addError}
-    {/if}
-  </p>
+      <Section title="On your page" description="In the order visitors see them. Drag the grip to reorder.">
+        <Paper padding="none">
+          {#if onPage.length === 0}
+            <EmptyState icon="eye" title="Nothing on your page yet" description="Switch a link on to show it on your public page." />
+          {:else}
+            <SortableList
+              items={onPage}
+              label="On your page"
+              name={(l) => l.profileRow?.title || shortLabel(l)}
+              disabled={anyPending}
+              on:reorder={onReorder}
+              let:item={l}
+              let:handle
+            >
+              <Row muted={l.pending} data-link={l.id}>
+                <svelte:fragment slot="leading">{@render leading(l, handle)}</svelte:fragment>
+                <span class="clip">{l.profileRow?.title || 'Untitled'}</span>
+                <svelte:fragment slot="subtitle">
+                  {#if !l.shortURL}
+                    <Skeleton width="96px" height="18px" />
+                  {:else}
+                    <span class="line t-mono">{shortLabel(l)}</span>
+                  {/if}
+                  {@render destination(l)}
+                </svelte:fragment>
+                <svelte:fragment slot="meta">{@render clicks(l)}</svelte:fragment>
+                <svelte:fragment slot="actions">
+                  {@render badges(l)}
+                  {@render controls(l)}
+                </svelte:fragment>
+              </Row>
+            </SortableList>
+          {/if}
+        </Paper>
+      </Section>
 
-  <OneTimeLinkForm on:created={onOneTimeCreated} />
-</section>
+      {#if others.length > 0}
+        <Section title="Other links" description="Short links that are not on your page.">
+          <Paper padding="none">
+            <List label="Other links">
+              {#each others as l (l.id)}
+                <Row muted={l.pending} data-link={l.id}>
+                  <svelte:fragment slot="leading">{@render leading(l, null)}</svelte:fragment>
+                  {#if !l.shortURL}
+                    <Skeleton width="120px" height="22px" />
+                  {:else}
+                    <span class="clip t-mono">{shortLabel(l)}</span>
+                  {/if}
+                  <svelte:fragment slot="subtitle">{@render destination(l)}</svelte:fragment>
+                  <svelte:fragment slot="meta">{@render clicks(l)}</svelte:fragment>
+                  <svelte:fragment slot="actions">
+                    {@render badges(l)}
+                    {@render controls(l)}
+                  </svelte:fragment>
+                </Row>
+              {/each}
+            </List>
+          </Paper>
+          {#if data.hasMore}
+            <p class="more t-label t-muted">Showing the latest {formatCount(data.limit)} of {formatCount(data.totalCount)} links.</p>
+          {/if}
+        </Section>
+      {/if}
+    {/if}
+
+    <Section title="One-time links" description="A URL or a text that opens once, then it is erased. Unopened links expire after {ONE_TIME_TTL_DAYS} days.">
+      <Stack gap={16}>
+        {#if oneTimes.length > 0}
+          <Paper padding="none">
+            <List label="One-time links">
+              {#each oneTimes as l (l.id)}
+                {@const state = ONE_TIME_STATE[l.oneTime.state]}
+                <Row data-link={l.id}>
+                  <svelte:fragment slot="leading">{@render leading(l, null)}</svelte:fragment>
+                  <span class="clip t-mono">{shortLabel(l)}</span>
+                  <svelte:fragment slot="subtitle">
+                    {#if confirmingId === l.id}
+                      Delete this one-time link?
+                    {:else}
+                      <span>One-time {l.oneTime.kind === 'url' ? 'URL' : 'text'}</span>
+                    {/if}
+                  </svelte:fragment>
+                  <svelte:fragment slot="meta">
+                    <span class="when t-caption t-faint">{relativeDate(l.createdAt)}</span>
+                  </svelte:fragment>
+                  <svelte:fragment slot="actions">
+                    {#if confirmingId === l.id}
+                      <Button size="sm" variant="ghost" data-confirm-cancel={l.id} on:click={() => keep(l)}>Cancel</Button>
+                      <Button size="sm" variant="danger" on:click={() => confirmDelete(l)}>Delete</Button>
+                    {:else}
+                      <Badge variant={state.variant} dot={l.oneTime.state === 'unopened'}>{state.label}</Badge>
+                      <IconButton icon="copy" label="Copy {shortLabel(l)}" on:click={() => copy(l)} />
+                      <IconButton icon="trash" variant="danger" label="Delete {shortLabel(l)}" data-delete={l.id} on:click={() => askDelete(l)} />
+                    {/if}
+                  </svelte:fragment>
+                </Row>
+              {/each}
+            </List>
+          </Paper>
+        {/if}
+        <OneTimeLinkForm on:created={onOneTimeCreated} />
+      </Stack>
+    </Section>
+  </Container>
+</div>
 
 {#if sheetLink && sheetLink.settings}
-  <div class="sheet-root d-scope">
-    <!-- Pointer-only shortcut; Escape and the close button cover keyboards. -->
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="backdrop" data-testid="sheet-backdrop" on:click={closeSheet}></div>
-    <div
-      class="sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="sheet-title"
-      aria-describedby="sheet-sub"
-      tabindex="-1"
-      bind:this={sheetEl}
-      on:keydown={trapFocus}
-    >
-      <header class="sheet-head">
-        <div class="min-w-0">
-          <h2 id="sheet-title" class="d-title">Link settings</h2>
-          <p id="sheet-sub" class="sheet-sub">iksi.app/{sheetLink.shortURL}</p>
-        </div>
-        <button type="button" class="d-icon" aria-label="Close settings" on:click={closeSheet}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </header>
-      <div class="sheet-body">
-        {#key sheetLink.id}
-          <LinkSettings id={sheetLink.id} settings={sheetLink.settings} on:saved={(e) => onSettingsSaved(sheetLink.id, e.detail)} />
-        {/key}
-      </div>
-    </div>
-  </div>
+  <LinkSettings
+    bind:open={sheetOpen}
+    id={sheetLink.id}
+    settings={sheetLink.settings}
+    short={shortLabel(sheetLink)}
+    pageTitle={sheetLink.profileRow?.title ?? ''}
+    deletable
+    on:close={onSheetClose}
+    on:saved={(e) => onSettingsSaved(sheetLink.id, e.detail)}
+    on:title={(e) => saveTitle(sheetLink, e.detail)}
+    on:delete={() => deleteFromSheet(sheetLink)}
+  />
 {/if}
 
 <style>
-  /* Links table: flat, hairline rows, no outer box. */
-  .links {
-    border-collapse: collapse;
-    table-layout: fixed;
-    font-size: 14px;
+  .page {
+    display: flex;
+    flex-direction: column;
   }
-  .links th {
-    height: 36px;
-    padding: 0 8px;
-    font-size: 12px;
-    font-weight: 400;
-    text-align: center;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border);
-  }
-  .links th.text-left { text-align: left; padding-left: 0; }
-  .links td {
-    padding: 12px 8px;
-    vertical-align: middle;
-  }
-  .row { border-bottom: 1px solid var(--border); }
-  .row.drop-target { background-color: color-mix(in srgb, var(--accent) 8%, transparent); }
-  .handle-col { width: 24px; padding-left: 0 !important; padding-right: 0 !important; }
-  .link-col { padding-left: 0 !important; }
-  .toggle-col { width: 76px; text-align: center; }
-  .toggle-col .d-switch { vertical-align: middle; }
-  .clicks-col { width: 64px; text-align: right !important; }
-  .links td.clicks-col { padding-right: 12px; }
-  .icon-col { width: 40px; padding-left: 0 !important; padding-right: 0 !important; text-align: center; }
-  .add-col { text-align: right; padding-right: 0 !important; }
-
-  .title-input {
+  .clip {
     display: block;
-    width: calc(100% + 16px);
-    margin: 0 -8px;
-    padding: 4px 8px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
-    background-color: transparent;
-    border: none;
-    border-radius: 4px;
-    outline: none;
+    overflow: hidden;
     text-overflow: ellipsis;
   }
-  .title-input.untitled,
-  .title-input.sub { color: var(--text-muted); }
-  .title-input.sub { font-size: 13px; font-weight: 400; }
-  .title-input::placeholder { color: var(--text-muted); opacity: 0.6; }
-  .title-input:hover:not(:focus) { background-color: color-mix(in srgb, var(--text-primary) 4%, transparent); }
-  .title-input:focus { background-color: color-mix(in srgb, var(--text-primary) 6%, transparent); }
-  .title-input:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 0; }
-
-  .one-time-title {
-    padding: 4px 0;
-    font-size: 14px;
-    font-weight: 500;
+  .line {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mark { display: inline-flex; }
+  .clicks {
+    display: block;
     color: var(--text-primary);
   }
-
-  .meta {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    margin-top: 2px;
-    font-size: 12px;
+  .when { display: block; }
+  .states {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  .prefix {
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* The prefix reads as one address with the typed name. */
+  .ui-box > .prefix {
+    margin-right: -8px;
     color: var(--text-muted);
   }
-  .short {
-    flex: none;
-    padding: 0;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    color: inherit;
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
-  .short:hover { color: var(--text-primary); }
-  .sep { opacity: 0.4; }
-  .dots {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 4px;
-    margin-left: 4px;
-  }
-
-  .d-icon.delete { opacity: 0; }
-  .row:hover .d-icon.delete,
-  .d-icon.delete:focus-visible { opacity: 1; }
-  .d-icon.delete:hover { color: var(--error) !important; }
-  @media (hover: none) {
-    .d-icon.delete { opacity: 1; }
-  }
-
-  .add-row { border-bottom: none; }
-  /* As tall as a control, so the suggestion button never moves the page. */
-  .add-error {
+  .suggest { margin-top: -4px; }
+  .submit {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 6px;
-    min-height: var(--d-ctl);
-    margin-top: 4px;
-    font-size: 13px;
-    color: var(--error);
-  }
-  .add-error .suggest { color: var(--accent); overflow-wrap: anywhere; text-align: left; }
-  .add-error .suggest:hover:not(:disabled) { color: var(--accent); text-decoration: underline; }
-  .name-field {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-  }
-  .name-prefix {
-    flex: none;
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-  .title-input.name-input {
-    flex: 1;
-    width: auto;
-    min-width: 0;
-    margin: 0 -8px 0 0;
-    padding-left: 1px;
-  }
-  .title-input.name-input[aria-invalid='true'] { color: var(--error); }
-
-  @media (max-width: 639px) {
-    .handle-col { display: none; }
-    .toggle-col { width: 52px; }
-    .clicks-col { width: 48px; }
-    .links td.clicks-col { padding-right: 4px; }
-    .icon-col { width: 44px; }
-    .add-col .d-btn { padding: 0 12px; }
-  }
-
-  /* Settings sheet */
-  .sheet-root {
-    position: fixed;
-    inset: 0;
-    z-index: 90;
-  }
-  .backdrop {
-    position: absolute;
-    inset: 0;
-    background-color: rgb(0 0 0 / 0.55);
-    animation: backdrop-in 200ms var(--ease-out);
-  }
-  :global([data-theme="light"]) .backdrop { background-color: rgb(0 0 0 / 0.2); }
-  .sheet {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    flex-direction: column;
-    width: 480px;
-    max-width: 100%;
-    background-color: var(--bg);
-    border-left: 1px solid var(--border);
-    outline: none;
-    animation: sheet-in 200ms var(--ease-out);
-  }
-  .sheet-head {
-    display: flex;
-    align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
-    padding: 20px 20px 20px 24px;
-    border-bottom: 1px solid var(--border);
+    gap: 12px 16px;
+    padding-top: 8px;
   }
-  .sheet-head .d-icon { margin-top: -6px; }
-  .sheet-sub {
-    margin-top: 2px;
-    overflow: hidden;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    color: var(--text-muted);
-  }
-  .sheet-body {
-    --ls-pad: 24px;
-    --d-label: 136px;
-    /* Save row: 16px padding above and below a control, plus its hairline. */
-    --ls-footer-h: calc(var(--d-ctl) + 33px);
-    flex: 1;
-    min-height: 0;
-    padding: 4px 24px calc(var(--ls-footer-h) + 24px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  /* The Save row is pinned to the sheet's bottom edge, outside the scroll
-     flow; the padding above keeps the last control clear of it. */
-  .sheet-body :global(.ls-footer) {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: var(--ls-footer-h);
-    margin: 0;
-  }
-  @keyframes sheet-in {
-    from { transform: translateX(100%); }
-    to { transform: translateX(0); }
-  }
-  @keyframes backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @media (max-width: 639px) {
-    .sheet { width: 100%; border-left: none; }
-    .sheet-head { padding: 12px 8px 12px 16px; }
-    .sheet-head .d-icon { margin-top: -10px; }
-    .sheet-body { --ls-pad: 16px; padding: 0 16px calc(var(--ls-footer-h) + 24px); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .sheet,
-    .backdrop { animation: none; }
-  }
-
-  /* Toast: bottom centre so it never sits on the sheet's header. */
-  .toast-wrap {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 24px;
-    z-index: 100;
-    display: flex;
-    justify-content: center;
-    padding: 0 16px;
-    pointer-events: none;
-  }
-  .toast {
+  .publish {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    max-width: min(90vw, 26rem);
-    padding: 8px 14px;
-    font-size: 13px;
-    color: var(--text-primary);
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    gap: 12px;
   }
-  .toast.error { border-color: var(--error); }
-  .err-dot { background-color: var(--error) !important; }
-  .toast-anim { animation: toast-in 180ms var(--ease-out); }
-  @keyframes toast-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .toast-anim { animation: none; }
+  .more { margin: 12px 0 0; }
+
+  /* Phones: the row keeps its text room; badges and the favicon, which the
+     sheet and the destination line already cover, step aside. */
+  @media (max-width: 639px) {
+    .mark,
+    .states,
+    .when { display: none; }
+    /* A row whose only leading item is the hidden mark drops its gap too. */
+    .page :global(.leading:has(> .mark:only-child)) { display: none; }
+    .pair { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .submit > :global(button) { width: 100%; }
   }
 </style>

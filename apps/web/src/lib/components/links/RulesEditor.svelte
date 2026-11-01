@@ -1,7 +1,23 @@
 <script lang="ts">
+  // Routing rules inside the link settings sheet. Rules are reordered with
+  // the kit's SortableList (drag the grip, or Space and the arrow keys on it);
+  // the first rule that matches wins.
   import { tick } from 'svelte';
   import { MAX_RULES } from '@iksi/core';
   import type { Continent, Device, Os } from '@iksi/core';
+  import {
+    Button,
+    ChipGroup,
+    DragHandle,
+    Field,
+    IconButton,
+    Input,
+    Paper,
+    Segmented,
+    Select,
+    SortableList,
+    Stack
+  } from '#lib/ui/index.js';
   import { newRuleId, type ConditionForm, type RuleForm } from '#lib/rules-form.js';
 
   export let rules: RuleForm[] = [];
@@ -21,13 +37,13 @@
   const MAX_SPLIT = 5;
   const MIN_SPLIT = 2;
 
-  const KINDS: { kind: ConditionForm['kind']; label: string }[] = [
-    { kind: 'country', label: 'Country' },
-    { kind: 'continent', label: 'Continent' },
-    { kind: 'device', label: 'Device' },
-    { kind: 'os', label: 'Operating system' },
-    { kind: 'referrer', label: 'Referrer' },
-    { kind: 'time', label: 'Time of day' }
+  const KINDS: { kind: ConditionForm['kind']; label: string; field: string }[] = [
+    { kind: 'country', label: 'Country', field: 'Countries' },
+    { kind: 'continent', label: 'Continent', field: 'Continents' },
+    { kind: 'device', label: 'Device', field: 'Devices' },
+    { kind: 'os', label: 'Operating system', field: 'Operating systems' },
+    { kind: 'referrer', label: 'Referrer', field: 'Referrer hosts' },
+    { kind: 'time', label: 'Time of day', field: 'Time of day' }
   ];
   const CONTINENTS: { value: Continent; label: string }[] = [
     { value: 'AF', label: 'Africa' },
@@ -51,7 +67,11 @@
     { value: 'linux', label: 'Linux' },
     { value: 'other', label: 'Other' }
   ];
-  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label, value) => ({ value, label }));
+  const MODES = [
+    { value: 'single', label: 'One URL' },
+    { value: 'split', label: 'A/B split' }
+  ];
 
   function browserZone(): string {
     try {
@@ -67,12 +87,11 @@
     } catch {
       zones = [];
     }
-    const set = new Set(['UTC', browserZone(), ...zones]);
-    return [...set];
+    return [...new Set(['UTC', browserZone(), ...zones])];
   }
   const ZONES = zoneList();
-  function zonesWith(tz: string): string[] {
-    return ZONES.includes(tz) ? ZONES : [tz, ...ZONES];
+  function zonesWith(tz: string) {
+    return (ZONES.includes(tz) ? ZONES : [tz, ...ZONES]).map((z) => ({ value: z, label: z.replace(/_/g, ' ') }));
   }
 
   function defaultCondition(kind: ConditionForm['kind']): ConditionForm {
@@ -95,16 +114,15 @@
     rules = rules.filter((_, idx) => idx !== i);
     focusAfter(...(next ? [ruleSel(next, 'remove')] : []), '[data-act="add-rule"]');
   }
-  function move(i: number, by: -1 | 1) {
-    const j = i + by;
-    if (j < 0 || j >= rules.length) return;
-    const next = [...rules];
-    [next[i], next[j]] = [next[j], next[i]];
-    rules = next;
-    focusAfter(ruleSel(next[j].id, by === -1 ? 'up' : 'down'), ruleSel(next[j].id, by === -1 ? 'down' : 'up'));
+  // SortableList has already moved the row; this keeps `rules` (bound up to
+  // the sheet, which saves it) in the same order.
+  function onReorder(e: CustomEvent<{ ids: string[] }>) {
+    const byId = new Map(rules.map((r) => [r.id, r]));
+    rules = e.detail.ids.map((id) => byId.get(id)!).filter(Boolean);
   }
-  // Condition picker: "Add condition" is a quiet text button that reveals
-  // the kinds still available for that rule. One picker open at a time.
+
+  // Condition picker: "Add condition" reveals the kinds still available for
+  // that rule. One picker open at a time.
   let pickerFor: string | null = null;
   function togglePicker(rule: RuleForm) {
     pickerFor = pickerFor === rule.id ? null : rule.id;
@@ -116,7 +134,7 @@
   }
   function onPickerKey(e: KeyboardEvent, rule: RuleForm) {
     if (e.key !== 'Escape') return;
-    // Keep Escape from also closing a surrounding dialog.
+    // Keep Escape from also closing the sheet.
     e.stopPropagation();
     closePicker(rule);
   }
@@ -124,18 +142,12 @@
     pickerFor = null;
     rule.conditions = [...rule.conditions, defaultCondition(kind)];
     rules = rules;
-    focusAfter(`[data-cond="${rule.id}-${kind}"] input, [data-cond="${rule.id}-${kind}"] select`);
+    focusAfter(`[data-cond="${rule.id}-${kind}"] input`, `[data-cond="${rule.id}-${kind}"] select`);
   }
   function removeCondition(rule: RuleForm, ci: number) {
     rule.conditions = rule.conditions.filter((_, idx) => idx !== ci);
     rules = rules;
-    focusAfter(`[data-rule="${rule.id}"] [data-act="add-condition"]`, ruleSel(rule.id, 'up'));
-  }
-  function toggle<T>(list: T[], value: T): T[] {
-    return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-  }
-  function toggleDay(days: number[], d: number): number[] {
-    return toggle(days, d).sort((a, b) => a - b);
+    focusAfter(ruleSel(rule.id, 'add-condition'), ruleSel(rule.id, 'remove'));
   }
   function setMode(rule: RuleForm, mode: 'single' | 'split') {
     if (rule.mode === mode) return;
@@ -157,7 +169,7 @@
     if (rule.split.length <= MIN_SPLIT) return;
     rule.split = rule.split.filter((_, idx) => idx !== si);
     rules = rules;
-    focusAfter(`[data-rule="${rule.id}"] [data-split="${Math.min(si, rule.split.length - 1)}"]`, `[data-rule="${rule.id}"] [data-act="add-split"]`);
+    focusAfter(`[data-rule="${rule.id}"] [data-split="${Math.min(si, rule.split.length - 1)}"]`, ruleSel(rule.id, 'add-split'));
   }
   function total(rule: RuleForm): number {
     return rule.split.reduce((sum, s) => sum + (Number(s.weight) || 0), 0);
@@ -166,352 +178,217 @@
     const used = new Set(rule.conditions.map((c) => c.kind));
     return KINDS.filter((k) => !used.has(k.kind));
   }
-  function kindLabel(kind: string) {
-    return KINDS.find((k) => k.kind === kind)?.label ?? kind;
-  }
-  /** Empty cells that complete the last row of a key grid. */
-  function fillers(count: number, cols: number): number[] {
-    return Array.from({ length: (cols - (count % cols)) % cols }, (_, i) => i);
-  }
+  const kindOf = (kind: string) => KINDS.find((k) => k.kind === kind)!;
+  const ruleName = (r: RuleForm) => `Rule ${rules.indexOf(r) + 1}`;
 </script>
 
 <div class="editor" bind:this={root}>
   {#if rules.length === 0}
-    <p class="empty">No rules yet. Everyone goes to the destination.</p>
+    <p class="empty t-body t-muted">No rules yet. Everyone goes to the destination.</p>
   {:else}
-    <ol class="list">
-      {#each rules as rule, i (rule.id)}
+    <Paper padding="none">
+      <SortableList items={rules} label="Routing rules" name={ruleName} on:reorder={onReorder} let:item={rule} let:index={i} let:handle>
         <li class="rule">
-          <span class="num" aria-hidden="true">{i + 1}</span>
           <fieldset class="body" aria-label={`Rule ${i + 1}`} data-rule={rule.id}>
             <div class="head">
-              <span class="head-label">When</span>
-              <div class="tools">
-                <button type="button" class="d-icon" data-act="up" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} on:click={() => move(i, -1)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
-                </button>
-                <button type="button" class="d-icon" data-act="down" aria-label={`Move rule ${i + 1} down`} disabled={i === rules.length - 1} on:click={() => move(i, 1)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
-                </button>
-                <button type="button" class="d-icon danger" data-act="remove" aria-label={`Remove rule ${i + 1}`} on:click={() => removeRule(i)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-                </button>
-              </div>
+              <DragHandle {handle} />
+              <span class="t-label">Rule {i + 1}</span>
+              <span class="grow"></span>
+              <IconButton icon="trash" variant="danger" data-act="remove" label={`Remove rule ${i + 1}`} on:click={() => removeRule(i)} />
             </div>
 
-            {#if rule.conditions.length === 0}
-              <p class="always">Always, unless an earlier rule matched.</p>
-            {/if}
+            <Stack gap={16}>
+              {#if rule.conditions.length === 0}
+                <p class="t-label t-muted always">Always, unless an earlier rule matched.</p>
+              {/if}
 
-            {#each rule.conditions as c, ci (c.kind)}
-              <div class="row" data-cond={`${rule.id}-${c.kind}`}>
-                <span class="name">{kindLabel(c.kind)}</span>
-                <div class="values">
+              {#each rule.conditions as c, ci (c.kind)}
+                {@const k = kindOf(c.kind)}
+                <div class="cond" data-cond={`${rule.id}-${c.kind}`}>
                   {#if c.kind === 'country'}
-                    <label class="sr-only" for={`${rule.id}-country`}>Countries</label>
-                    <input id={`${rule.id}-country`} class="d-field" type="text" placeholder="SG, MY, ID" bind:value={c.values} />
-                    <p class="d-hint">Two-letter codes, separated by commas.</p>
+                    <Input label={k.field} placeholder="SG, MY, ID" hint="Two-letter codes, separated by commas." bind:value={c.values}>
+                      <Button slot="aside" size="sm" variant="ghost" aria-label={`Remove ${k.label} condition`} on:click={() => removeCondition(rule, ci)}>Remove</Button>
+                    </Input>
                   {:else if c.kind === 'referrer'}
-                    <label class="sr-only" for={`${rule.id}-referrer`}>Referrer hosts</label>
-                    <input id={`${rule.id}-referrer`} class="d-field" type="text" placeholder="x.com, news.ycombinator.com" bind:value={c.values} />
-                    <p class="d-hint">Subdomains match too. Separate with commas.</p>
-                  {:else if c.kind === 'continent'}
-                    <div class="d-keys" style="--cols: 2;" role="group" aria-label="Continents">
-                      {#each CONTINENTS as o}
-                        <label class="d-key">
-                          <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
-                                 on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
-                          <span>{o.label}</span>
-                        </label>
-                      {/each}
-                      {#each fillers(CONTINENTS.length, 2) as _}<span class="d-key-fill" aria-hidden="true"></span>{/each}
-                    </div>
-                  {:else if c.kind === 'device'}
-                    <div class="d-keys" style="--cols: 3;" role="group" aria-label="Devices">
-                      {#each DEVICES as o}
-                        <label class="d-key">
-                          <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
-                                 on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
-                          <span>{o.label}</span>
-                        </label>
-                      {/each}
-                    </div>
-                  {:else if c.kind === 'os'}
-                    <div class="d-keys" style="--cols: 3;" role="group" aria-label="Operating systems">
-                      {#each OSES as o}
-                        <label class="d-key">
-                          <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
-                                 on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
-                          <span>{o.label}</span>
-                        </label>
-                      {/each}
-                      {#each fillers(OSES.length, 3) as _}<span class="d-key-fill" aria-hidden="true"></span>{/each}
-                    </div>
+                    <Input label={k.field} placeholder="x.com, news.ycombinator.com" hint="Subdomains match too. Separate with commas." bind:value={c.values}>
+                      <Button slot="aside" size="sm" variant="ghost" aria-label={`Remove ${k.label} condition`} on:click={() => removeCondition(rule, ci)}>Remove</Button>
+                    </Input>
                   {:else}
-                    <div class="d-keys days" style="--cols: 7;" role="group" aria-label="Days">
-                      {#each DAYS as d, di}
-                        <label class="d-key">
-                          <input type="checkbox" class="sr-only" checked={c.days.includes(di)}
-                                 on:change={() => { c.days = toggleDay(c.days, di); rules = rules; }} />
-                          <span>{d}</span>
-                        </label>
-                      {/each}
-                    </div>
-                    <div class="range">
-                      <label class="sr-only" for={`${rule.id}-start`}>Start</label>
-                      <input id={`${rule.id}-start`} class="d-field" type="time" bind:value={c.start} />
-                      <span class="to" aria-hidden="true">to</span>
-                      <label class="sr-only" for={`${rule.id}-end`}>End</label>
-                      <input id={`${rule.id}-end`} class="d-field" type="time" bind:value={c.end} />
-                    </div>
-                    <label class="sr-only" for={`${rule.id}-tz`}>Time zone</label>
-                    <select id={`${rule.id}-tz`} class="d-field tz" bind:value={c.tz}>
-                      {#each zonesWith(c.tz) as z}<option value={z}>{z}</option>{/each}
-                    </select>
-                    <p class="d-hint">No days means every day. Overnight windows count from their start day.</p>
+                    <Field label={k.field} group reserve={c.kind === 'time'} hint={c.kind === 'time' ? 'No days means every day. Overnight windows count from their start day.' : ''} let:labelId>
+                      <Button slot="aside" size="sm" variant="ghost" aria-label={`Remove ${k.label} condition`} on:click={() => removeCondition(rule, ci)}>Remove</Button>
+                      {#if c.kind === 'continent'}
+                        <ChipGroup labelledby={labelId} options={CONTINENTS} bind:value={c.values} on:change={() => (rules = rules)} />
+                      {:else if c.kind === 'device'}
+                        <ChipGroup labelledby={labelId} options={DEVICES} bind:value={c.values} on:change={() => (rules = rules)} />
+                      {:else if c.kind === 'os'}
+                        <ChipGroup labelledby={labelId} options={OSES} bind:value={c.values} on:change={() => (rules = rules)} />
+                      {:else}
+                        <Stack gap={12}>
+                          <ChipGroup label="Days" options={DAYS} value={c.days} on:change={(e) => { c.days = [...e.detail.value].sort((a, b) => a - b); rules = rules; }} />
+                          <div class="range">
+                            <Input label="Start" type="time" reserve={false} bind:value={c.start} />
+                            <Input label="End" type="time" reserve={false} bind:value={c.end} />
+                          </div>
+                          <Select label="Time zone" reserve={false} options={zonesWith(c.tz)} bind:value={c.tz} />
+                        </Stack>
+                      {/if}
+                    </Field>
                   {/if}
                 </div>
-                <button type="button" class="d-icon remove" aria-label={`Remove ${kindLabel(c.kind)} condition`} on:click={() => removeCondition(rule, ci)}>
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-                </button>
-              </div>
-            {/each}
+              {/each}
 
-            {#if available(rule).length > 0}
-              <div class="add">
-                <button type="button" class="d-btn d-btn-text" data-act="add-condition"
-                        aria-expanded={pickerFor === rule.id} aria-controls={`${rule.id}-picker`}
-                        on:click={() => togglePicker(rule)}>Add condition</button>
-                {#if pickerFor === rule.id}
-                  <!-- Escape closes the picker; the keys inside are the interactive parts. -->
-                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                  <div class="picker" id={`${rule.id}-picker`} role="group" aria-label="Condition type" on:keydown={(e) => onPickerKey(e, rule)}>
-                    {#each available(rule) as k}
-                      <button type="button" class="d-btn d-btn-secondary pick" data-kind={k.kind} on:click={() => addCondition(rule, k.kind)}>{k.label}</button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            {/if}
+              {#if available(rule).length > 0}
+                <div class="add">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="plus"
+                    data-act="add-condition"
+                    aria-expanded={pickerFor === rule.id}
+                    aria-controls={`${rule.id}-picker`}
+                    on:click={() => togglePicker(rule)}
+                  >Add condition</Button>
+                  {#if pickerFor === rule.id}
+                    <!-- Escape closes the picker; the buttons inside are the interactive parts. -->
+                    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                    <div class="picker" id={`${rule.id}-picker`} role="group" aria-label="Condition type" on:keydown={(e) => onPickerKey(e, rule)}>
+                      {#each available(rule) as kind (kind.kind)}
+                        <Button size="sm" data-kind={kind.kind} on:click={() => addCondition(rule, kind.kind)}>{kind.label}</Button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
 
-            <div class="row goto">
-              <span class="name">Go to</span>
-              <div class="values">
-                <div class="d-seg" role="radiogroup" aria-label={`Rule ${i + 1} destination type`}>
-                  <label class="d-key">
-                    <input type="radio" class="sr-only" name={`${rule.id}-mode`} value="single" checked={rule.mode === 'single'} on:change={() => setMode(rule, 'single')} />
-                    <span>One URL</span>
-                  </label>
-                  <label class="d-key">
-                    <input type="radio" class="sr-only" name={`${rule.id}-mode`} value="split" checked={rule.mode === 'split'} on:change={() => setMode(rule, 'split')} />
-                    <span>A/B split</span>
-                  </label>
+              <div class="goto">
+                <div class="goto-head">
+                  <span class="t-label" id={`${rule.id}-goto`}>Go to</span>
+                  <Segmented
+                    size="sm"
+                    label={`Rule ${i + 1} destination type`}
+                    options={MODES}
+                    value={rule.mode}
+                    on:change={(e) => setMode(rule, e.detail.value)}
+                  />
                 </div>
 
                 {#if rule.mode === 'single'}
-                  <label class="sr-only" for={`${rule.id}-dest`}>Go to</label>
-                  <input id={`${rule.id}-dest`} class="d-field" type="text" inputmode="url" placeholder="https://example.com" bind:value={rule.destination} />
+                  <Input label="Go to" hideLabel reserve={false} inputmode="url" placeholder="https://example.com" bind:value={rule.destination} />
                 {:else}
-                  {#each rule.split as s, si}
-                    <div class="split">
-                      <input class="d-field url" type="text" inputmode="url" placeholder="https://example.com" data-split={si} aria-label={`Split destination ${si + 1}`} bind:value={s.destination} />
-                      <div class="d-unit-field weight">
-                        <input class="d-field" type="text" inputmode="numeric" placeholder="0" aria-label={`Split weight ${si + 1}`} bind:value={s.weight} />
-                        <span class="d-unit" aria-hidden="true">%</span>
+                  <Stack gap={8}>
+                    {#each rule.split as s, si}
+                      <div class="split">
+                        <Input label={`Split destination ${si + 1}`} hideLabel reserve={false} inputmode="url" placeholder="https://example.com" data-split={si} bind:value={s.destination} />
+                        <div class="weight">
+                          <Input label={`Split weight ${si + 1}`} hideLabel reserve={false} inputmode="numeric" placeholder="0" align="end" unit="%" bind:value={s.weight} />
+                        </div>
+                        <IconButton icon="x" label={`Remove split row ${si + 1}`} disabled={rule.split.length <= MIN_SPLIT} on:click={() => removeSplit(rule, si)} />
                       </div>
-                      <button type="button" class="d-icon" aria-label={`Remove split row ${si + 1}`} disabled={rule.split.length <= MIN_SPLIT} on:click={() => removeSplit(rule, si)}>
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-                      </button>
+                    {/each}
+                    <div class="split-foot">
+                      <Button size="sm" variant="ghost" icon="plus" data-act="add-split" disabled={rule.split.length >= MAX_SPLIT} on:click={() => addSplit(rule)}>Add split row</Button>
+                      <p class="total t-label t-tabular" class:ok={total(rule) === 100} aria-live="polite">
+                        {total(rule)} of 100{total(rule) === 100 ? '' : ', must add up to 100'}
+                      </p>
                     </div>
-                  {/each}
-                  <div class="split-foot">
-                    <button type="button" class="d-btn d-btn-text" data-act="add-split" disabled={rule.split.length >= MAX_SPLIT} on:click={() => addSplit(rule)}>Add split row</button>
-                    <p class="total" class:ok={total(rule) === 100} aria-live="polite">
-                      {total(rule)} of 100{total(rule) === 100 ? '' : ', must add up to 100'}
-                    </p>
-                  </div>
+                  </Stack>
                 {/if}
               </div>
-            </div>
+            </Stack>
           </fieldset>
         </li>
-      {/each}
-    </ol>
+      </SortableList>
+    </Paper>
   {/if}
 
   <div class="foot">
-    <button type="button" class="d-btn d-btn-secondary" data-act="add-rule" disabled={rules.length >= MAX_RULES} on:click={addRule}>Add rule</button>
-    <span class="d-readout cap">{rules.length} of {MAX_RULES}</span>
+    <Button icon="plus" data-act="add-rule" disabled={rules.length >= MAX_RULES} on:click={addRule}>Add rule</Button>
+    <span class="t-label t-muted t-tabular">{rules.length} of {MAX_RULES}</span>
   </div>
 </div>
 
 <style>
-  .editor {
-    margin-top: 16px;
-  }
   .empty {
-    padding: 20px 0;
-    font-size: 14px;
-    color: var(--text-muted);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .list {
     margin: 0;
-    padding: 0;
-    list-style: none;
-    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-paper);
   }
   .rule {
-    display: grid;
-    grid-template-columns: 28px minmax(0, 1fr);
-    padding: 16px 0 20px;
-    border-top: 1px solid var(--border);
-  }
-  .num {
-    line-height: 32px;
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-muted);
+    padding: 12px 16px 20px;
   }
   .body {
     min-width: 0;
     margin: 0;
     padding: 0;
-    border: none;
+    border: 0;
   }
   .head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     min-height: 32px;
+    margin: 0 -8px 12px 0;
   }
-  .head-label,
-  .name {
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--text-muted);
-  }
-  .tools {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    margin-right: -6px;
-  }
-  .d-icon.danger:hover:not(:disabled) {
-    color: var(--error);
-  }
-  .always {
-    padding: 4px 0 12px;
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-
-  /* Condition and destination rows. The sheet is too narrow for a label
-     column, so the name is a small muted line above a full-width control,
-     with the remove icon at the end of that line. */
-  .row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'name remove' 'values values';
-    align-items: center;
-    column-gap: 12px;
-    row-gap: 6px;
-    padding: 12px 0;
-    border-top: 1px solid var(--border);
-  }
-  .row .name {
-    grid-area: name;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-  }
-  .values {
-    grid-area: values;
+  .grow { flex: 1; }
+  .always { margin: 0; }
+  /* A ghost "Remove" in a field's label line stays on that line's height. */
+  .cond :global(.aside) { margin: -7px -12px -7px 0; }
+  .add {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
-    min-width: 0;
-  }
-  .values .d-hint {
-    margin-top: 0;
-  }
-  .remove {
-    grid-area: remove;
-    margin-right: -6px;
-  }
-  .days .d-key > span {
-    padding: 0;
-    font-size: 12px;
-  }
-  .range {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .range .d-field {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 0 8px;
-    font-variant-numeric: tabular-nums;
-  }
-  .to {
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-  .add {
-    padding: 4px 0 8px;
-  }
-  /* Text buttons start flush with the controls above them. */
-  .add .d-btn-text,
-  .split-foot .d-btn-text {
-    padding-left: 0;
+    margin: -4px 0 0 -12px;
   }
   .picker {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    padding-top: 4px;
+    padding-left: 12px;
   }
-  .pick {
-    height: 32px;
-    padding: 0 12px;
-    font-size: 13px;
+  .range {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
-  .d-seg {
-    align-self: flex-start;
+  .goto {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .goto-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
   .split {
     display: flex;
     align-items: center;
     gap: 8px;
   }
-  .split .url {
-    flex: 1 1 0;
-    width: auto;
-    min-width: 0;
-  }
+  .split > :global(:first-child) { flex: 1 1 auto; }
   .weight {
     flex: none;
-    width: 72px;
-    --d-unit-pad: 28px;
+    width: 88px;
   }
   .split-foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    margin-left: -12px;
   }
   .total {
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
+    margin: 0;
     text-align: right;
     color: var(--error);
   }
-  .total.ok {
-    color: var(--accent);
-  }
+  .total.ok { color: var(--success); }
   .foot {
     display: flex;
     align-items: center;
@@ -519,17 +396,7 @@
     gap: 8px;
     padding-top: 16px;
   }
-  .cap {
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-
   @media (max-width: 639px) {
-    .row .name {
-      min-height: 44px;
-    }
-    .pick {
-      height: 44px;
-    }
+    .rule { padding: 12px 12px 20px; }
   }
 </style>

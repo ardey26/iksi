@@ -1,33 +1,32 @@
 <script lang="ts">
+  // Dashboard create form for a one-time (burn after reading) link. The page
+  // puts it in its "One-time links" section.
   import { createEventDispatcher } from 'svelte';
+  import { Button, Field, IconButton, Input, Paper, Segmented, Stack, Textarea } from '#lib/ui/index.js';
   import { PASSWORD_MIN, PASSWORD_MAX } from '#lib/password-limits.js';
-  import {
-    ONE_TIME_TEXT_MAX,
-    ONE_TIME_TTL_DAYS,
-    createOneTimeLink,
-    oneTimeContentValid,
-    type OneTimeKind
-  } from '#lib/one-time.js';
-
-  /** Dashboard create form for a one-time (burn after reading) link. */
+  import { ONE_TIME_TEXT_MAX, createOneTimeLink, oneTimeContentValid, type OneTimeKind } from '#lib/one-time.js';
+  import { formatCount } from '#lib/format.js';
 
   const dispatch = createEventDispatcher<{ created: Record<string, unknown> }>();
-  const MAX_LABEL = ONE_TIME_TEXT_MAX.toLocaleString('en-US');
+  const MAX_LABEL = formatCount(ONE_TIME_TEXT_MAX);
 
   let kind: OneTimeKind = 'url';
   let url = '';
   let text = '';
   let password = '';
+  let reveal = false;
   let busy = false;
   let error = '';
+  let passwordError = '';
 
   $: content = kind === 'url' ? url : text;
-  $: canCreate = oneTimeContentValid(kind, content) && !busy;
+  $: canCreate = oneTimeContentValid(kind, content);
 
   async function create() {
-    if (!canCreate) return;
+    if (!canCreate || busy) return;
+    passwordError = '';
     if (password !== '' && (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX)) {
-      error = `Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters`;
+      passwordError = `Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters`;
       return;
     }
     busy = true;
@@ -49,93 +48,70 @@
   }
 </script>
 
-<section class="d-section one-time" aria-labelledby="ot-title">
-  <h2 class="d-title" id="ot-title">One-time link</h2>
-  <p class="d-desc">A URL or a text that opens once, then it is erased. Unopened links expire after {ONE_TIME_TTL_DAYS} days.</p>
+<Paper as="form" on:submit={(e) => { e.preventDefault(); create(); }}>
+  <Stack gap={16}>
+    <Field label="Content" group reserve={false} let:labelId>
+      <Segmented
+        labelledby={labelId}
+        bind:value={kind}
+        on:change={() => (error = '')}
+        options={[
+          { value: 'url', label: 'URL', icon: 'link' },
+          { value: 'text', label: 'Text' }
+        ]}
+      />
+    </Field>
 
-  <form class="d-spec" on:submit|preventDefault={create}>
-    <div class="d-row">
-      <span class="d-label" id="ot-kind-label">Content</span>
-      <div class="d-control">
-        <div class="d-seg" role="radiogroup" aria-labelledby="ot-kind-label">
-          <label class="d-key">
-            <input type="radio" class="sr-only" name="ot-kind" value="url" bind:group={kind} />
-            <span>URL</span>
-          </label>
-          <label class="d-key">
-            <input type="radio" class="sr-only" name="ot-kind" value="text" bind:group={kind} />
-            <span>Text</span>
-          </label>
-        </div>
-      </div>
-    </div>
+    {#if kind === 'url'}
+      <Input
+        label="Link to share"
+        icon="link"
+        inputmode="url"
+        maxlength="2048"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="https://example.com/private"
+        hint="Visitors go here once. https:// is added if missing."
+        {error}
+        bind:value={url}
+      />
+    {:else}
+      <Textarea label="Message" rows={4} maxlength={ONE_TIME_TEXT_MAX} {error} bind:value={text}>
+        <span slot="aside" class="t-caption t-muted t-tabular" aria-live="polite">{formatCount(text.length)} / {MAX_LABEL}</span>
+      </Textarea>
+    {/if}
 
-    <div class="d-row">
-      {#if kind === 'url'}
-        <label class="d-label" for="ot-url">Link to share</label>
-        <div class="d-control">
-          <input id="ot-url" class="d-field" type="text" inputmode="url" maxlength="2048" autocomplete="off"
-                 spellcheck="false" placeholder="https://example.com/private" bind:value={url} />
-          <p class="d-hint">Visitors go here once. https:// is added if missing.</p>
-        </div>
-      {:else}
-        <label class="d-label" for="ot-text">Message</label>
-        <div class="d-control">
-          <textarea id="ot-text" class="d-field" rows="4" maxlength={ONE_TIME_TEXT_MAX}
-                    aria-describedby="ot-count" bind:value={text}></textarea>
-          <p class="d-hint count" id="ot-count" aria-live="polite">
-            <span class="d-readout">{text.length.toLocaleString('en-US')} / {MAX_LABEL}</span>
-          </p>
-        </div>
-      {/if}
-    </div>
+    <Input
+      label="Password"
+      optional
+      type={reveal ? 'text' : 'password'}
+      autocomplete="new-password"
+      maxlength={PASSWORD_MAX}
+      placeholder="Not set"
+      hint="Asked before it opens."
+      error={passwordError}
+      bind:value={password}
+    >
+      <IconButton
+        slot="end"
+        icon={reveal ? 'eye-off' : 'eye'}
+        label={reveal ? 'Hide password' : 'Show password'}
+        on:click={() => (reveal = !reveal)}
+      />
+    </Input>
 
-    <div class="d-row">
-      <label class="d-label" for="ot-pw">Password</label>
-      <div class="d-control">
-        <input id="ot-pw" class="d-field" type="password" autocomplete="new-password" maxlength={PASSWORD_MAX}
-               placeholder="Not set" aria-describedby="ot-pw-hint" bind:value={password} />
-        <p class="d-hint" id="ot-pw-hint">Optional. Asked before it opens.</p>
-      </div>
+    <div class="foot">
+      <Button type="submit" variant="secondary" icon="lock" loading={busy} disabled={!canCreate}>Create one-time link</Button>
     </div>
-
-    <div class="footer">
-      <p class="err" role={error ? 'alert' : undefined}>{error}</p>
-      <button type="submit" class="d-btn d-btn-primary" disabled={!canCreate}>
-        {busy ? 'Creating' : 'Create one-time link'}
-      </button>
-    </div>
-  </form>
-</section>
+  </Stack>
+</Paper>
 
 <style>
-  .one-time {
-    margin-top: 48px;
-  }
-  textarea.d-field {
-    min-height: 112px;
-  }
-  .count {
-    text-align: right;
-  }
-  .count .d-readout {
-    font-size: 13px;
-  }
-  .footer {
+  .foot {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding-top: 16px;
+    justify-content: flex-end;
   }
-  .err {
-    min-width: 0;
-    min-height: 18px;
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--error);
-  }
-  .footer .d-btn {
-    flex: none;
+  @media (max-width: 639px) {
+    .foot > :global(*) { width: 100%; }
   }
 </style>
