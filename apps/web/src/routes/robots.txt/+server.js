@@ -6,6 +6,7 @@ Disallow: /
 
 const PUBLIC_ROBOTS = `User-agent: *
 Allow: /
+Allow: /api/@
 Disallow: /api/
 
 Sitemap: https://www.iksi.app/sitemap.xml
