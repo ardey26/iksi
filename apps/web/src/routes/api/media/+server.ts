@@ -4,16 +4,9 @@ import { purgeProfileOnSuccess } from '#lib/server/profile-cache.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
 import { rateLimit } from '#lib/rateLimit.js';
-import { MAX_UPLOAD_BYTES, MediaError, type MediaKind } from '#lib/server/media.js';
+import { MAX_UPLOAD_BYTES, MEDIA_ERROR_TEXT, MediaError, type MediaKind } from '#lib/server/media.js';
 import { r2MediaStore } from '#lib/server/media-store.js';
 import { NoProfileError, prismaProfileMediaDb, removeMedia, replaceMedia } from '#lib/server/profile-media.js';
-
-const MEDIA_ERROR_TEXT: Record<MediaError['code'], string> = {
-	too_large: 'Images must be under 4 MB.',
-	unsupported: 'Use a JPEG, PNG, WebP, GIF or AVIF image.',
-	too_many_pixels: 'Images must be 8000 px or smaller on each side.',
-	empty: 'That file is empty.'
-};
 
 function parseKind(v: unknown): MediaKind | null {
 	return v === 'avatar' || v === 'background' ? v : null;

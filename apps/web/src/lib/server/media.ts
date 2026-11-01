@@ -15,6 +15,13 @@ export class MediaError extends Error {
 	}
 }
 
+export const MEDIA_ERROR_TEXT: Record<MediaError['code'], string> = {
+	too_large: 'Images must be under 4 MB.',
+	unsupported: 'Use a JPEG, PNG, WebP, GIF or AVIF image.',
+	too_many_pixels: 'Images must be 8000 px or smaller on each side.',
+	empty: 'That file is empty.'
+};
+
 export interface Variant {
 	name: string;
 	bytes: Uint8Array;
