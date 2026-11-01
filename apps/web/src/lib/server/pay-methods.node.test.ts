@@ -25,7 +25,9 @@ describe('methodFromImage', () => {
 		expect(await methodFromImage(await qrPng(payload), newId)).toEqual({
 			id: 'id1',
 			kind: 'qr',
-			provider: 'gcash',
+			bic: 'GXCHPHM2XXX',
+			institution: 'gcash',
+			label: 'GCash',
 			payload,
 			name: 'JUAN DELA CRUZ',
 			city: 'MANDALUYONG',
@@ -34,24 +36,22 @@ describe('methodFromImage', () => {
 		});
 	});
 
-	it('trusts the BIC over the app the owner chose', async () => {
+	it('names a MariBank QR by its BIC', async () => {
 		const payload = payQrPayload({ bic: 'LAUIPHM2XXX' });
-		expect(await methodFromImage(await qrPng(payload), newId, 'gcash')).toMatchObject({ provider: 'maribank' });
+		expect(await methodFromImage(await qrPng(payload), newId)).toMatchObject({ institution: 'maribank', label: 'MariBank' });
 	});
 
-	it('keeps the chosen app when the BIC is unknown, as for Maya', async () => {
-		const payload = payQrPayload({ bic: 'MAYAPHXXXXX' });
-		expect(await methodFromImage(await qrPng(payload), newId, 'maya')).toMatchObject({ provider: 'maya' });
-	});
-
-	it.each(['gcash', 'maribank'] as const)('saves a %s choice with an unknown BIC as a bank QR', async (chosen) => {
+	it('calls a QR from a bank it does not know Bank QR', async () => {
 		const payload = payQrPayload({ bic: 'BOPIPHMMXXX' });
-		expect(await methodFromImage(await qrPng(payload), newId, chosen)).toMatchObject({ kind: 'qr', provider: null });
+		const m = await methodFromImage(await qrPng(payload), newId);
+		expect(m).toMatchObject({ kind: 'qr', bic: 'BOPIPHMMXXX', label: 'Bank QR' });
+		expect(m).not.toHaveProperty('institution');
 	});
 
-	it('names no provider for an unknown BIC uploaded without choosing an app', async () => {
-		const payload = payQrPayload({ bic: 'BOPIPHMMXXX' });
-		expect(await methodFromImage(await qrPng(payload), newId)).toMatchObject({ kind: 'qr', provider: null });
+	it('does not take a Maya-looking BIC for Maya', async () => {
+		const m = await methodFromImage(await qrPng(payQrPayload({ bic: 'PAPHPHM1XXX' })), newId);
+		expect(m).toMatchObject({ label: 'Bank QR' });
+		expect(m).not.toHaveProperty('institution');
 	});
 
 	it('accepts a Singapore payment QR with an arbitrary GUID', async () => {

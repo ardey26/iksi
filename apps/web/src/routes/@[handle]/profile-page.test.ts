@@ -138,10 +138,27 @@ describe('profile payment methods', () => {
     expect(((await run()) as any).pay).toEqual({
       label: 'tip',
       methods: [
-        { id: 'q1', kind: 'qr', provider: 'gcash', name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
+        {
+          id: 'q1',
+          kind: 'qr',
+          institution: 'gcash',
+          label: 'GCash',
+          name: 'JUAN DELA CRUZ',
+          city: 'MANDALUYONG',
+          country: 'PH',
+          currency: 'PHP'
+        },
         kofi
       ]
     });
+  });
+
+  it('names a QR stored with a wallet provider by its bank', async () => {
+    findFirst.mockResolvedValue({ ...profile([]), payMethods: [{ id: 'q1', kind: 'qr', payload: payQrPayload({ bic: 'LAUIPHM2XXX' }), provider: 'gcash' }] });
+    const [m] = ((await run()) as any).pay.methods;
+    expect(m).toMatchObject({ institution: 'maribank', label: 'MariBank' });
+    expect(m).not.toHaveProperty('provider');
+    expect(m).not.toHaveProperty('bic');
   });
 
   it('keeps the QR payload, which can hold a mobile number, out of the cached page', async () => {

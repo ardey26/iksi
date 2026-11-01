@@ -3,8 +3,16 @@
   // (--bg, --surface, --border, --text-primary, --text-muted) it sits in.
   import { onDestroy, tick } from 'svelte';
   import QRCode from 'qrcode';
-  import PayLogo from './PayLogo.svelte';
-  import { PAY_LABEL_TEXT, PROVIDER_NAMES, qrPlace, type PayLabel, type PublicPayMethod } from '#lib/pay-methods.js';
+  import PayMark from './PayMark.svelte';
+  import {
+    PAY_LABEL_TEXT,
+    PROVIDER_NAMES,
+    methodTitle,
+    qrPlace,
+    titleCase,
+    type PayLabel,
+    type PublicPayMethod
+  } from '#lib/pay-methods.js';
 
   export let handle: string;
   export let displayName: string;
@@ -30,7 +38,8 @@
   $: picking = methods.length > 1;
   $: shown = picking ? methods.filter((m) => m.id === selected) : methods;
   $: cols = methods.length <= 3 ? methods.length : methods.length === 4 ? 2 : 3;
-  const pickName = (m: PublicPayMethod) => (m.kind === 'link' ? PROVIDER_NAMES[m.provider] : m.name || 'Bank QR');
+  // Links have no bank, so they always get a monogram of the service name.
+  const institutionOf = (m: PublicPayMethod) => (m.kind === 'qr' ? m.institution : null);
 
   $: title = label === 'tip' ? `Send ${displayName} a tip` : `Pay ${displayName}`;
   $: fileName = `${handle}-payment-qr.png`;
@@ -165,12 +174,9 @@
           {#each methods as m (m.id)}
             <label class="pay-key">
               <input type="radio" class="sr-only" name="pay-pick-{handle}" value={m.id} bind:group={selected} />
-              <span title={m.kind === 'qr' && m.provider ? undefined : pickName(m)}>
-                {#if m.kind === 'qr' && m.provider}
-                  <PayLogo provider={m.provider} size={28} />
-                {:else}
-                  <span class="pay-key-text">{pickName(m)}</span>
-                {/if}
+              <span title={methodTitle(m)}>
+                <PayMark institution={institutionOf(m)} label={methodTitle(m)} size={24} alt="" />
+                <span class="pay-key-text">{methodTitle(m)}</span>
               </span>
             </label>
           {/each}
@@ -183,7 +189,7 @@
             {#if m.kind === 'qr'}
               <div class="qr-frame" style="width: {QR_SIZE}px;">
                 {#if images[m.id]}
-                  <img src={images[m.id].url} alt="Payment QR for {m.name}" width={QR_SIZE} height={QR_SIZE} />
+                  <img src={images[m.id].url} alt="Payment QR for {titleCase(m.name)}" width={QR_SIZE} height={QR_SIZE} />
                 {:else if failed(m.id)}
                   <div class="qr-failed" role="alert">
                     <p>Could not load this QR.</p>
@@ -192,9 +198,10 @@
                 {/if}
               </div>
               <div class="pay-who">
-                {#if m.provider}<PayLogo provider={m.provider} size={28} />{/if}
-                <p class="pay-name">Pays to {m.name}</p>
+                <PayMark institution={m.institution} label={m.label} size={28} alt="" />
+                <p class="pay-method">{m.label}</p>
               </div>
+              <p class="pay-name">Pays to {titleCase(m.name)}</p>
               <p class="pay-meta">{qrPlace(m)}</p>
               <p class="pay-meta">Pays in {m.currency}</p>
               <div class="pay-action">
@@ -372,8 +379,16 @@
     max-width: 100%;
     margin-top: 16px;
   }
+  .pay-method {
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
   .pay-name {
     min-width: 0;
+    margin-top: 8px;
     font-size: 16px;
     font-weight: 600;
     overflow-wrap: anywhere;
@@ -391,6 +406,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     width: 100%;
     height: 48px;
     padding: 0 10px;

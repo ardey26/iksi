@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/svelte';
 import PaymentMethods from './PaymentMethods.svelte';
 
 const qr = {
   id: 'q1',
   kind: 'qr',
-  provider: null,
+  label: 'Bank QR',
   payload: '000201...',
   name: 'JUAN DELA CRUZ',
   city: 'MANDALUYONG',
@@ -14,12 +14,11 @@ const qr = {
 };
 const paypal = { id: 'l1', kind: 'link', provider: 'paypal', url: 'https://paypal.me/ana' };
 const kofi = { id: 'l2', kind: 'link', provider: 'kofi', url: 'https://ko-fi.com/ana' };
-const gcash = { ...qr, id: 'q2', provider: 'gcash', payload: '000201gc', name: 'ANA REYES' };
-const other = () => fireEvent.click(screen.getByRole('button', { name: 'Other bank or payment link' }));
-const pickFile = (container) =>
-  fireEvent.change(container.querySelector('input[type="file"]'), {
-    target: { files: [new File(['x'], 'qr.png', { type: 'image/png' })] }
-  });
+const gcash = { ...qr, id: 'q2', institution: 'gcash', label: 'GCash', payload: '000201gc', name: 'ANA REYES' };
+const png = (name = 'qr.png') => new File(['x'], name, { type: 'image/png' });
+const pickFiles = (container, files) =>
+  fireEvent.change(container.querySelector('input[type="file"]'), { target: { files } });
+const openLink = () => fireEvent.click(screen.getByRole('button', { name: 'Add payment link' }));
 
 const ok = (body) => ({ ok: true, status: 200, json: async () => body });
 const bad = (status, error) => ({ ok: false, status, json: async () => ({ error }) });
@@ -32,142 +31,214 @@ describe('PaymentMethods', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('lists a QR by the name payers will see, and a link by its service', () => {
-    render(PaymentMethods, { props: { methods: [qr, paypal], label: 'pay' } });
-    expect(screen.getByText('Pays to JUAN DELA CRUZ')).toBeInTheDocument();
-    expect(screen.getByText('MANDALUYONG, Philippines')).toBeInTheDocument();
-    expect(screen.getByText('Pays in PHP')).toBeInTheDocument();
-    expect(screen.getByText('PayPal')).toBeInTheDocument();
-    expect(screen.getByText('https://paypal.me/ana')).toBeInTheDocument();
-  });
-
-  it('names each QR by its wallet logo and the name in it', () => {
-    render(PaymentMethods, { props: { methods: [gcash, qr], label: 'pay' } });
-    const logo = screen.getByRole('img', { name: 'GCash' });
-    expect(logo.closest('.d-row')).toHaveTextContent('Pays to ANA REYES');
-    expect(screen.getByText('Bank QR')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove GCash' })).toBeInTheDocument();
-  });
-
-  it('offers GCash, Maya and MariBank first, as buttons', () => {
-    render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    for (const name of ['GCash', 'Maya', 'MariBank']) {
-      const tile = screen.getByRole('button', { name: `Add ${name} QR` });
-      expect(tile.tagName).toBe('BUTTON');
-      expect(tile).toHaveAttribute('aria-pressed', 'false');
-      expect(tile.querySelector('img')).not.toBeNull();
-    }
-    // Maya's logo is a wordmark, so only GCash and MariBank are captioned.
-    expect(screen.getByText('GCash')).toBeInTheDocument();
-    expect(screen.getByText('MariBank')).toBeInTheDocument();
-    expect(screen.queryByText('Maya')).toBeNull();
-    expect(screen.queryByRole('radio', { name: 'Upload a QR image' })).toBeNull();
-  });
-
-  it('shows where to find the QR in the wallet that was tapped', async () => {
-    render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    expect(screen.queryByRole('button', { name: 'Choose image' })).toBeNull();
-    await fireEvent.click(screen.getByRole('button', { name: 'Add Maya QR' }));
-    expect(screen.getByRole('button', { name: 'Add Maya QR' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText(/^Open Maya and save your receive-money QR\./)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Choose image' })).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole('button', { name: 'Add GCash QR' }));
-    expect(screen.getByText(/^Open GCash and save your receive-money QR\./)).toBeInTheDocument();
-  });
-
-  it('uploads a QR with the wallet that was tapped', async () => {
-    fetchMock.mockResolvedValue(ok({ methods: [gcash], label: 'pay', notice: null }));
-    const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Add GCash QR' }));
-    await pickFile(container);
-    expect(await screen.findByText('Pays to ANA REYES')).toBeInTheDocument();
-    const init = fetchMock.mock.calls[0][1];
-    expect(init.body.get('kind')).toBe('qr');
-    expect(init.body.get('provider')).toBe('gcash');
-  });
-
-  it('says when the QR was for another wallet', async () => {
-    const mari = { ...gcash, provider: 'maribank' };
-    fetchMock.mockResolvedValue(ok({ methods: [mari], label: 'pay', notice: 'This is a MariBank QR. Saved as MariBank.' }));
-    const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Add GCash QR' }));
-    await pickFile(container);
-    const note = await screen.findByText('This is a MariBank QR. Saved as MariBank.');
-    expect(note).toHaveAttribute('role', 'status');
-  });
-
-  it('keeps any other bank or a payment link behind a quieter button', async () => {
-    render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    const more = screen.getByRole('button', { name: 'Other bank or payment link' });
-    expect(more).toHaveAttribute('aria-expanded', 'false');
-    await other();
-    expect(more).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('radio', { name: 'Upload a QR image' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Paste a link' })).not.toBeChecked();
-    expect(screen.getByRole('button', { name: 'Choose image' })).toBeInTheDocument();
-  });
-
-  it('uploads the chosen image as a QR and shows the method the server read', async () => {
-    fetchMock.mockResolvedValue(ok({ methods: [qr], label: 'pay' }));
-    const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    await other();
-    await pickFile(container);
-    expect(await screen.findByText('Pays to JUAN DELA CRUZ')).toBeInTheDocument();
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/pay-methods');
-    expect(init.method).toBe('POST');
-    expect(init.body.get('kind')).toBe('qr');
-    expect(init.body.get('file')).toBeInstanceOf(File);
-    expect(init.body.get('provider')).toBeNull();
-  });
-
-  it('shows the reason an upload was refused', async () => {
-    fetchMock.mockResolvedValue(bad(400, "That QR isn't a payment QR or a supported payment link."));
-    const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    await fireEvent.change(container.querySelector('input[type="file"]'), {
-      target: { files: [new File(['x'], 'qr.png', { type: 'image/png' })] }
+  describe('the list', () => {
+    it('shows each QR by its label, with who it pays in title case', () => {
+      render(PaymentMethods, { props: { methods: [qr, paypal], label: 'pay' } });
+      expect(screen.getByText('Pays to Juan Dela Cruz')).toBeInTheDocument();
+      expect(screen.getByText('Mandaluyong, Philippines')).toBeInTheDocument();
+      expect(screen.getByText('Pays in PHP')).toBeInTheDocument();
+      expect(screen.getByText('Bank QR')).toBeInTheDocument();
+      expect(screen.getByText('PayPal')).toBeInTheDocument();
+      expect(screen.getByText('https://paypal.me/ana')).toBeInTheDocument();
     });
-    expect(await screen.findByRole('alert')).toHaveTextContent("That QR isn't a payment QR or a supported payment link.");
+
+    it("marks a known bank's QR with its logo and an unknown bank's with a monogram", () => {
+      const { container } = render(PaymentMethods, { props: { methods: [gcash, qr], label: 'pay' } });
+      const [first, second] = container.querySelectorAll('.d-row');
+      expect(first.querySelector('img')).toHaveAttribute('src', '/brands/gcash.svg');
+      expect(first).toHaveTextContent('Pays to Ana Reyes');
+      expect(second.querySelector('img')).toBeNull();
+      expect(second.querySelector('.pay-monogram')).toHaveTextContent('B');
+      expect(screen.getByRole('button', { name: 'Remove GCash' })).toBeInTheDocument();
+    });
+
+    it('lists no banks to choose from', () => {
+      render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      expect(screen.queryByRole('button', { name: /GCash|Maya|MariBank/ })).toBeNull();
+      expect(screen.queryByRole('img')).toBeNull();
+    });
   });
 
-  it('adds a pasted link', async () => {
-    fetchMock.mockResolvedValue(ok({ methods: [paypal], label: 'pay' }));
-    render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    await other();
-    await fireEvent.click(screen.getByRole('radio', { name: 'Paste a link' }));
-    await fireEvent.input(screen.getByLabelText('Payment link'), { target: { value: 'https://paypal.me/ana' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
-    expect(await screen.findByText('PayPal')).toBeInTheDocument();
-    const init = fetchMock.mock.calls[0][1];
-    expect(init.body.get('kind')).toBe('link');
-    expect(init.body.get('url')).toBe('https://paypal.me/ana');
-    expect(screen.getByLabelText('Payment link')).toHaveValue('');
+  describe('adding QRs', () => {
+    it('offers one button that picks several images', () => {
+      const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      const button = screen.getByRole('button', { name: 'Add payment QR' });
+      expect(button).toHaveClass('d-btn-primary');
+      const input = container.querySelector('input[type="file"]');
+      expect(input).toHaveAttribute('multiple');
+      expect(input.getAttribute('accept')).toContain('image/png');
+    });
+
+    it('uploads one image and says which bank it was', async () => {
+      fetchMock.mockResolvedValue(ok({ methods: [gcash], label: 'pay', added: 'q2' }));
+      const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      await pickFiles(container, [png()]);
+      expect(await screen.findByText('Pays to Ana Reyes')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Added GCash');
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('/api/pay-methods');
+      expect(init.method).toBe('POST');
+      expect(init.body.get('kind')).toBe('qr');
+      expect(init.body.get('file')).toBeInstanceOf(File);
+      expect(init.body.get('provider')).toBeNull();
+    });
+
+    it('uploads several images one by one and reports each', async () => {
+      fetchMock
+        .mockResolvedValueOnce(ok({ methods: [gcash], label: 'pay', added: 'q2' }))
+        .mockResolvedValueOnce(bad(400, "That QR isn't a payment QR or a supported payment link."))
+        .mockResolvedValueOnce(ok({ methods: [gcash, qr], label: 'pay', added: 'q1' }));
+      const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      await pickFiles(container, [png('gcash.png'), png('menu.png'), png('bpi.png')]);
+      const report = await screen.findByRole('list', { name: 'Upload results' });
+      await waitFor(() => expect(within(report).getAllByRole('listitem')).toHaveLength(3));
+      expect(within(report).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+        'gcash.png: Added GCash',
+        "menu.png: That QR isn't a payment QR or a supported payment link.",
+        'bpi.png: Added Bank QR'
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls.map(([, init]) => init.body.get('file').name)).toEqual(['gcash.png', 'menu.png', 'bpi.png']);
+      expect(screen.getByText('Pays to Juan Dela Cruz')).toBeInTheDocument();
+    });
+
+    it('sends the next image only after the previous one is saved', async () => {
+      let release;
+      fetchMock.mockReturnValueOnce(new Promise((r) => (release = r))).mockResolvedValue(ok({ methods: [gcash, qr], label: 'pay', added: 'q1' }));
+      const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      await pickFiles(container, [png('a.png'), png('b.png')]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'Add payment QR' })).toBeDisabled();
+      release(ok({ methods: [gcash], label: 'pay', added: 'q2' }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    });
+
+    it('stops sending once the profile is full and says why', async () => {
+      const five = [1, 2, 3, 4, 5].map((i) => ({ ...kofi, id: `k${i}`, url: `https://ko-fi.com/ana${i}` }));
+      fetchMock.mockResolvedValue(ok({ methods: [...five, gcash], label: 'pay', added: 'q2' }));
+      const { container } = render(PaymentMethods, { props: { methods: five, label: 'pay' } });
+      await pickFiles(container, [png('a.png'), png('b.png')]);
+      const report = await screen.findByRole('list', { name: 'Upload results' });
+      await waitFor(() => expect(within(report).getAllByRole('listitem')).toHaveLength(2));
+      expect(within(report).getAllByRole('listitem')[1]).toHaveTextContent(
+        'b.png: Not added. You can have up to 6 payment methods.'
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses an image over 4 MB without sending it', async () => {
+      const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      const big = new File([new Uint8Array(4 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
+      await pickFiles(container, [big]);
+      expect(await screen.findByRole('alert')).toHaveTextContent('Images must be under 4 MB.');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('shows the reason a single upload was refused', async () => {
+      fetchMock.mockResolvedValue(bad(400, "That QR isn't a payment QR or a supported payment link."));
+      const { container } = render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      await pickFiles(container, [png()]);
+      expect(await screen.findByRole('alert')).toHaveTextContent("That QR isn't a payment QR or a supported payment link.");
+    });
   });
 
-  it('keeps a refused link in the field and says why', async () => {
-    fetchMock.mockResolvedValue(bad(400, 'Use a link from PayPal, Venmo, Cash App, Wise, Revolut, Ko-fi, Buy Me a Coffee or Stripe.'));
-    render(PaymentMethods, { props: { methods: [], label: 'pay' } });
-    await other();
-    await fireEvent.click(screen.getByRole('radio', { name: 'Paste a link' }));
-    await fireEvent.input(screen.getByLabelText('Payment link'), { target: { value: 'https://evil.example/' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/^Use a link from PayPal/);
-    expect(screen.getByLabelText('Payment link')).toHaveValue('https://evil.example/');
+  describe('adding a link', () => {
+    it('keeps the link field behind a secondary button', async () => {
+      render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      const more = screen.getByRole('button', { name: 'Add payment link' });
+      expect(more).toHaveClass('d-btn-secondary');
+      expect(more).toHaveAttribute('aria-expanded', 'false');
+      await openLink();
+      expect(more).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByLabelText('Payment link')).toBeInTheDocument();
+    });
+
+    it('adds a pasted link', async () => {
+      fetchMock.mockResolvedValue(ok({ methods: [paypal], label: 'pay', added: 'l1' }));
+      render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      await openLink();
+      await fireEvent.input(screen.getByLabelText('Payment link'), { target: { value: 'https://paypal.me/ana' } });
+      await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+      expect(await screen.findByText('https://paypal.me/ana')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Added PayPal');
+      const init = fetchMock.mock.calls[0][1];
+      expect(init.body.get('kind')).toBe('link');
+      expect(init.body.get('url')).toBe('https://paypal.me/ana');
+      expect(screen.getByLabelText('Payment link')).toHaveValue('');
+    });
+
+    it('keeps a refused link in the field and says why', async () => {
+      fetchMock.mockResolvedValue(bad(400, 'Use a link from PayPal, Venmo, Cash App, Wise, Revolut, Ko-fi, Buy Me a Coffee or Stripe.'));
+      render(PaymentMethods, { props: { methods: [], label: 'pay' } });
+      await openLink();
+      await fireEvent.input(screen.getByLabelText('Payment link'), { target: { value: 'https://evil.example/' } });
+      await fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/^Use a link from PayPal/);
+      expect(screen.getByLabelText('Payment link')).toHaveValue('https://evil.example/');
+    });
+  });
+
+  describe('renaming', () => {
+    const rename = (name) => fireEvent.click(screen.getByRole('button', { name: `Rename ${name}` }));
+
+    it('renames a QR in place and saves it', async () => {
+      fetchMock.mockResolvedValue(ok({ methods: [{ ...gcash, label: 'Shop' }], label: 'pay' }));
+      render(PaymentMethods, { props: { methods: [gcash], label: 'pay' } });
+      await rename('GCash');
+      const field = screen.getByRole('textbox', { name: 'Name for GCash' });
+      expect(field).toHaveValue('GCash');
+      expect(field).toHaveAttribute('maxlength', '24');
+      await fireEvent.input(field, { target: { value: 'Shop' } });
+      await fireEvent.submit(field.closest('form'));
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('/api/pay-methods');
+      expect(init.method).toBe('PATCH');
+      expect(JSON.parse(init.body)).toEqual({ rename: { id: 'q2', label: 'Shop' } });
+      expect(await screen.findByRole('button', { name: 'Rename Shop' })).toBeInTheDocument();
+      expect(screen.queryByRole('textbox', { name: /^Name for/ })).toBeNull();
+    });
+
+    it('cancels with Escape and changes nothing', async () => {
+      render(PaymentMethods, { props: { methods: [gcash], label: 'pay' } });
+      await rename('GCash');
+      const field = screen.getByRole('textbox', { name: 'Name for GCash' });
+      await fireEvent.input(field, { target: { value: 'Shop' } });
+      await fireEvent.keyDown(field, { key: 'Escape' });
+      expect(screen.queryByRole('textbox', { name: 'Name for GCash' })).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Rename GCash' })));
+    });
+
+    it('keeps the field open and says why when the name is refused', async () => {
+      fetchMock.mockResolvedValue(bad(400, 'Names can be up to 24 characters of plain text.'));
+      render(PaymentMethods, { props: { methods: [gcash], label: 'pay' } });
+      await rename('GCash');
+      const field = screen.getByRole('textbox', { name: 'Name for GCash' });
+      await fireEvent.input(field, { target: { value: '<b>' } });
+      await fireEvent.submit(field.closest('form'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Names can be up to 24 characters of plain text.');
+      expect(screen.getByRole('textbox', { name: 'Name for GCash' })).toHaveValue('<b>');
+    });
+
+    it('offers no rename for a link, which is named by its service', () => {
+      render(PaymentMethods, { props: { methods: [paypal], label: 'pay' } });
+      expect(screen.queryByRole('button', { name: /^Rename/ })).toBeNull();
+    });
   });
 
   it('removes a method', async () => {
     fetchMock.mockResolvedValue(ok({ methods: [paypal], label: 'pay' }));
     render(PaymentMethods, { props: { methods: [qr, paypal], label: 'pay' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Remove Bank QR' }));
-    await waitFor(() => expect(screen.queryByText('Pays to JUAN DELA CRUZ')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Pays to Juan Dela Cruz')).toBeNull());
     expect(fetchMock).toHaveBeenCalledWith('/api/pay-methods?id=q1', { method: 'DELETE' });
   });
 
   it('hides the add controls at six methods and says why', () => {
     const more = [1, 2, 3].map((i) => ({ ...kofi, id: `k${i}`, url: `https://ko-fi.com/ana${i}` }));
     render(PaymentMethods, { props: { methods: [qr, paypal, kofi, ...more], label: 'pay' } });
-    expect(screen.queryByRole('button', { name: 'Add GCash QR' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Other bank or payment link' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add payment QR' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add payment link' })).toBeNull();
     expect(screen.getByText(/6 payment methods, the most a profile can have/)).toBeInTheDocument();
   });
 
@@ -175,6 +246,7 @@ describe('PaymentMethods', () => {
     const more = [1, 2].map((i) => ({ ...kofi, id: `k${i}`, url: `https://ko-fi.com/ana${i}` }));
     render(PaymentMethods, { props: { methods: [qr, paypal, kofi, ...more], label: 'pay' } });
     expect(screen.queryByText(/the most a profile can have/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add payment QR' })).toBeInTheDocument();
   });
 
   it('moves a method up and saves the new order', async () => {

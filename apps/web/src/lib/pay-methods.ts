@@ -17,38 +17,18 @@ export const PROVIDER_NAMES: Record<PayProvider, string> = {
 	stripe: 'Stripe'
 };
 
-/** Philippine wallets offered first in the dashboard, each with a logo. */
-export type QrProvider = 'gcash' | 'maya' | 'maribank';
-
-export const QR_PROVIDERS: QrProvider[] = ['gcash', 'maya', 'maribank'];
-
-export interface QrProviderInfo {
-	name: string;
-	/** A trademark, shown only to say which payment app the QR is for. */
-	logo: string;
-	/** Natural aspect of the logo, as width / height. */
-	aspect: number;
-	/** The logo already spells the name, so the name is not repeated under it. */
-	wordmark: boolean;
-}
-
-export const QR_PROVIDER_INFO: Record<QrProvider, QrProviderInfo> = {
-	gcash: { name: 'GCash', logo: '/brands/gcash.svg', aspect: 72 / 61, wordmark: false },
-	maya: { name: 'Maya', logo: '/brands/maya.svg', aspect: 112 / 33, wordmark: true },
-	maribank: { name: 'MariBank', logo: '/brands/maribank.png', aspect: 152 / 128, wordmark: false }
-};
-
-export function parseQrProvider(v: unknown): QrProvider | null {
-	return typeof v === 'string' && (QR_PROVIDERS as string[]).includes(v) ? (v as QrProvider) : null;
-}
-
 export interface QrMethod {
 	id: string;
 	kind: 'qr';
-	/** The wallet the QR is for: from its BIC when known, else the owner's choice. Null for any other bank. */
-	provider: QrProvider | null;
+	/** The bank's BIC as the QR states it (sub-tag 01 of a merchant account), when it has one. */
+	bic?: string;
+	/** Registry id (#lib/pay-institutions) of the bank the QR is for. Absent when unknown. */
+	institution?: string;
+	/** What payers and the owner call it: the bank's name, "Bank QR", or the owner's own name for it. */
+	label: string;
 	/** EMVCo payload text; the QR is rendered from it, the uploaded image is never kept. */
 	payload: string;
+	/** Merchant name (tag 59) exactly as the QR holds it, usually in capitals. Shown through titleCase. */
 	name: string;
 	city: string | null;
 	country: string;
@@ -68,13 +48,45 @@ export type PayMethod = QrMethod | LinkMethod;
  * What the public profile page gets. A personal QR's payload usually holds
  * the owner's mobile number, so it is fetched only when the Pay sheet opens.
  */
-export type PublicQrMethod = Omit<QrMethod, 'payload'>;
+export type PublicQrMethod = Omit<QrMethod, 'payload' | 'bic'>;
 export type PublicPayMethod = PublicQrMethod | LinkMethod;
 
-/** How a method is named to payers and in the dashboard: "GCash", "BPI QR", "PayPal". */
+/** How a method is named to payers and in the dashboard: "GCash", "Bank QR", "Shop", "PayPal". */
 export function methodTitle(m: PublicPayMethod): string {
-	if (m.kind === 'link') return PROVIDER_NAMES[m.provider];
-	return m.provider ? QR_PROVIDER_INFO[m.provider].name : 'Bank QR';
+	return m.kind === 'link' ? PROVIDER_NAMES[m.provider] : m.label;
+}
+
+export const MAX_METHOD_LABEL_LENGTH = 24;
+
+export type MethodLabelResult = { ok: true; label: string | null } | { ok: false };
+
+/**
+ * A name the owner gives a QR method: plain text, up to 24 characters. Control,
+ * formatting and direction characters and angle brackets are refused rather than
+ * stripped, so what is saved is what was typed. An empty name (null) means
+ * "back to the default".
+ */
+export function parseMethodLabel(v: unknown): MethodLabelResult {
+	if (typeof v !== 'string' || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}<>]/u.test(v)) return { ok: false };
+	const label = v.normalize('NFC').trim().replace(/\s+/g, ' ');
+	if (!label) return { ok: true, label: null };
+	return [...label].length > MAX_METHOD_LABEL_LENGTH ? { ok: false } : { ok: true, label };
+}
+
+const ROMAN = /(^|\s)(i{2,3}|iv)(?=$|[\s,.])/gi;
+
+/**
+ * "Maria Santos" for "MARIA SANTOS": QRs hold names and cities in capitals. Text
+ * that already has lowercase letters is the owner's or bank's own casing and is
+ * kept. Only for display; the raw value is what is stored.
+ */
+export function titleCase(raw: string): string {
+	const s = raw.trim().replace(/\s+/g, ' ');
+	if (/\p{Ll}/u.test(s)) return s;
+	return s
+		.toLocaleLowerCase('en')
+		.replace(/(^|[^\p{L}\p{M}\p{N}*])(\p{L})/gu, (_, before: string, ch: string) => before + ch.toLocaleUpperCase('en'))
+		.replace(ROMAN, (_, before: string, numeral: string) => before + numeral.toUpperCase());
 }
 
 export type PayLabel = 'pay' | 'tip';
@@ -97,7 +109,7 @@ export function countryName(code: string): string {
 	}
 }
 
-/** "MANDALUYONG, Philippines": where a QR's merchant is. */
+/** "Quezon City, Philippines": where a QR's merchant is. */
 export function qrPlace(m: Pick<QrMethod, 'city' | 'country'>): string {
-	return [m.city, countryName(m.country)].filter(Boolean).join(', ');
+	return [m.city && titleCase(m.city), countryName(m.country)].filter(Boolean).join(', ');
 }

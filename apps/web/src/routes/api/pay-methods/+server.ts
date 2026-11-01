@@ -10,12 +10,12 @@ import {
 	methodFromImage,
 	methodFromLink,
 	PayMethodError,
-	providerNotice,
 	readPayMethods,
 	removePayMethod,
+	renamePayMethod,
 	reorderPayMethods
 } from '#lib/server/pay-methods.js';
-import { parseQrProvider, payLabelOf, type PayLabel, type PayMethod } from '#lib/pay-methods.js';
+import { payLabelOf, type PayLabel, type PayMethod } from '#lib/pay-methods.js';
 
 // Payment methods behind the profile's Pay button. An uploaded QR image is
 // decoded in memory and never stored; only what the QR holds is saved.
@@ -42,7 +42,8 @@ async function saveMethods(p: Profile, methods: PayMethod[]): Promise<boolean> {
 	return count === 1;
 }
 
-const view = (methods: PayMethod[], label: PayLabel, notice: string | null = null) => json({ methods, label, notice });
+/** `added` is the id of the method a POST added, so the dashboard can say "Added GCash". */
+const view = (methods: PayMethod[], label: PayLabel, added: string | null = null) => json({ methods, label, added });
 const changed = () => json({ error: 'Your payment methods changed in another tab. Reload and try again.' }, { status: 409 });
 const noProfile = () => json({ error: 'No profile' }, { status: 404 });
 const signedOut = () => json({ error: 'Not signed in' }, { status: 401 });
@@ -67,14 +68,14 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
 	try {
 		const newId = () => crypto.randomUUID();
 		let method: PayMethod;
-		// The wallet tile the owner tapped, if any. The QR's own BIC wins over it.
-		const chosen = parseQrProvider(form.get('provider'));
+		// One image per request: Vercel caps a request body at 4.5 MB, so the
+		// dashboard sends several QRs one after another. The QR names its own bank.
 		const kind = form.get('kind');
 		if (kind === 'qr') {
 			const file = form.get('file');
 			if (!(file instanceof File)) return json({ error: 'File required' }, { status: 400 });
 			if (file.size > MAX_UPLOAD_BYTES) throw new MediaError('too_large');
-			method = await methodFromImage(new Uint8Array(await file.arrayBuffer()), newId, chosen);
+			method = await methodFromImage(new Uint8Array(await file.arrayBuffer()), newId);
 		} else if (kind === 'link') {
 			const url = form.get('url');
 			method = methodFromLink(typeof url === 'string' ? url : '', newId);
@@ -84,7 +85,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
 
 		const methods = addPayMethod(readPayMethods(p.payMethods), method);
 		if (!(await saveMethods(p, methods))) return changed();
-		return view(methods, payLabelOf(p.payLabel), providerNotice(chosen, method));
+		return view(methods, payLabelOf(p.payLabel), method.id);
 	} catch (err) {
 		if (err instanceof PayMethodError) return json({ error: err.message, code: err.code }, { status: 400 });
 		if (err instanceof MediaError) return json({ error: MEDIA_ERROR_TEXT[err.code], code: err.code }, { status: 400 });
@@ -116,6 +117,23 @@ const handlePatch: RequestHandler = async ({ request, cookies }) => {
 		if (!p) return noProfile();
 		const methods = reorderPayMethods(readPayMethods(p.payMethods), body.order);
 		if (!methods || !(await saveMethods(p, methods))) return changed();
+		return view(methods, payLabelOf(p.payLabel));
+	}
+
+	// The owner's own name for a QR method ("Shop GCash"); an empty name puts the bank's back.
+	if (typeof body === 'object' && body !== null && 'rename' in body) {
+		const { id, label } = (typeof body.rename === 'object' && body.rename) || {};
+		const p = await profileOf(uid);
+		if (!p) return noProfile();
+		let methods: PayMethod[] | null;
+		try {
+			methods = renamePayMethod(readPayMethods(p.payMethods), typeof id === 'string' ? id : '', label);
+		} catch (err) {
+			if (err instanceof PayMethodError) return json({ error: err.message, code: err.code }, { status: 400 });
+			throw err;
+		}
+		if (!methods) return json({ error: 'Not found' }, { status: 404 });
+		if (!(await saveMethods(p, methods))) return changed();
 		return view(methods, payLabelOf(p.payLabel));
 	}
 

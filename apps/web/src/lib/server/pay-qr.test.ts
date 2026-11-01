@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crc16, MAX_PAYLOAD_LENGTH, parseTlv, PAY_QR_ERROR_TEXT, qrProviderOf, validatePayQr } from './pay-qr';
+import { crc16, MAX_PAYLOAD_LENGTH, parseTlv, PAY_QR_ERROR_TEXT, qrBankOf, validatePayQr } from './pay-qr';
 import { damagedPayload, payQrBody, payQrPayload, testCrc, tlv, withCrc } from '../../test/pay-qr';
 
 const codeOf = (text: string) => {
@@ -160,33 +160,54 @@ describe('validatePayQr', () => {
 	});
 });
 
-describe('qrProviderOf', () => {
+describe('qrBankOf', () => {
 	it('knows a GCash QR by its BIC', () => {
-		expect(qrProviderOf(payQrPayload({ bic: 'GXCHPHM2XXX' }))).toBe('gcash');
+		expect(qrBankOf(payQrPayload({ bic: 'GXCHPHM2XXX' }))).toMatchObject({ bic: 'GXCHPHM2XXX', institution: { id: 'gcash' } });
 	});
 
 	it('knows a MariBank QR by its BIC', () => {
-		expect(qrProviderOf(payQrPayload({ bic: 'LAUIPHM2XXX' }))).toBe('maribank');
+		expect(qrBankOf(payQrPayload({ bic: 'LAUIPHM2XXX' })).institution?.id).toBe('maribank');
 	});
 
 	it('reads the BIC from a P2M template too', () => {
-		expect(qrProviderOf(payQrPayload({ guid: 'ph.ppmi.p2m', merchantTag: '28', bic: 'LAUIPHM2XXX' }))).toBe('maribank');
+		expect(qrBankOf(payQrPayload({ guid: 'ph.ppmi.p2m', merchantTag: '28', bic: 'LAUIPHM2XXX' })).institution?.id).toBe('maribank');
 	});
 
 	it('ignores case and padding in the BIC', () => {
-		expect(qrProviderOf(payQrPayload({ bic: ' gxchphm2xxx ' }))).toBe('gcash');
+		expect(qrBankOf(payQrPayload({ bic: ' gxchphm2xxx ' }))).toMatchObject({ bic: 'GXCHPHM2XXX', institution: { id: 'gcash' } });
+	});
+
+	it('keeps the BIC of a bank it does not know, and names no bank', () => {
+		expect(qrBankOf(payQrPayload({ bic: 'BOPIPHMMXXX' }))).toEqual({ bic: 'BOPIPHMMXXX', institution: null });
+	});
+
+	it('does not take a sub-tag 01 that is not shaped like a BIC', () => {
+		// PayNow puts a proxy type in sub-tag 01.
+		expect(qrBankOf(payQrPayload({ country: 'SG', currency: '702', guid: 'SG.PAYNOW', merchantTag: '26', bic: '2' }))).toEqual({
+			bic: null,
+			institution: null
+		});
+	});
+
+	it('knows Maya only when the GUID names it', () => {
+		expect(qrBankOf(payQrPayload({ guid: 'com.paymaya', bic: 'BOPIPHMMXXX' })).institution?.id).toBe('maya');
+		expect(qrBankOf(payQrPayload({ bic: 'PAPHPHM1XXX' })).institution).toBeNull();
+	});
+
+	it('never reads the bank from the account holder name', () => {
+		expect(qrBankOf(payQrPayload({ name: 'MAYA SANTOS', bic: 'BOPIPHMMXXX' })).institution).toBeNull();
+		expect(qrBankOf(payQrPayload({ name: 'GCASH STORE', bic: 'BOPIPHMMXXX' })).institution).toBeNull();
 	});
 
 	it.each([
-		['an unknown bank', { bic: 'BOPIPHMMXXX' }],
 		['no BIC', { bic: '' }],
 		['a foreign code', { country: 'SG', currency: '702', guid: 'sg.paynow', merchantTag: '26', bic: '' }]
-	])('names no provider for %s', (_name, parts) => {
-		expect(qrProviderOf(payQrPayload(parts))).toBeNull();
+	])('names no bank for %s', (_name, parts) => {
+		expect(qrBankOf(payQrPayload(parts))).toEqual({ bic: null, institution: null });
 	});
 
-	it('names no provider for text that is not a payment code', () => {
-		expect(qrProviderOf('https://example.com/')).toBeNull();
-		expect(qrProviderOf('')).toBeNull();
+	it('names no bank for text that is not a payment code', () => {
+		expect(qrBankOf('https://example.com/')).toEqual({ bic: null, institution: null });
+		expect(qrBankOf('')).toEqual({ bic: null, institution: null });
 	});
 });

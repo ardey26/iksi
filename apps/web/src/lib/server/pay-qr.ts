@@ -5,7 +5,7 @@
 // What this cannot prove: that the code belongs to the profile owner. The
 // decoded merchant name (tag 59) is shown to payers as the safeguard.
 
-import type { QrProvider } from '#lib/pay-methods.js';
+import { identifyInstitution, normalizeBic, type Institution, type QrAccount } from '#lib/pay-institutions.js';
 
 export type PayQrErrorCode = 'not_qr' | 'not_payment' | 'damaged' | 'malformed';
 
@@ -130,23 +130,29 @@ export function validatePayQr(text: string): PayQrResult {
 	};
 }
 
-/**
- * BICs (sub-tag 01 of a QR Ph merchant account) of the wallets with a logo.
- * Maya's is not confirmed, so a Maya QR is known only by the owner's choice.
- */
-const PROVIDER_BICS: Record<string, QrProvider> = {
-	GXCHPHM2XXX: 'gcash',
-	LAUIPHM2XXX: 'maribank'
-};
-
-/** The wallet a payment QR is for, from its BIC. Null when unknown or not a payment code. */
-export function qrProviderOf(payload: string): QrProvider | null {
-	const entries = parseTlv(payload);
-	if (!entries) return null;
-	for (const [tag, value] of entries) {
+/** The merchant account templates (tags 26–51) of a payload, in order. */
+function qrAccounts(payload: string): QrAccount[] {
+	const out: QrAccount[] = [];
+	for (const [tag, value] of parseTlv(payload) ?? []) {
 		if (!isMerchantTag(tag)) continue;
-		const bic = parseTlv(value)?.find(([t]) => t === '01')?.[1].trim().toUpperCase();
-		if (bic && PROVIDER_BICS[bic]) return PROVIDER_BICS[bic];
+		const sub = new Map(parseTlv(value) ?? []);
+		out.push({ guid: sub.get('00')?.trim() ?? '', bic: sub.get('01') ?? null });
 	}
-	return null;
+	return out;
+}
+
+export interface QrBank {
+	/** The BIC the QR states, normalised; the known bank's when there are several. */
+	bic: string | null;
+	/** The registry entry for the bank, when known. */
+	institution: Institution | null;
+}
+
+/** Which bank a payment QR is for, by the registry in #lib/pay-institutions. */
+export function qrBankOf(payload: string): QrBank {
+	const accounts = qrAccounts(payload);
+	const institution = identifyInstitution(accounts);
+	const bics = accounts.map((a) => normalizeBic(a.bic)).filter((b): b is string => b !== null);
+	const own = institution && bics.find((b) => identifyInstitution([{ guid: '', bic: b }])?.id === institution.id);
+	return { bic: own ?? bics[0] ?? null, institution };
 }

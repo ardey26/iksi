@@ -1,24 +1,26 @@
 // Building and editing a profile's payment methods. Nothing here touches the
 // media store: an uploaded QR image is decoded in memory and discarded.
 import {
+	MAX_METHOD_LABEL_LENGTH,
 	MAX_PAY_METHODS,
-	parseQrProvider,
+	parseMethodLabel,
 	PROVIDER_NAMES,
-	QR_PROVIDER_INFO,
 	type LinkMethod,
 	type PayMethod,
 	type PayProvider,
 	type PublicPayMethod,
-	type QrProvider
+	type QrMethod
 } from '#lib/pay-methods.js';
-import { PAY_QR_ERROR_TEXT, qrProviderOf, validatePayQr, type PayQrErrorCode } from './pay-qr';
+import { defaultQrLabel, FALLBACK_QR_LABEL, storedInstitution } from '#lib/pay-institutions.js';
+import { PAY_QR_ERROR_TEXT, qrBankOf, validatePayQr, type PayQr, type PayQrErrorCode } from './pay-qr';
 import { PAY_LINK_ERROR_TEXT, parsePayLink, type PayLinkErrorCode } from './pay-links';
 
-export type PayMethodErrorCode = PayQrErrorCode | PayLinkErrorCode | 'too_many' | 'duplicate';
+export type PayMethodErrorCode = PayQrErrorCode | PayLinkErrorCode | 'too_many' | 'duplicate' | 'bad_label';
 
 const LIST_ERROR_TEXT = {
 	too_many: `You can add up to ${MAX_PAY_METHODS} payment methods. Remove one to add another.`,
-	duplicate: 'That payment method is already on your profile.'
+	duplicate: 'That payment method is already on your profile.',
+	bad_label: `Names can be up to ${MAX_METHOD_LABEL_LENGTH} characters of plain text.`
 };
 
 export class PayMethodError extends Error {
@@ -31,19 +33,39 @@ export class PayMethodError extends Error {
 	}
 }
 
+/** What a stored method may carry over: the owner's name for it, and (from older versions) the bank it was saved as. */
+interface StoredQr {
+	label?: unknown;
+	institution?: unknown;
+	/** The wallet tile chosen in the version before the registry: gcash, maya, maribank or null. */
+	provider?: unknown;
+}
+
 /**
- * The QR's BIC decides when it is known. Real GCash and MariBank QRs always
- * carry theirs, so an unknown BIC with either chosen means another bank.
- * Maya's BIC is unconfirmed, so a Maya QR relies on the owner's choice.
+ * A QR method from a validated payload. The bank comes from the QR itself, by
+ * the registry; a stored bank only fills in where the QR cannot name one (see
+ * storedInstitution). The label is the owner's name for it, else the bank's.
  */
-const providerFor = (payload: string, chosen: QrProvider | null) =>
-	qrProviderOf(payload) ?? (chosen === 'maya' ? 'maya' : null);
+function qrMethod(id: string, qr: PayQr, stored: StoredQr = {}): QrMethod {
+	const { bic, institution: known } = qrBankOf(qr.payload);
+	const institution = known ?? storedInstitution(stored.institution) ?? storedInstitution(stored.provider);
+	// A stored fallback name is not the owner's choice: it gives way once the bank is known.
+	const own = parseMethodLabel(stored.label);
+	const label = own.ok && own.label && own.label !== FALLBACK_QR_LABEL ? own.label : defaultQrLabel(institution);
+	return {
+		id,
+		kind: 'qr',
+		...(bic ? { bic } : {}),
+		...(institution ? { institution: institution.id } : {}),
+		label,
+		...qr
+	};
+}
 
 /**
  * An EMVCo payload becomes a QR method; an allow-listed https link (as Venmo or Cash App QR codes hold) a link method.
- * `chosen` is the wallet tile the owner tapped, null for the generic upload.
  */
-export async function methodFromImage(input: Uint8Array, newId: () => string, chosen: QrProvider | null = null): Promise<PayMethod> {
+export async function methodFromImage(input: Uint8Array, newId: () => string): Promise<PayMethod> {
 	// Loaded here so pages that only read methods never load sharp and jsQR.
 	const { decodeQrImage } = await import('./pay-qr-image');
 	const text = (await decodeQrImage(input))?.trim();
@@ -51,7 +73,7 @@ export async function methodFromImage(input: Uint8Array, newId: () => string, ch
 	if (text.startsWith('000201')) {
 		const r = validatePayQr(text);
 		if (!r.ok) throw new PayMethodError(r.code);
-		return { id: newId(), kind: 'qr', provider: providerFor(text, chosen), ...r.value };
+		return qrMethod(newId(), r.value);
 	}
 	const link = parsePayLink(text);
 	if (!link.ok) throw new PayMethodError('not_payment');
@@ -92,19 +114,27 @@ export function reorderPayMethods(list: PayMethod[], order: unknown): PayMethod[
 	return out;
 }
 
-/** Tells the owner when the QR turned out not to be for the wallet tile they tapped. */
-export function providerNotice(chosen: QrProvider | null, method: PayMethod): string | null {
-	if (!chosen || method.kind !== 'qr' || method.provider === chosen) return null;
-	if (!method.provider) return `This isn't a ${QR_PROVIDER_INFO[chosen].name} QR. Saved as a bank QR.`;
-	const name = QR_PROVIDER_INFO[method.provider].name;
-	return `This is a ${name} QR. Saved as ${name}.`;
+/**
+ * Gives a QR method the owner's own name; an empty name puts the default back.
+ * Null when no QR method has that id. Throws for a name that is not plain text
+ * of up to 24 characters.
+ */
+export function renamePayMethod(list: PayMethod[], id: string, raw: unknown): PayMethod[] | null {
+	const i = list.findIndex((m) => m.id === id && m.kind === 'qr');
+	if (i < 0) return null;
+	const r = parseMethodLabel(raw);
+	if (!r.ok) throw new PayMethodError('bad_label');
+	const { id: _id, payload, name, city, country, currency, institution } = list[i] as QrMethod;
+	const next = [...list];
+	next[i] = qrMethod(id, { payload, name, city, country, currency }, { label: r.label, institution });
+	return next;
 }
 
-/** Methods as the public page may show them: everything but the QR payload. */
+/** Methods as the public page may show them: everything but the QR payload (and the BIC, which payers do not need). */
 export function publicPayMethods(list: PayMethod[]): PublicPayMethod[] {
 	return list.map((m) => {
 		if (m.kind === 'link') return m;
-		const { payload: _payload, ...rest } = m;
+		const { payload: _payload, bic: _bic, ...rest } = m;
 		return rest;
 	});
 }
@@ -122,7 +152,7 @@ export function readPayMethods(raw: unknown): PayMethod[] {
 		if (!m || typeof m !== 'object' || !isText(m.id)) continue;
 		if (m.kind === 'qr' && isText(m.payload)) {
 			const r = validatePayQr(m.payload);
-			if (r.ok) out.push({ id: m.id, kind: 'qr', provider: providerFor(r.value.payload, parseQrProvider(m.provider)), ...r.value });
+			if (r.ok) out.push(qrMethod(m.id, r.value, m));
 		} else if (m.kind === 'link' && isText(m.url)) {
 			const r = parsePayLink(m.url);
 			if (r.ok && r.provider in PROVIDER_NAMES) {

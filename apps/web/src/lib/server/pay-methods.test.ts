@@ -3,26 +3,31 @@ import {
 	addPayMethod,
 	methodFromLink,
 	PayMethodError,
-	providerNotice,
 	publicPayMethods,
 	readPayMethods,
 	removePayMethod,
+	renamePayMethod,
 	reorderPayMethods
 } from './pay-methods';
 import type { LinkMethod, PayMethod, QrMethod } from '#lib/pay-methods.js';
 import { payQrPayload } from '../../test/pay-qr';
 
 const link = (id: string, url = `https://paypal.me/${id}`): LinkMethod => ({ id, kind: 'link', provider: 'paypal', url });
-const qr = (id: string, payload = payQrPayload(), provider: QrMethod['provider'] = 'gcash'): QrMethod => ({
+const qr = (id: string, payload = payQrPayload(), over: Partial<QrMethod> = {}): QrMethod => ({
 	id,
 	kind: 'qr',
-	provider,
+	bic: 'GXCHPHM2XXX',
+	institution: 'gcash',
+	label: 'GCash',
 	payload,
 	name: 'JUAN DELA CRUZ',
 	city: 'MANDALUYONG',
 	country: 'PH',
-	currency: 'PHP'
+	currency: 'PHP',
+	...over
 });
+const bank = (id: string) =>
+	qr(id, payQrPayload({ bic: 'BOPIPHMMXXX' }), { bic: 'BOPIPHMMXXX', institution: undefined, label: 'Bank QR' });
 
 function codeOf(fn: () => unknown) {
 	try {
@@ -90,36 +95,83 @@ describe('readPayMethods', () => {
 		expect(readPayMethods(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => link(id)))).toHaveLength(6);
 	});
 
-	it('reads a QR stored before providers were saved', () => {
-		const { provider: _p, ...old } = qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }));
-		expect(readPayMethods([old])).toEqual([{ ...old, provider: null }]);
+	it('names a QR of an unknown bank Bank QR, with no bank', () => {
+		const [m] = readPayMethods([bank('a')]) as QrMethod[];
+		expect(m.label).toBe('Bank QR');
+		expect(m).not.toHaveProperty('institution');
+		expect(m.bic).toBe('BOPIPHMMXXX');
 	});
 
-	it('names an old GCash QR by its BIC', () => {
-		const { provider: _p, ...old } = qr('a');
-		expect(readPayMethods([old])[0]).toMatchObject({ provider: 'gcash' });
+	it('keeps the name the owner gave a QR', () => {
+		expect(readPayMethods([qr('a', payQrPayload(), { label: 'Shop' })])[0]).toMatchObject({ label: 'Shop', institution: 'gcash' });
 	});
 
-	it('keeps a stored Maya choice when the BIC is unknown', () => {
-		const stored = qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'maya');
-		expect(readPayMethods([stored])[0]).toMatchObject({ provider: 'maya' });
+	it('names a QR by its bank once the registry learns it', () => {
+		// Stored when the bank was unknown, so its label was the fallback.
+		const stored = { ...bank('a'), payload: payQrPayload() };
+		expect(readPayMethods([stored])[0]).toMatchObject({ institution: 'gcash', label: 'GCash' });
 	});
 
-	it('trusts the BIC over a stored provider', () => {
-		const stored = qr('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), 'gcash');
-		expect(readPayMethods([stored])[0]).toMatchObject({ provider: 'maribank' });
+	it('replaces a stored label that is not a valid name', () => {
+		expect(readPayMethods([qr('a', payQrPayload(), { label: '<b>x</b>' })])[0]).toMatchObject({ label: 'GCash' });
+		expect(readPayMethods([qr('a', payQrPayload(), { label: 'x'.repeat(40) })])[0]).toMatchObject({ label: 'GCash' });
 	});
 
-	it('reads a stored GCash or MariBank choice with an unknown BIC as a bank QR', () => {
-		for (const provider of ['gcash', 'maribank'] as const) {
-			const stored = qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), provider);
-			expect(readPayMethods([stored])[0]).toMatchObject({ provider: null });
-		}
+	it('trusts the BIC over a stored bank', () => {
+		const stored = qr('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), { institution: 'gcash', label: 'GCash' });
+		expect(readPayMethods([stored])[0]).toMatchObject({ institution: 'maribank', bic: 'LAUIPHM2XXX' });
 	});
 
-	it('drops a stored provider it does not know', () => {
-		const stored = { ...qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' })), provider: 'bpi' };
-		expect(readPayMethods([stored])[0]).toMatchObject({ provider: null });
+	it('never takes a stored claim to a bank known by BIC', () => {
+		const stored = { ...bank('a'), institution: 'gcash' };
+		expect(readPayMethods([stored])[0]).not.toHaveProperty('institution');
+	});
+
+	describe('methods saved by the version with wallet tiles', () => {
+		// That version stored `provider` (gcash, maya, maribank or null) and no label, bic or institution.
+		const legacy = (id: string, payload: string, provider: string | null) => {
+			const { label: _l, bic: _b, institution: _i, ...rest } = qr(id, payload);
+			return { ...rest, provider };
+		};
+
+		it('reads a GCash QR as GCash, named GCash', () => {
+			const [m] = readPayMethods([legacy('a', payQrPayload(), 'gcash')]);
+			expect(m).toMatchObject({ institution: 'gcash', label: 'GCash', bic: 'GXCHPHM2XXX' });
+			expect(m).not.toHaveProperty('provider');
+		});
+
+		it('reads a QR stored before providers were saved by its BIC', () => {
+			expect(readPayMethods([legacy('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), undefined as any)])[0]).toMatchObject({
+				institution: 'maribank',
+				label: 'MariBank'
+			});
+		});
+
+		it('keeps a Maya choice the owner made, as the QR cannot prove or refute it', () => {
+			expect(readPayMethods([legacy('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'maya')])[0]).toMatchObject({
+				institution: 'maya',
+				label: 'Maya'
+			});
+		});
+
+		it('keeps Maya once saved again in the new shape', () => {
+			const once = readPayMethods([legacy('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'maya')]);
+			expect(readPayMethods(JSON.parse(JSON.stringify(once)))[0]).toMatchObject({ institution: 'maya', label: 'Maya' });
+		});
+
+		it('reads a GCash or MariBank choice the BIC does not back as a bank QR', () => {
+			for (const provider of ['gcash', 'maribank']) {
+				const [m] = readPayMethods([legacy('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), provider)]);
+				expect(m).toMatchObject({ label: 'Bank QR' });
+				expect(m).not.toHaveProperty('institution');
+			}
+		});
+
+		it('drops a provider it does not know', () => {
+			const [m] = readPayMethods([legacy('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'bpi')]);
+			expect(m).toMatchObject({ label: 'Bank QR' });
+			expect(m).not.toHaveProperty('institution');
+		});
 	});
 
 	it('drops a stored link that no longer passes the allow-list', () => {
@@ -153,27 +205,30 @@ describe('methodFromLink', () => {
 	});
 });
 
-describe('providerNotice', () => {
-	it.each([
-		['gcash', "This isn't a GCash QR. Saved as a bank QR."],
-		['maribank', "This isn't a MariBank QR. Saved as a bank QR."]
-	] as const)('says when a QR chosen as %s is from another bank', (chosen, text) => {
-		expect(providerNotice(chosen, qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), null))).toBe(text);
+describe('renamePayMethod', () => {
+	it('renames a QR', () => {
+		const out = renamePayMethod([qr('a'), bank('b')], 'b', '  Shop  QR ');
+		expect(out?.map((m) => (m.kind === 'qr' ? m.label : ''))).toEqual(['GCash', 'Shop QR']);
 	});
 
-	it('says when the QR is from another app than the one chosen', () => {
-		expect(providerNotice('gcash', qr('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), 'maribank'))).toBe(
-			'This is a MariBank QR. Saved as MariBank.'
-		);
+	it('puts the default name back for an empty name', () => {
+		expect(renamePayMethod([qr('a', payQrPayload(), { label: 'Shop' })], 'a', '')?.[0]).toMatchObject({ label: 'GCash' });
+		expect(renamePayMethod([{ ...bank('a'), label: 'Shop' }], 'a', ' ')?.[0]).toMatchObject({ label: 'Bank QR' });
 	});
 
 	it.each([
-		['the chosen app matches', 'gcash', qr('a')],
-		['nothing was chosen', null, qr('a')],
-		['Maya was chosen and the app is unknown', 'maya', qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'maya')],
-		['it is a link', 'gcash', link('a')]
-	] as const)('says nothing when %s', (_name, chosen, method) => {
-		expect(providerNotice(chosen, method)).toBeNull();
+		['more than 24 characters', 'x'.repeat(25)],
+		['markup', '<script>'],
+		['a line break', 'a\nb'],
+		['a non-text value', 5]
+	])('refuses a name with %s', (_name, label) => {
+		expect(codeOf(() => renamePayMethod([qr('a')], 'a', label))).toBe('bad_label');
+		expect(new PayMethodError('bad_label').message).toBe('Names can be up to 24 characters of plain text.');
+	});
+
+	it('returns null for an unknown id or a link', () => {
+		expect(renamePayMethod([qr('a')], 'zz', 'Shop')).toBeNull();
+		expect(renamePayMethod([link('a')], 'a', 'Shop')).toBeNull();
 	});
 });
 
@@ -197,7 +252,16 @@ describe('publicPayMethods', () => {
 	it('leaves out the QR payload, which can hold a mobile number', () => {
 		const out = publicPayMethods([qr('a'), link('b')]);
 		expect(out).toEqual([
-			{ id: 'a', kind: 'qr', provider: 'gcash', name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
+			{
+				id: 'a',
+				kind: 'qr',
+				institution: 'gcash',
+				label: 'GCash',
+				name: 'JUAN DELA CRUZ',
+				city: 'MANDALUYONG',
+				country: 'PH',
+				currency: 'PHP'
+			},
 			link('b')
 		]);
 		expect(JSON.stringify(out)).not.toContain('09171234567');

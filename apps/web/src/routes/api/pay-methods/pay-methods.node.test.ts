@@ -71,36 +71,34 @@ describe('POST /api/pay-methods: upload a QR image', () => {
 		expect(h.cacheDelete).toHaveBeenCalledWith('profile-7');
 	});
 
-	it('saves the app the owner chose with the QR', async () => {
-		const res = await upload(await qrPng(payQrPayload({ bic: 'MAYAPHXXXXX' })), 'maya');
+	it('names the QR by the bank its BIC identifies, and says which method was added', async () => {
+		const res = await upload(await qrPng(payQrPayload({ bic: 'LAUIPHM2XXX' })));
 		expect(res.status).toBe(200);
-		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: 'maya' })]);
-		expect((await res.json()).notice).toBeNull();
+		const [saved] = savedMethods();
+		expect(saved).toMatchObject({ kind: 'qr', bic: 'LAUIPHM2XXX', institution: 'maribank', label: 'MariBank' });
+		expect((await res.json()).added).toBe(saved.id);
 	});
 
-	it('saves the app the QR belongs to, and says so when it differs from the choice', async () => {
-		const res = await upload(await qrPng(payQrPayload({ bic: 'LAUIPHM2XXX' })), 'gcash');
-		expect(res.status).toBe(200);
-		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: 'maribank' })]);
-		expect((await res.json()).notice).toBe('This is a MariBank QR. Saved as MariBank.');
-	});
-
-	it('saves a GCash choice from another bank as a bank QR, and says so', async () => {
-		const res = await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })), 'gcash');
-		expect(res.status).toBe(200);
-		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);
-		expect((await res.json()).notice).toBe("This isn't a GCash QR. Saved as a bank QR.");
-	});
-
-	it('saves no app for an unknown bank uploaded without a choice', async () => {
+	it('calls a QR from an unknown bank Bank QR', async () => {
 		const res = await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })));
-		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);
 		expect(res.status).toBe(200);
+		const [saved] = savedMethods();
+		expect(saved).toMatchObject({ kind: 'qr', label: 'Bank QR' });
+		expect(saved).not.toHaveProperty('institution');
 	});
 
-	it('ignores an app choice it does not know', async () => {
-		await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })), 'bpi');
-		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);
+	it('ignores a bank chosen by an older dashboard', async () => {
+		await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })), 'maya');
+		expect(savedMethods()[0]).not.toHaveProperty('institution');
+	});
+
+	it('keeps the stored methods, in the new shape, when adding to an older list', async () => {
+		h.profile.payMethods = [{ id: 'old', kind: 'qr', provider: 'gcash', payload: payQrPayload(), name: 'X', city: null, country: 'PH', currency: 'PHP' }];
+		await upload(await qrPng(payQrPayload({ bic: 'LAUIPHM2XXX' })));
+		const [old, added] = savedMethods();
+		expect(old).toMatchObject({ id: 'old', institution: 'gcash', label: 'GCash' });
+		expect(old).not.toHaveProperty('provider');
+		expect(added).toMatchObject({ institution: 'maribank' });
 	});
 
 	it('stores a QR holding a Venmo link as a link method', async () => {
@@ -231,6 +229,56 @@ describe('PATCH /api/pay-methods', () => {
 		const res = await patch({ label: 'donate' });
 		expect(res.status).toBe(400);
 		expect(h.update).not.toHaveBeenCalled();
+	});
+});
+
+describe('PATCH /api/pay-methods: rename a QR', () => {
+	const qrs = () => [
+		{ id: 'q1', kind: 'qr', payload: payQrPayload(), name: 'X', city: null, country: 'PH', currency: 'PHP', label: 'GCash', institution: 'gcash' },
+		{ id: 'l1', kind: 'link', provider: 'kofi', url: 'https://ko-fi.com/ann' }
+	];
+	beforeEach(() => {
+		h.profile.payMethods = qrs();
+	});
+
+	it('saves the new name and clears the cached profile', async () => {
+		const res = await patch({ rename: { id: 'q1', label: ' Shop ' } });
+		expect(res.status).toBe(200);
+		expect(h.updateMany).toHaveBeenCalledWith({
+			where: { id: 3, updatedAt: UPDATED },
+			data: { payMethods: [expect.objectContaining({ id: 'q1', label: 'Shop', institution: 'gcash' }), expect.objectContaining({ id: 'l1' })] }
+		});
+		expect((await res.json()).methods[0].label).toBe('Shop');
+		expect(h.cacheDelete).toHaveBeenCalledWith('profile-7');
+	});
+
+	it('puts the bank name back for an empty name', async () => {
+		h.profile.payMethods = [{ ...qrs()[0], label: 'Shop' }];
+		await patch({ rename: { id: 'q1', label: '' } });
+		expect(savedMethods()[0].label).toBe('GCash');
+	});
+
+	it('refuses a name that is too long or not plain text', async () => {
+		for (const label of ['x'.repeat(25), '<b>Shop</b>']) {
+			const res = await patch({ rename: { id: 'q1', label } });
+			expect(res.status).toBe(400);
+			expect((await res.json()).error).toBe('Names can be up to 24 characters of plain text.');
+		}
+		expect(h.updateMany).not.toHaveBeenCalled();
+		expect(h.cacheDelete).not.toHaveBeenCalled();
+	});
+
+	it('is a 404 for an unknown method or a link', async () => {
+		expect((await patch({ rename: { id: 'nope', label: 'Shop' } })).status).toBe(404);
+		expect((await patch({ rename: { id: 'l1', label: 'Shop' } })).status).toBe(404);
+		expect((await patch({ rename: 'q1' })).status).toBe(404);
+		expect(h.updateMany).not.toHaveBeenCalled();
+	});
+
+	it('refuses when the profile changed since it was read', async () => {
+		h.updateMany.mockResolvedValue({ count: 0 });
+		expect((await patch({ rename: { id: 'q1', label: 'Shop' } })).status).toBe(409);
+		expect(h.cacheDelete).not.toHaveBeenCalled();
 	});
 });
 
