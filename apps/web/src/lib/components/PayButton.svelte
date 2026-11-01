@@ -3,12 +3,14 @@
   // (--bg, --surface, --border, --text-primary, --text-muted) it sits in.
   import { onDestroy, tick } from 'svelte';
   import QRCode from 'qrcode';
-  import { PAY_LABEL_TEXT, PROVIDER_NAMES, qrPlace, type PayLabel, type PayMethod } from '#lib/pay-methods.js';
+  import PayLogo from './PayLogo.svelte';
+  import { PAY_LABEL_TEXT, PROVIDER_NAMES, qrPlace, type PayLabel, type PublicPayMethod } from '#lib/pay-methods.js';
 
   export let handle: string;
   export let displayName: string;
   export let label: PayLabel = 'pay';
-  export let methods: PayMethod[] = [];
+  /** Display info only. QR payloads usually hold the owner's mobile number, so they stay out of the cached page. */
+  export let methods: PublicPayMethod[] = [];
 
   const QR_SIZE = 264;
 
@@ -17,6 +19,18 @@
   let trigger: HTMLButtonElement;
   // Rendered PNGs by method id; a missing entry is still rendering.
   let images: Record<string, { url: string; file: File | null }> = {};
+  // QR payloads by method id, fetched once when the sheet first opens.
+  let payloads: Record<string, string> | null = null;
+  let loading = false;
+  let loadFailed = false;
+
+  // With two or more methods a picker shows one at a time; the owner's first is the default.
+  let selected: string | undefined = methods[0]?.id;
+  $: if (!methods.some((m) => m.id === selected)) selected = methods[0]?.id;
+  $: picking = methods.length > 1;
+  $: shown = picking ? methods.filter((m) => m.id === selected) : methods;
+  $: cols = methods.length <= 3 ? methods.length : methods.length === 4 ? 2 : 3;
+  const pickName = (m: PublicPayMethod) => (m.kind === 'link' ? PROVIDER_NAMES[m.provider] : m.name || 'Bank QR');
 
   $: title = label === 'tip' ? `Send ${displayName} a tip` : `Pay ${displayName}`;
   $: fileName = `${handle}-payment-qr.png`;
@@ -31,12 +45,37 @@
     }
   }
 
+  async function load() {
+    if (loading || payloads || !methods.some((m) => m.kind === 'qr')) return;
+    loading = true;
+    loadFailed = false;
+    try {
+      const res = await fetch(`/api/@${encodeURIComponent(handle)}/pay`);
+      const body = res.ok ? await res.json() : null;
+      if (body && typeof body.payloads === 'object' && body.payloads) payloads = body.payloads;
+      else loadFailed = true;
+    } catch {
+      loadFailed = true;
+    }
+    loading = false;
+    await render();
+  }
+
+  function retry() {
+    payloads = null;
+    load();
+  }
+
+  // A QR whose payload did not arrive (the request failed, or the page is older than the owner's last change).
+  $: failed = (id: string) => loadFailed || (payloads !== null && !payloads[id]);
+
   async function render() {
     for (const m of methods) {
-      if (m.kind !== 'qr' || images[m.id]) continue;
+      const payload = payloads?.[m.id];
+      if (m.kind !== 'qr' || !payload || images[m.id]) continue;
       try {
         // Black on white with a full quiet zone: what payment apps scan most reliably.
-        const url = await QRCode.toDataURL(m.payload, {
+        const url = await QRCode.toDataURL(payload, {
           width: 1024,
           margin: 4,
           errorCorrectionLevel: 'M',
@@ -52,7 +91,7 @@
   async function show() {
     open = true;
     document.body.style.overflow = 'hidden';
-    render();
+    load();
     await tick();
     sheetEl?.focus();
   }
@@ -121,16 +160,41 @@
         </button>
       </header>
 
+      {#if picking}
+        <div class="pay-pick" role="radiogroup" aria-label="Payment method" style="--cols: {cols};">
+          {#each methods as m (m.id)}
+            <label class="pay-key">
+              <input type="radio" class="sr-only" name="pay-pick-{handle}" value={m.id} bind:group={selected} />
+              <span title={m.kind === 'qr' && m.provider ? undefined : pickName(m)}>
+                {#if m.kind === 'qr' && m.provider}
+                  <PayLogo provider={m.provider} size={28} />
+                {:else}
+                  <span class="pay-key-text">{pickName(m)}</span>
+                {/if}
+              </span>
+            </label>
+          {/each}
+        </div>
+      {/if}
+
       <ul class="pay-list">
-        {#each methods as m (m.id)}
+        {#each shown as m (m.id)}
           <li class="pay-item">
             {#if m.kind === 'qr'}
               <div class="qr-frame" style="width: {QR_SIZE}px;">
                 {#if images[m.id]}
                   <img src={images[m.id].url} alt="Payment QR for {m.name}" width={QR_SIZE} height={QR_SIZE} />
+                {:else if failed(m.id)}
+                  <div class="qr-failed" role="alert">
+                    <p>Could not load this QR.</p>
+                    <button type="button" class="qr-retry" on:click={retry}>Try again</button>
+                  </div>
                 {/if}
               </div>
-              <p class="pay-name">Pays to {m.name}</p>
+              <div class="pay-who">
+                {#if m.provider}<PayLogo provider={m.provider} size={28} />{/if}
+                <p class="pay-name">Pays to {m.name}</p>
+              </div>
               <p class="pay-meta">{qrPlace(m)}</p>
               <p class="pay-meta">Pays in {m.currency}</p>
               <div class="pay-action">
@@ -272,12 +336,86 @@
     border-radius: 12px;
   }
   .qr-frame img { display: block; width: 100%; height: 100%; }
+  /* The frame stays white in both themes, so its text is set dark. */
+  .qr-failed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 100%;
+    padding: 24px;
+    font-size: 14px;
+    color: #52525b;
+  }
+  .qr-retry {
+    min-height: 44px;
+    padding: 0 16px;
+    font: inherit;
+    font-weight: 500;
+    color: #18181b;
+    background-color: transparent;
+    border: 1px solid #d4d4d8;
+    border-radius: 9999px;
+    cursor: pointer;
+  }
+  .qr-retry:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
-  .pay-name {
+  .pay-who {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    max-width: 100%;
     margin-top: 16px;
+  }
+  .pay-name {
+    min-width: 0;
     font-size: 16px;
     font-weight: 600;
     overflow-wrap: anywhere;
+  }
+
+  /* Picker: one key per method, the chosen one outlined in the text color. */
+  .pay-pick {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .pay-key { display: flex; min-width: 0; cursor: pointer; }
+  .pay-key > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 48px;
+    padding: 0 10px;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+  }
+  .pay-key:hover > span { color: var(--text-primary); border-color: var(--text-muted); }
+  .pay-key input:checked + span {
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+    box-shadow: inset 0 0 0 1px var(--text-primary);
+  }
+  .pay-key input:focus-visible + span {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .pay-key-text {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .pay-meta {
     margin-top: 2px;
@@ -319,7 +457,8 @@
     .pay-sheet,
     .pay-backdrop { animation: none; }
     .pay-btn,
-    .pay-primary { transition: none; }
+    .pay-primary,
+    .pay-key > span { transition: none; }
     .pay-btn:active,
     .pay-primary:active { transform: none; }
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crc16, MAX_PAYLOAD_LENGTH, parseTlv, PAY_QR_ERROR_TEXT, validatePayQr } from './pay-qr';
+import { crc16, MAX_PAYLOAD_LENGTH, parseTlv, PAY_QR_ERROR_TEXT, qrProviderOf, validatePayQr } from './pay-qr';
 import { damagedPayload, payQrBody, payQrPayload, testCrc, tlv, withCrc } from '../../test/pay-qr';
 
 const codeOf = (text: string) => {
@@ -157,5 +157,36 @@ describe('validatePayQr', () => {
 		for (const code of ['not_qr', 'not_payment', 'damaged', 'malformed'] as const) {
 			expect(PAY_QR_ERROR_TEXT[code]).toMatch(/\.$/);
 		}
+	});
+});
+
+describe('qrProviderOf', () => {
+	it('knows a GCash QR by its BIC', () => {
+		expect(qrProviderOf(payQrPayload({ bic: 'GXCHPHM2XXX' }))).toBe('gcash');
+	});
+
+	it('knows a MariBank QR by its BIC', () => {
+		expect(qrProviderOf(payQrPayload({ bic: 'LAUIPHM2XXX' }))).toBe('maribank');
+	});
+
+	it('reads the BIC from a P2M template too', () => {
+		expect(qrProviderOf(payQrPayload({ guid: 'ph.ppmi.p2m', merchantTag: '28', bic: 'LAUIPHM2XXX' }))).toBe('maribank');
+	});
+
+	it('ignores case and padding in the BIC', () => {
+		expect(qrProviderOf(payQrPayload({ bic: ' gxchphm2xxx ' }))).toBe('gcash');
+	});
+
+	it.each([
+		['an unknown bank', { bic: 'BOPIPHMMXXX' }],
+		['no BIC', { bic: '' }],
+		['a foreign code', { country: 'SG', currency: '702', guid: 'sg.paynow', merchantTag: '26', bic: '' }]
+	])('names no provider for %s', (_name, parts) => {
+		expect(qrProviderOf(payQrPayload(parts))).toBeNull();
+	});
+
+	it('names no provider for text that is not a payment code', () => {
+		expect(qrProviderOf('https://example.com/')).toBeNull();
+		expect(qrProviderOf('')).toBeNull();
 	});
 });

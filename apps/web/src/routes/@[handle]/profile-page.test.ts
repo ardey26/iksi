@@ -138,10 +138,19 @@ describe('profile payment methods', () => {
     expect(((await run()) as any).pay).toEqual({
       label: 'tip',
       methods: [
-        { id: 'q1', kind: 'qr', payload, name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
+        { id: 'q1', kind: 'qr', provider: 'gcash', name: 'JUAN DELA CRUZ', city: 'MANDALUYONG', country: 'PH', currency: 'PHP' },
         kofi
       ]
     });
+  });
+
+  it('keeps the QR payload, which can hold a mobile number, out of the cached page', async () => {
+    const payload = payQrPayload();
+    findFirst.mockResolvedValue({ ...profile([]), payMethods: [{ id: 'q1', kind: 'qr', payload, provider: 'gcash' }] });
+    const text = JSON.stringify(await run());
+    expect(text).not.toContain(payload);
+    expect(text).not.toContain('09171234567');
+    expect(text).not.toContain('payload');
   });
 
   it('never shows a stored link that fails the allow-list', async () => {

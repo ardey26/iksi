@@ -227,6 +227,7 @@
     <section class="d-section" aria-labelledby="p-payments">
       <h2 class="d-title" id="p-payments">Payments</h2>
       <p class="d-desc">A button on your public page that shows how to pay you. Changes save right away. Payers see the name in your QR, so check that it is yours.</p>
+      <p class="d-desc">Your QR may include your mobile number. Anyone who opens Pay can see it.</p>
       <PaymentMethods methods={data.payments.methods} label={data.payments.label} />
     </section>
   {/if}

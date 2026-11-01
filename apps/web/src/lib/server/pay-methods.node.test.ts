@@ -25,12 +25,33 @@ describe('methodFromImage', () => {
 		expect(await methodFromImage(await qrPng(payload), newId)).toEqual({
 			id: 'id1',
 			kind: 'qr',
+			provider: 'gcash',
 			payload,
 			name: 'JUAN DELA CRUZ',
 			city: 'MANDALUYONG',
 			country: 'PH',
 			currency: 'PHP'
 		});
+	});
+
+	it('trusts the BIC over the app the owner chose', async () => {
+		const payload = payQrPayload({ bic: 'LAUIPHM2XXX' });
+		expect(await methodFromImage(await qrPng(payload), newId, 'gcash')).toMatchObject({ provider: 'maribank' });
+	});
+
+	it('keeps the chosen app when the BIC is unknown, as for Maya', async () => {
+		const payload = payQrPayload({ bic: 'MAYAPHXXXXX' });
+		expect(await methodFromImage(await qrPng(payload), newId, 'maya')).toMatchObject({ provider: 'maya' });
+	});
+
+	it.each(['gcash', 'maribank'] as const)('saves a %s choice with an unknown BIC as a bank QR', async (chosen) => {
+		const payload = payQrPayload({ bic: 'BOPIPHMMXXX' });
+		expect(await methodFromImage(await qrPng(payload), newId, chosen)).toMatchObject({ kind: 'qr', provider: null });
+	});
+
+	it('names no provider for an unknown BIC uploaded without choosing an app', async () => {
+		const payload = payQrPayload({ bic: 'BOPIPHMMXXX' });
+		expect(await methodFromImage(await qrPng(payload), newId)).toMatchObject({ kind: 'qr', provider: null });
 	});
 
 	it('accepts a Singapore payment QR with an arbitrary GUID', async () => {
