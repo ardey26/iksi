@@ -7,7 +7,7 @@
   async function copyPublicUrl() {
     if (!data.user.handle) return;
     try {
-      await navigator.clipboard.writeText(`https://iksi.app/@${data.user.handle}`);
+      await navigator.clipboard.writeText(`https://www.iksi.app/@${data.user.handle}`);
       copied = true;
       setTimeout(() => (copied = false), 1400);
     } catch {}

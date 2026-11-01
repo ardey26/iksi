@@ -7,7 +7,7 @@
   let avatarBroken = false;
   async function copyProfileUrl() {
     try {
-      await navigator.clipboard.writeText(`https://iksi.app/@${data.handle}`);
+      await navigator.clipboard.writeText(`https://www.iksi.app/@${data.handle}`);
       copied = true;
       setTimeout(() => (copied = false), 1400);
     } catch {}
@@ -122,8 +122,19 @@
   $: ogImageUrl = `https://www.iksi.app/api/@${data.handle}/og`;
   $: seoTitle = `${data.displayName} (@${data.handle}) — iksi`;
   $: seoDescription = data.bio
-    ? data.bio.replace(/\s+/g, ' ').trim().slice(0, 160)
+    ? clip(data.bio.replace(/\s+/g, ' ').trim(), 160)
     : `${data.displayName}'s links on iksi. Follow @${data.handle}.`;
+  // A profile with no bio and no live links is thin content: keep it out of the index.
+  // Mirrors the sitemap's filter in routes/sitemap.xml.
+  $: indexable = !!data.bio?.trim() || data.rows.some((r) => r.href);
+
+  /** Cuts at the last word boundary that fits, so a description never ends mid-word. */
+  function clip(s: string, max: number) {
+    if (s.length <= max) return s;
+    const cut = s.slice(0, max - 1);
+    const space = cut.lastIndexOf(' ');
+    return (space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s.,;:!?-]+$/, '') + '…';
+  }
 
   // Schema.org Person JSON-LD — gives Google structured info about this
   // profile so it can render richer results and understand identity.
@@ -137,16 +148,15 @@
     ...(data.bio ? { description: data.bio } : {}),
     ...(data.sameAs && data.sameAs.length ? { sameAs: data.sameAs } : {})
   };
-  $: personLdJson = JSON.stringify(personLd);
+  // Escape every `<` so a bio containing a closing script tag cannot break out of the JSON-LD block.
+  $: personLdJson = JSON.stringify(personLd).replace(/</g, '\\u003c');
 </script>
 
 <svelte:head>
   <title>{seoTitle}</title>
-  <meta name="title" content={seoTitle} />
   <meta name="description" content={seoDescription} />
   <meta name="author" content={data.displayName} />
-  <meta name="robots" content="index, follow" />
-  <meta name="language" content="English" />
+  <meta name="robots" content={indexable ? 'index, follow' : 'noindex, follow'} />
   <link rel="canonical" href={profileUrl} />
 
   <!-- Open Graph — dynamic per-user card (avatar + bio + @handle + iksi mark) -->
@@ -274,7 +284,7 @@
                      class="menu-item block px-4 py-2.5 text-sm transition-colors"
                      style="color: var(--text-primary);">Share on Facebook</a>
                   <div class="mx-4 my-1" style="border-top: 1px solid var(--border);"></div>
-                  <a href="https://iksi.app/" target="_blank" rel="noopener"
+                  <a href="https://www.iksi.app/" target="_blank" rel="noopener"
                      class="menu-item block px-4 py-2.5 text-sm transition-colors"
                      style="color: var(--text-muted);">Try iksi →</a>
                 </div>
@@ -297,7 +307,7 @@
     <div class="px-7 sm:px-8 pb-6 pt-2 text-center">
       <span class="text-sm" style="color: var(--text-muted);">
         {data.handle} shortens links with
-        <a href="https://iksi.app/" target="_blank" rel="noopener"
+        <a href="https://www.iksi.app/" target="_blank" rel="noopener"
            class="underline decoration-1 underline-offset-2 transition-colors hover:opacity-70"
            style="color: var(--text-primary);">iksi</a>
       </span>

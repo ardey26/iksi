@@ -5,38 +5,52 @@ let cache = null;
 let cacheExpires = 0;
 const CACHE_TTL = 15 * 60 * 1000; // 15 min
 
+const HEADERS = { 'Content-Type': 'application/xml', 'Cache-Control': 'public, max-age=3600' };
+
 function xmlEscape(s) {
 	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+const day = (d) => d.toISOString().split('T')[0];
+
 export async function GET() {
 	const now = Date.now();
-	if (cache && cacheExpires > now) {
-		return new Response(cache, {
-			headers: { 'Content-Type': 'application/xml', 'Cache-Control': 'public, max-age=3600' }
-		});
-	}
+	if (cache && cacheExpires > now) return new Response(cache, { headers: HEADERS });
 
-	const today = new Date().toISOString().split('T')[0];
-
-	// All claimed handles get their public profile URL in the sitemap so Google
-	// discovers and indexes them. Only claimed handles are actually reachable.
-	let handles = [];
+	// Only profiles with something on them: a bio or at least one live link.
+	// Empty profiles are thin content and render noindex (see @[handle]/+page.svelte).
+	let profiles = [];
 	try {
-		handles = await prisma.handle.findMany({
-			select: { handle: true, claimedAt: true },
-			orderBy: { claimedAt: 'desc' },
-			take: 50000 // sitemap spec cap is 50k URLs per file
+		profiles = await prisma.profile.findMany({
+			where: {
+				user: { handle: { isNot: null } },
+				OR: [
+					{ AND: [{ bio: { not: null } }, { NOT: { bio: '' } }] },
+					{ rows: { some: { enabled: true, quarantined: false, linkId: { not: null } } } }
+				]
+			},
+			select: {
+				updatedAt: true,
+				user: { select: { handle: { select: { handle: true } } } },
+				// Row changes don't touch Profile.updatedAt; the newest row counts as a change too.
+				rows: { select: { createdAt: true }, orderBy: { createdAt: 'desc' }, take: 1 }
+			},
+			orderBy: { updatedAt: 'desc' },
+			take: 49999 // sitemap spec cap is 50k URLs per file, minus the homepage
 		});
 	} catch (err) {
-		console.error('[sitemap] failed to load handles', err);
+		console.error('[sitemap] failed to load profiles', err);
 	}
 
-	const profileUrls = handles
-		.map((h) => {
-			const loc = `https://www.iksi.app/@${xmlEscape(h.handle)}`;
-			const lastmod = h.claimedAt.toISOString().split('T')[0];
-			return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
+	// Google ignores changefreq/priority and only trusts lastmod when it is accurate,
+	// so the homepage carries no lastmod rather than an always-today one.
+	const profileUrls = profiles
+		.filter((p) => p.user.handle)
+		.map((p) => {
+			const loc = `https://www.iksi.app/@${xmlEscape(p.user.handle.handle)}`;
+			const newestRow = p.rows[0]?.createdAt;
+			const lastmod = newestRow && newestRow > p.updatedAt ? newestRow : p.updatedAt;
+			return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${day(lastmod)}</lastmod>\n  </url>`;
 		})
 		.join('\n');
 
@@ -44,9 +58,6 @@ export async function GET() {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.iksi.app/</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
   </url>
 ${profileUrls}
 </urlset>`;
@@ -54,10 +65,5 @@ ${profileUrls}
 	cache = sitemap;
 	cacheExpires = now + CACHE_TTL;
 
-	return new Response(sitemap, {
-		headers: {
-			'Content-Type': 'application/xml',
-			'Cache-Control': 'public, max-age=3600'
-		}
-	});
+	return new Response(sitemap, { headers: HEADERS });
 }
