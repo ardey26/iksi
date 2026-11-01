@@ -47,12 +47,12 @@
   ];
 
   const TYPE = [
-    ['t-display', 'Display', '36/40 · 44/48 from 768 · 700 · -0.03em', 'Payments'],
-    ['t-title', 'Title', '20/26 · 600 · -0.015em', 'Link settings'],
-    ['t-body', 'Body', '15/22 · 400', 'People pick a method and pay you directly.'],
-    ['t-label', 'Label', '13/18 · 500', 'Destination'],
-    ['t-caption', 'Caption', '12/16 · 400', 'Updated 2 days ago'],
-    ['t-readout', 'Readout', '15/20 · 500 · tabular', '12,480 · 1,284 · 3.2%']
+    ['t-display', 'Display', '36/40, 44/48 from 768, 700, -0.03em', 'Payments'],
+    ['t-title', 'Title', '20/26, 600, -0.015em', 'Link settings'],
+    ['t-body', 'Body', '15/22, 400', 'People pick a method and pay you directly.'],
+    ['t-label', 'Label', '13/18, 500', 'Destination'],
+    ['t-caption', 'Caption', '12/16, 400', 'Updated 2 days ago'],
+    ['t-readout', 'Readout', '15/20, 500, tabular', '12,480 clicks, 3.2%']
   ];
 
   const VARIANTS = ['primary', 'secondary', 'ghost', 'danger'];
@@ -146,7 +146,7 @@
             <span class="t-label">Mono</span>
             <span class="t-caption t-faint">Short links and keys only</span>
           </div>
-          <span class="t-body t-mono type-sample">iksi.app/abc · iksi_ab12…</span>
+          <span class="t-body t-mono type-sample">iksi.app/abc and iksi_ab12…</span>
         </li>
       </List>
     </Paper>
@@ -205,7 +205,7 @@
 
   <Section title="Icon button" description="Always labelled; the label is also the tooltip.">
     <Stack gap={24}>
-      <Specimen label="Ghost · 32 and 40">
+      <Specimen label="Ghost, 32 and 40">
         <IconButton icon="copy" label="Copy" />
         <IconButton icon="settings" label="Settings" />
         <IconButton icon="more" label="More" />
@@ -221,7 +221,7 @@
       <Specimen label="Focus">
         <span class="g-focus"><IconButton icon="settings" label="Settings" /></span>
       </Specimen>
-      <Specimen label="Icons · 16 and 20 · 1.5px stroke">
+      <Specimen label="Icons, 16 and 20, 1.5px stroke">
         <div class="icons">
           {#each Object.keys(ICONS) as name (name)}
             <span class="icon-cell" title={name}><Icon {name} size={20} /><span class="t-caption t-faint">{name}</span></span>
@@ -271,7 +271,7 @@
         <Switch label="Disabled on" checked disabled />
         <span class="g-focus"><Switch label="Focused" checked /></span>
       </Specimen>
-      <Specimen label="Segmented · 40 and 32 · arrow keys move">
+      <Specimen label="Segmented, 40 and 32, arrow keys move">
         <Segmented
           label="Range"
           bind:value={seg.a}
@@ -292,7 +292,7 @@
           ]}
         />
       </Specimen>
-      <Specimen label="Segmented · full width, one option disabled">
+      <Specimen label="Segmented, full width, one option disabled">
         <div class="narrow">
           <Segmented
             full
@@ -331,7 +331,7 @@
         <Badge variant="error">Flagged</Badge>
         <Badge>1,284</Badge>
       </Specimen>
-      <Specimen label="Logo (no chip) and Monogram · 40 and 32">
+      <Specimen label="Logo (no chip) and Monogram, 40 and 32">
         <Logo src="/brands/gcash.svg" alt="GCash" />
         <Logo src="/brands/maya.svg" alt="Maya" />
         <Logo src="/brands/maribank.png" alt="MariBank" />
@@ -350,7 +350,7 @@
           <Monogram slot="leading" name="shop" />
           <svelte:fragment slot="meta">12,480</svelte:fragment>
         </Row>
-        <Row interactive subtitle="docs.google.com · Expires Oct 15">
+        <Row interactive subtitle="docs.google.com, expires Oct 15">
           <Monogram slot="leading" name="docs" />
           <span class="t-mono">iksi.app/q3</span>
           <svelte:fragment slot="meta">1,284</svelte:fragment>
@@ -366,7 +366,7 @@
             <IconButton icon="settings" label="Settings" />
           </svelte:fragment>
         </Row>
-        <Row muted title="iksi.app/old" subtitle="Disabled · 2 days ago">
+        <Row muted title="iksi.app/old" subtitle="Disabled 2 days ago">
           <Monogram slot="leading" name="old" />
           <svelte:fragment slot="meta">0</svelte:fragment>
         </Row>

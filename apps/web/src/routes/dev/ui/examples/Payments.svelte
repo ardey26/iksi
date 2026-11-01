@@ -26,7 +26,7 @@
     { id: 'gcash', name: 'GCash', detail: 'Pays to Maria Santos', logo: '/brands/gcash.svg' },
     { id: 'maya', name: 'Maya', detail: 'Pays to Maria Santos', logo: '/brands/maya.svg' },
     { id: 'maribank', name: 'MariBank', detail: 'Pays to Maria Santos', logo: '/brands/maribank.png' },
-    { id: 'bpi', name: 'BPI', detail: 'Pays to Maria Santos · Savings' },
+    { id: 'bpi', name: 'BPI', detail: 'Pays to Maria Santos, savings' },
     { id: 'paypal', name: 'PayPal', detail: 'paypal.me/mariasantos' }
   ];
 

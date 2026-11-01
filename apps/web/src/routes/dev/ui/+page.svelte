@@ -23,7 +23,7 @@
 </script>
 
 <svelte:head>
-  <title>UI kit · iksi</title>
+  <title>UI kit | iksi</title>
   <meta name="robots" content="noindex" />
 </svelte:head>
 
