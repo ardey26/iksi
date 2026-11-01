@@ -23,6 +23,8 @@ const MAX_BODY_BYTES = 16 * 1024;
 
 /** One-time links carry a secret, so their names are longer and harder to guess. */
 const ONE_TIME_SLUG_LENGTH = 10;
+import { API_KEY_RATE, authenticateApiKey, readBearer } from '#lib/server/api-keys.js';
+import { extensionPreflight, withExtensionCors } from '#lib/server/extension-cors.js';
 
 /** What anonymous dedupe needs to know about the row already holding a urlHash. */
 const DEDUPE_SELECT = {
@@ -142,7 +144,37 @@ async function createOneTime(input, customURL, uid) {
 	});
 }
 
-export const POST = async (event) => {
+const jsonError = (status, error, extra = {}) =>
+	new Response(JSON.stringify({ error, ...extra }), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+/**
+ * Who is shortening: an API key's owner, the signed-in user, or nobody.
+ * A request that sends an Authorization header is judged by that header
+ * alone. A bad or revoked key is refused, never treated as anonymous, and the
+ * session cookie is ignored.
+ */
+async function identify(request, cookies) {
+	const bearer = readBearer(request.headers.get('authorization'));
+	if (bearer.kind === 'none') return { uid: verifyUserSession(cookies.get('user_session')) };
+
+	const invalid = { response: jsonError(401, 'Invalid API key', { code: 'invalid_key' }) };
+	if (bearer.kind === 'bad') return invalid;
+	const key = await authenticateApiKey(bearer.key);
+	if (!key) return invalid;
+
+	const limit = await rateLimit(`apikey:${key.id}`, API_KEY_RATE.requests, API_KEY_RATE.windowMs);
+	if (!limit.allowed) return { response: jsonError(429, 'Too many requests for this key. Please wait a minute.') };
+	return { uid: key.userId };
+}
+
+export const OPTIONS = async ({ request }) => extensionPreflight(request);
+
+export const POST = async (event) => withExtensionCors(event.request, await shorten(event));
+
+const shorten = async (event) => {
 	const { request, cookies } = event;
 	try {
 		// Rate limiting
@@ -169,8 +201,11 @@ export const POST = async (event) => {
 			});
 		}
 
+		const who = await identify(request, cookies);
+		if (who.response) return who.response;
+		const uid = who.uid;
+
 		const { longURL, customURL, oneTime } = await request.json();
-		const uid = verifyUserSession(cookies.get('user_session'));
 
 		if (oneTime !== undefined) return await createOneTime(oneTime, customURL, uid);
 

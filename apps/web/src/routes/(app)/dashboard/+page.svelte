@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ApiKeys from '#lib/components/ApiKeys.svelte';
+
   export let data;
 
   $: publicUrl = data.user.handle ? `iksi.app/@${data.user.handle}` : null;
@@ -117,6 +119,13 @@
         </a>
       {/each}
     </nav>
+  </section>
+
+  <!-- SECTION: API keys -->
+  <section class="d-section" aria-labelledby="d-api-keys">
+    <h2 class="d-title" id="d-api-keys">API keys</h2>
+    <p class="d-desc">Keys let the iksi browser extension shorten links as you.</p>
+    <ApiKeys keys={data.apiKeys ?? []} />
   </section>
 </section>
 

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iksi</title>
+    <link rel="stylesheet" href="ui.css" />
+    <style>
+      body { width: 340px; }
+      main { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+      header { display: flex; align-items: center; justify-content: space-between; }
+      .page { display: flex; flex-direction: column; gap: 2px; min-height: 38px; }
+      .row { display: flex; gap: 8px; }
+      .row .field { flex: 1 1 auto; min-width: 0; }
+      .result { display: flex; align-items: center; height: var(--ctl); padding: 0 12px;
+                font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums;
+                background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+      #copy { min-width: 84px; }
+      #shorten { width: 100%; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="brand"><img src="../icons/icon-32.png" alt="" />iksi</span>
+        <button type="button" class="btn btn-text" id="options">Options</button>
+      </header>
+
+      <section id="no-key" hidden>
+        <p class="title">Add your key to start</p>
+        <p class="muted" style="margin-top: 4px">Create a key in your iksi dashboard, then paste it in the options.</p>
+        <button type="button" class="btn btn-primary" id="add-key" style="margin-top: 16px; width: 100%">Add key</button>
+      </section>
+
+      <section id="ready" hidden>
+        <div class="page">
+          <p class="title clip" id="page-title"></p>
+          <p class="muted clip" id="page-url"></p>
+        </div>
+        <div id="action" style="margin-top: 16px">
+          <button type="button" class="btn btn-primary" id="shorten">Shorten this page</button>
+        </div>
+        <div id="done" class="row" style="margin-top: 16px" hidden>
+          <output class="result field mono clip" id="short" aria-label="Short link"></output>
+          <button type="button" class="btn btn-secondary" id="copy">Copy</button>
+        </div>
+        <p class="status" id="status" role="status" style="margin-top: 8px"></p>
+      </section>
+    </main>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

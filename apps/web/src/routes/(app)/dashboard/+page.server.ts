@@ -1,8 +1,10 @@
 import type { PageServerLoad } from './$types';
+import { listApiKeys } from '#lib/server/api-keys.js';
 
 export const load: PageServerLoad = async ({ parent }) => {
   const { user } = await parent();
-  if (!user.handle || !user.profileId) return { user, stats: null };
+  const apiKeys = await listApiKeys(user.id);
+  if (!user.handle || !user.profileId) return { user, apiKeys, stats: null };
 
   // Stream: page shell renders immediately; the KPI numbers arrive when the DB responds.
   const stats = (async () => {
@@ -17,5 +19,5 @@ export const load: PageServerLoad = async ({ parent }) => {
     return { views, clicks, ctr: views > 0 ? clicks / views : 0 };
   })();
 
-  return { user, streamed: { stats } };
+  return { user, apiKeys, streamed: { stats } };
 };
