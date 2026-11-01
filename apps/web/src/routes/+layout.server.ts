@@ -1,6 +1,7 @@
 import type { LayoutServerLoad } from './$types';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
+import { mediaUrl } from '#lib/server/media-url.js';
 import { getCachedUser, setCachedUser, type CachedUserPayload } from '#lib/server/user-cache.js';
 
 // Public profile pages are edge-cached and identical for every viewer, so the
@@ -36,7 +37,7 @@ export const load: LayoutServerLoad = async ({ cookies, route }) => {
         handle: row.handle?.handle ?? null,
         profileId: row.profile?.id ?? null,
         displayName: row.profile?.displayName ?? null,
-        avatarUrl: row.profile?.avatarUrl ? normalizeAvatarUrl(row.profile.avatarUrl) : null
+        avatarUrl: row.profile?.avatarUrl ? mediaUrl(normalizeAvatarUrl(row.profile.avatarUrl)) : null
       }
     : null;
 

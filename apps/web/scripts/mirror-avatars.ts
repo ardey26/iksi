@@ -7,13 +7,16 @@ import { prisma } from '#lib/prisma.js';
 import { fetchImage, mirrorAvatars } from '../src/lib/server/mirror';
 import { prismaProfileMediaDb } from '../src/lib/server/profile-media';
 import { r2MediaStore } from '../src/lib/server/media-store';
+import { LEGACY_MEDIA_BASE, mediaBase } from '../src/lib/server/media-url';
 
 const dryRun = process.argv.includes('--dry-run');
-const cdn = process.env.MEDIA_BASE_URL || 'https://cdn.iksi.app';
 
 try {
 	const rows = await prisma.profile.findMany({
-		where: { avatarUrl: { not: null }, NOT: { avatarUrl: { startsWith: cdn } } },
+		where: {
+			avatarUrl: { not: null },
+			NOT: [{ avatarUrl: { startsWith: `${mediaBase()}/` } }, { avatarUrl: { startsWith: `${LEGACY_MEDIA_BASE}/` } }]
+		},
 		select: { id: true, userId: true, avatarUrl: true }
 	});
 	const profiles = rows.map((r) => ({

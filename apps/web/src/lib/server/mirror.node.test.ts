@@ -25,6 +25,7 @@ function setup(fetchImage: (url: string) => Promise<Uint8Array>, dryRun = false)
 	};
 	const store: MediaStore = {
 		put: vi.fn(async () => {}),
+		get: vi.fn(async () => null),
 		deletePrefix: vi.fn(async () => {}),
 		publicUrl: (k) => `https://cdn.iksi.app/${k}`
 	};
@@ -41,6 +42,26 @@ describe('mirrorAvatars', () => {
 		const r = await mirrorAvatars([p(1, 'https://cdn.iksi.app/u/1/avatar/x.400.webp')], deps);
 		expect(r).toEqual({ mirrored: 0, skipped: 1, failed: [] });
 		expect(deps.fetchImage).not.toHaveBeenCalled();
+	});
+
+	it('skips legacy cdn.iksi.app avatars after the base moves', async () => {
+		const saved = process.env.MEDIA_BASE_URL;
+		process.env.MEDIA_BASE_URL = 'https://www.iksi.app/media';
+		try {
+			const { deps } = setup(async () => png());
+			const r = await mirrorAvatars(
+				[
+					p(1, 'https://cdn.iksi.app/1/avatar/x.400.webp'),
+					p(2, 'https://www.iksi.app/media/2/avatar/y.400.webp')
+				],
+				deps
+			);
+			expect(r).toEqual({ mirrored: 0, skipped: 2, failed: [] });
+			expect(deps.fetchImage).not.toHaveBeenCalled();
+		} finally {
+			if (saved === undefined) delete process.env.MEDIA_BASE_URL;
+			else process.env.MEDIA_BASE_URL = saved;
+		}
 	});
 
 	it('mirrors a good avatar, writing objects and the row', async () => {

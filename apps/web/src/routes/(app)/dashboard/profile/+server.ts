@@ -9,6 +9,7 @@ import { invalidateUserCache } from '#lib/server/user-cache.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
 import { destinationsOf, isFlagged } from '#lib/server/link-record.js';
 import { r2MediaStore } from '#lib/server/media-store.js';
+import { mediaUrl } from '#lib/server/media-url.js';
 import { deleteMediaQuietly } from '#lib/server/profile-media.js';
 
 const THEMES = new Set(['dark', 'light', 'default', 'mono']);
@@ -77,8 +78,10 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
       if (accent && !HEX_RE.test(accent)) return json({ error: 'Accent must be #RRGGBB' }, { status: 400 });
 
       const submitted = typeof avatarUrl === 'string' ? avatarUrl.trim() : '';
-      // The stored CDN url means "unchanged": keep avatarKey so the objects survive.
-      const keepUploaded = !!p.avatarKey && submitted !== '' && submitted === p.avatarUrl;
+      // The stored upload url means "unchanged": keep avatarKey so the objects survive.
+      // Compared through mediaUrl because pages show a legacy cdn.iksi.app url on MEDIA_BASE_URL.
+      const keepUploaded =
+        !!p.avatarKey && submitted !== '' && mediaUrl(submitted) === mediaUrl(p.avatarUrl);
 
       let finalAvatarUrl: string | null = null;
       if (keepUploaded) {
@@ -97,7 +100,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
       await prisma.profile.update({ where: { id: p.id }, data });
       await deleteMediaQuietly(r2MediaStore(), oldKey);
       invalidateUserCache(uid);
-      return json({ ok: true, avatarUrl: finalAvatarUrl });
+      return json({ ok: true, avatarUrl: mediaUrl(finalAvatarUrl) });
     }
     case 'addRow': {
       const { linkId, title } = body;

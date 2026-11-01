@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
 	profile: {} as any,
@@ -33,6 +33,12 @@ function call(avatarUrl: string) {
 	} as any);
 }
 
+const savedBase = process.env.MEDIA_BASE_URL;
+afterEach(() => {
+	if (savedBase === undefined) delete process.env.MEDIA_BASE_URL;
+	else process.env.MEDIA_BASE_URL = savedBase;
+});
+
 beforeEach(() => {
 	vi.clearAllMocks();
 	h.profile = { id: 3, avatarUrl: CDN, avatarKey: '7/avatar/u1' };
@@ -44,6 +50,21 @@ describe('updateProfile media handling', () => {
 		const data = (h.update.mock.calls[0] as any)[0].data;
 		expect(data.avatarUrl).toBe(CDN);
 		expect('avatarKey' in data).toBe(false);
+		expect(h.deletePrefix).not.toHaveBeenCalled();
+	});
+	it('keeps avatarKey when the url arrives on MEDIA_BASE_URL', async () => {
+		process.env.MEDIA_BASE_URL = 'https://www.iksi.app/media';
+		const res = await call('https://www.iksi.app/media/7/avatar/u1.400.webp');
+		const data = (h.update.mock.calls[0] as any)[0].data;
+		expect(data.avatarUrl).toBe(CDN);
+		expect('avatarKey' in data).toBe(false);
+		expect(h.deletePrefix).not.toHaveBeenCalled();
+		expect((await res.json()).avatarUrl).toBe('https://www.iksi.app/media/7/avatar/u1.400.webp');
+	});
+	it('keeps avatarKey when a stale page submits the stored cdn url', async () => {
+		process.env.MEDIA_BASE_URL = 'https://www.iksi.app/media';
+		await call(CDN);
+		expect('avatarKey' in (h.update.mock.calls[0] as any)[0].data).toBe(false);
 		expect(h.deletePrefix).not.toHaveBeenCalled();
 	});
 	it('clears key and deletes when avatarUrl is empty', async () => {

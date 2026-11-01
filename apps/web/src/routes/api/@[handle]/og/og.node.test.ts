@@ -63,6 +63,26 @@ describe('og avatar', () => {
 		expect(b).toBeLessThan(60);
 	}, 30000);
 
+	it('fetches a stored cdn.iksi.app avatar from MEDIA_BASE_URL', async () => {
+		const saved = process.env.MEDIA_BASE_URL;
+		process.env.MEDIA_BASE_URL = 'https://www.iksi.app/media';
+		try {
+			h.avatarUrl = 'https://cdn.iksi.app/1/avatar/x.400.webp';
+			const bytes = await webp('#ff0000');
+			const fetchMock = vi.fn(async () => new Response(bytes, { headers: { 'content-type': 'image/webp' } }));
+			vi.stubGlobal('fetch', fetchMock);
+			const { data, info } = await render();
+			expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe('https://www.iksi.app/media/1/avatar/x.400.webp');
+			const [r, g, b] = pixel(data, info, 600, 200);
+			expect(r).toBeGreaterThan(200);
+			expect(g).toBeLessThan(60);
+			expect(b).toBeLessThan(60);
+		} finally {
+			if (saved === undefined) delete process.env.MEDIA_BASE_URL;
+			else process.env.MEDIA_BASE_URL = saved;
+		}
+	}, 30000);
+
 	it('falls back to initials and logs when the fetch fails', async () => {
 		h.avatarUrl = 'https://cdn.iksi.app/1/avatar/x.400.webp';
 		const err = vi.spyOn(console, 'error').mockImplementation(() => {});

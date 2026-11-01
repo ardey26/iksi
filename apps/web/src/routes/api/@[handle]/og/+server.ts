@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { ImageResponse } from '@vercel/og';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
+import { mediaBase, mediaUrl } from '#lib/server/media-url.js';
 
 // --- Color helpers: derive a soft palette from the user's accent + brightness ---
 
@@ -107,8 +108,7 @@ const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
 // @vercel/og (satori + resvg-wasm) accepts WebP but draws nothing, and every
 // uploaded avatar is WebP. Re-encode CDN avatars to PNG as a data URL.
 async function cdnAvatarDataUrl(url: string): Promise<string | null> {
-  const base = (process.env.MEDIA_BASE_URL ?? 'https://cdn.iksi.app').replace(/\/+$/, '');
-  if (!url.startsWith(`${base}/`)) return null;
+  if (!url.startsWith(`${mediaBase()}/`)) return null;
   const res = await fetch(url, { signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`avatar fetch failed: HTTP ${res.status}`);
   const declared = Number(res.headers.get('content-length'));
@@ -142,7 +142,8 @@ export const GET: RequestHandler = async ({ params }) => {
   let avatarSrc: string | null = null;
   if (p.avatarUrl) {
     try {
-      avatarSrc = (await cdnAvatarDataUrl(p.avatarUrl)) ?? normalizeAvatarUrl(p.avatarUrl);
+      const src = mediaUrl(p.avatarUrl);
+      avatarSrc = (await cdnAvatarDataUrl(src)) ?? normalizeAvatarUrl(src);
     } catch (err) {
       console.error('og: could not prepare CDN avatar, using initials', err);
     }

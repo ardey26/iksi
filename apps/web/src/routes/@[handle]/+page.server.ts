@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { decodeURL } from '#lib/server/crypto.js';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
+import { mediaUrl } from '#lib/server/media-url.js';
 import { tagProfile } from '#lib/server/profile-cache.js';
 
 // Popular social domains we recognize on row destinations — used to build
@@ -104,8 +105,8 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
     handle,
     displayName: p.displayName ?? `@${handle}`,
     bio: p.bio,
-    avatarUrl: p.avatarUrl ? normalizeAvatarUrl(p.avatarUrl) : null,
-    backgroundUrl: p.backgroundUrl ?? null,
+    avatarUrl: p.avatarUrl ? mediaUrl(normalizeAvatarUrl(p.avatarUrl)) : null,
+    backgroundUrl: mediaUrl(p.backgroundUrl ?? null),
     theme: p.theme,
     accent: p.accent,
     publicClicks: p.publicClicks,

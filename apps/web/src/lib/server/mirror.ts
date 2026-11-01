@@ -4,6 +4,7 @@ import { MAX_UPLOAD_BYTES, MediaError, processImage } from './media';
 import type { MediaStore } from './media-store';
 import { replaceMedia, type ProfileMediaDb } from './profile-media';
 import { normalizeAvatarUrl } from './avatar-url';
+import { mediaBase, mediaUrl } from './media-url';
 
 export interface MirrorReport {
 	mirrored: number;
@@ -64,10 +65,11 @@ export async function mirrorAvatars(
 	deps: MirrorDeps
 ): Promise<MirrorReport> {
 	const report: MirrorReport = { mirrored: 0, skipped: 0, failed: [] };
-	const cdn = process.env.MEDIA_BASE_URL || 'https://cdn.iksi.app';
+	const base = `${mediaBase()}/`;
 
 	for (const p of profiles) {
-		if (p.avatarUrl.startsWith(cdn)) {
+		// Legacy cdn.iksi.app avatars are already uploads, served from base via mediaUrl.
+		if (mediaUrl(p.avatarUrl).startsWith(base)) {
 			report.skipped++;
 			continue;
 		}
