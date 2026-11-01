@@ -1,8 +1,8 @@
 # Images in R2 runbook
 
-Avatars are uploaded to the `iksi-media` bucket and served from `https://cdn.iksi.app`. The one-time bucket, domain, token and env var setup lives in `infra/SETUP.md`; this file covers only what is specific to images.
+Avatars are uploaded to the `iksi-media` bucket and served from `https://cdn.iksi.app`. The bucket, domain, token and env vars are set up once beforehand; this file covers only what is specific to images.
 
-## 1. Prerequisites (see `infra/SETUP.md`)
+## 1. Prerequisites
 
 - Section 2.6: `iksi-media` bucket exists, `cdn.iksi.app` is connected, `r2.dev` stays **disabled**.
 - Section 2.7: the R2 token is scoped to `iksi-backups` and `iksi-media`.
@@ -14,7 +14,7 @@ Avatars are uploaded to the `iksi-media` bucket and served from `https://cdn.iks
 
 Vercel previews use the production database (there is no other), and `.github/workflows/deploy.yml` only runs `prisma migrate deploy` from `main`. A preview of this branch therefore errors on every route that selects the new `Profile` columns until the migration is applied. Apply it by hand first. This is safe: the columns are nullable and the code currently in production ignores them.
 
-Session-pooler URL from `infra/SETUP.md` section 3:
+Session-pooler URL (`DATABASE_URL` with port `5432` and without `?pgbouncer=true`):
 
 ```sh
 export DATABASE_URL='<DATABASE_SESSION_URL>' DIRECT_URL='<DATABASE_SESSION_URL>'
@@ -48,7 +48,7 @@ Then merge.
 
 ## 5. Mirror existing avatars (after verifying)
 
-Copies avatars hosted elsewhere into R2. Set these in your shell first (placeholders below; `DATABASE_SESSION_URL` is the session-pooler URL from `infra/SETUP.md` section 3). Do not paste the real values anywhere else.
+Copies avatars hosted elsewhere into R2. Set these in your shell first (placeholders below; `DATABASE_SESSION_URL` is the session-pooler URL). Do not paste the real values anywhere else.
 
 ```sh
 export DATABASE_URL='<DATABASE_SESSION_URL>'

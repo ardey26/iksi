@@ -11,7 +11,7 @@ export DATABASE_URL='<DATABASE_SESSION_URL>' DIRECT_URL='<DATABASE_SESSION_URL>'
 pnpm --filter @iksi/web exec prisma migrate deploy
 ```
 
-`DATABASE_SESSION_URL` is described in `infra/SETUP.md` section 3.
+`DATABASE_SESSION_URL` is `DATABASE_URL` with port `5432` and without `?pgbouncer=true`.
 
 **Settings saved in a preview change real links.** Use a throwaway link.
 

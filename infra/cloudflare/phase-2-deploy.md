@@ -5,7 +5,7 @@ Turns the pass-through Worker into one that answers redirects from KV (origin fa
 ## 1. Prerequisites
 
 - The Cloudflare cutover runbook (`README.md` in this folder) is complete and the pass-through Worker is live.
-- `infra/SETUP.md` is done, specifically:
+- The one-time setup is done, specifically:
   - Workers Paid (2.3)
   - KV namespace `iksi-links` (2.4)
   - Queues `iksi-clicks` and `iksi-clicks-dlq` (2.5)
@@ -15,7 +15,7 @@ Turns the pass-through Worker into one that answers redirects from KV (origin fa
 
 ## 2. Put the KV namespace ID in `wrangler.toml`
 
-The one manual step. On this branch, before it merges to `main`, replace `REPLACE_WITH_KV_ID` in `apps/redirect/wrangler.toml` with the ID from SETUP.md 2.4 and commit it. The ID is not secret. The merge triggers the Worker deploy; a deploy with the placeholder fails at the Worker step, after the web app has already deployed.
+The one manual step. On this branch, before it merges to `main`, replace `REPLACE_WITH_KV_ID` in `apps/redirect/wrangler.toml` with the `iksi-links` KV namespace ID and commit it. The ID is not secret. The merge triggers the Worker deploy; a deploy with the placeholder fails at the Worker step, after the web app has already deployed.
 
 ```sh
 grep -n "id = " apps/redirect/wrangler.toml   # no REPLACE_WITH_KV_ID left
@@ -27,7 +27,7 @@ Merge to `main`. After CI passes, `.github/workflows/deploy.yml` runs in the rig
 
 Watch it under GitHub → Actions → Deploy.
 
-Fallback, only when the workflow itself is broken. Run the same steps in the same order (migrations, web app, Worker). `DATABASE_SESSION_URL` is described in SETUP.md section 3.
+Fallback, only when the workflow itself is broken. Run the same steps in the same order (migrations, web app, Worker). `DATABASE_SESSION_URL` is `DATABASE_URL` with port `5432` and without `?pgbouncer=true`.
 
 ```sh
 # 1. Migrations (session pooler, port 5432)
