@@ -124,6 +124,7 @@
                 <Button size="sm" variant="ghost" id="pay-{m.id}-cancel" on:click={() => cancel(m)}>Cancel</Button>
                 <Button size="sm" variant="danger" on:click={() => remove(m)}>Remove</Button>
               {:else}
+                {#if m.id !== 'paypal'}<IconButton icon="edit" label="Rename {m.name}" on:click={() => toast(`Rename ${m.name}`)} />{/if}
                 <IconButton icon="trash" label="Remove {m.name}" variant="danger" id="pay-{m.id}-remove" on:click={() => ask(m)} />
               {/if}
             </svelte:fragment>

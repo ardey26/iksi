@@ -19,6 +19,7 @@
   import Link from 'lucide-svelte/icons/link';
   import Lock from 'lucide-svelte/icons/lock';
   import Moon from 'lucide-svelte/icons/moon';
+  import Pencil from 'lucide-svelte/icons/pencil';
   import Plus from 'lucide-svelte/icons/plus';
   import QrCode from 'lucide-svelte/icons/qr-code';
   import Search from 'lucide-svelte/icons/search';
@@ -37,6 +38,7 @@
     'chevron-right': ChevronRight,
     'clock': Clock,
     'copy': Copy,
+    'edit': Pencil,
     'external': ExternalLink,
     'eye': Eye,
     'eye-off': EyeOff,
