@@ -44,6 +44,11 @@ describe('methodFromImage', () => {
 		expect(await methodFromImage(await qrPng(payload), newId, 'maya')).toMatchObject({ provider: 'maya' });
 	});
 
+	it.each(['gcash', 'maribank'] as const)('saves a %s choice with an unknown BIC as a bank QR', async (chosen) => {
+		const payload = payQrPayload({ bic: 'BOPIPHMMXXX' });
+		expect(await methodFromImage(await qrPng(payload), newId, chosen)).toMatchObject({ kind: 'qr', provider: null });
+	});
+
 	it('names no provider for an unknown BIC uploaded without choosing an app', async () => {
 		const payload = payQrPayload({ bic: 'BOPIPHMMXXX' });
 		expect(await methodFromImage(await qrPng(payload), newId)).toMatchObject({ kind: 'qr', provider: null });

@@ -85,6 +85,13 @@ describe('POST /api/pay-methods: upload a QR image', () => {
 		expect((await res.json()).notice).toBe('This is a MariBank QR. Saved as MariBank.');
 	});
 
+	it('saves a GCash choice from another bank as a bank QR, and says so', async () => {
+		const res = await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })), 'gcash');
+		expect(res.status).toBe(200);
+		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);
+		expect((await res.json()).notice).toBe("This isn't a GCash QR. Saved as a bank QR.");
+	});
+
 	it('saves no app for an unknown bank uploaded without a choice', async () => {
 		const res = await upload(await qrPng(payQrPayload({ bic: 'BOPIPHMMXXX' })));
 		expect(savedMethods()).toEqual([expect.objectContaining({ kind: 'qr', provider: null })]);

@@ -31,8 +31,13 @@ export class PayMethodError extends Error {
 	}
 }
 
-/** The QR's BIC decides when it is known; otherwise the app the owner chose (always so for Maya). */
-const providerFor = (payload: string, chosen: QrProvider | null) => qrProviderOf(payload) ?? chosen;
+/**
+ * The QR's BIC decides when it is known. Real GCash and MariBank QRs always
+ * carry theirs, so an unknown BIC with either chosen means another bank.
+ * Maya's BIC is unconfirmed, so a Maya QR relies on the owner's choice.
+ */
+const providerFor = (payload: string, chosen: QrProvider | null) =>
+	qrProviderOf(payload) ?? (chosen === 'maya' ? 'maya' : null);
 
 /**
  * An EMVCo payload becomes a QR method; an allow-listed https link (as Venmo or Cash App QR codes hold) a link method.
@@ -87,9 +92,10 @@ export function reorderPayMethods(list: PayMethod[], order: unknown): PayMethod[
 	return out;
 }
 
-/** Tells the owner when the QR turned out to be for another wallet than the tile they tapped. */
+/** Tells the owner when the QR turned out not to be for the wallet tile they tapped. */
 export function providerNotice(chosen: QrProvider | null, method: PayMethod): string | null {
-	if (!chosen || method.kind !== 'qr' || !method.provider || method.provider === chosen) return null;
+	if (!chosen || method.kind !== 'qr' || method.provider === chosen) return null;
+	if (!method.provider) return `This isn't a ${QR_PROVIDER_INFO[chosen].name} QR. Saved as a bank QR.`;
 	const name = QR_PROVIDER_INFO[method.provider].name;
 	return `This is a ${name} QR. Saved as ${name}.`;
 }

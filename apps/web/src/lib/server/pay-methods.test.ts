@@ -110,6 +110,13 @@ describe('readPayMethods', () => {
 		expect(readPayMethods([stored])[0]).toMatchObject({ provider: 'maribank' });
 	});
 
+	it('reads a stored GCash or MariBank choice with an unknown BIC as a bank QR', () => {
+		for (const provider of ['gcash', 'maribank'] as const) {
+			const stored = qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), provider);
+			expect(readPayMethods([stored])[0]).toMatchObject({ provider: null });
+		}
+	});
+
 	it('drops a stored provider it does not know', () => {
 		const stored = { ...qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' })), provider: 'bpi' };
 		expect(readPayMethods([stored])[0]).toMatchObject({ provider: null });
@@ -147,6 +154,13 @@ describe('methodFromLink', () => {
 });
 
 describe('providerNotice', () => {
+	it.each([
+		['gcash', "This isn't a GCash QR. Saved as a bank QR."],
+		['maribank', "This isn't a MariBank QR. Saved as a bank QR."]
+	] as const)('says when a QR chosen as %s is from another bank', (chosen, text) => {
+		expect(providerNotice(chosen, qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), null))).toBe(text);
+	});
+
 	it('says when the QR is from another app than the one chosen', () => {
 		expect(providerNotice('gcash', qr('a', payQrPayload({ bic: 'LAUIPHM2XXX' }), 'maribank'))).toBe(
 			'This is a MariBank QR. Saved as MariBank.'
@@ -156,7 +170,7 @@ describe('providerNotice', () => {
 	it.each([
 		['the chosen app matches', 'gcash', qr('a')],
 		['nothing was chosen', null, qr('a')],
-		['the app is unknown', 'gcash', qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), null)],
+		['Maya was chosen and the app is unknown', 'maya', qr('a', payQrPayload({ bic: 'BOPIPHMMXXX' }), 'maya')],
 		['it is a link', 'gcash', link('a')]
 	] as const)('says nothing when %s', (_name, chosen, method) => {
 		expect(providerNotice(chosen, method)).toBeNull();
