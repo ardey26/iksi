@@ -32,6 +32,11 @@ describe('profile editor payments', () => {
     expect(screen.getByText('https://ko-fi.com/me')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Send a tip' })).toBeChecked();
   });
+
+  it('warns that a QR may show the mobile number to payers', () => {
+    render(Page, { props: { data: { ...data(), payments: { methods: [], label: 'pay' } } } });
+    expect(screen.getByText('Your QR may include your mobile number. Anyone who opens Pay can see it.')).toBeInTheDocument();
+  });
 });
 
 describe('profile editor upload sync', () => {
