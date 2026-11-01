@@ -145,7 +145,7 @@ describe('reserved custom names', () => {
     create.mockImplementation(async ({ data }: { data: { shortURL: string } }) => ({ shortURL: data.shortURL, settingsVersion: 0 }));
   });
 
-  it.each(['dashboard', 'api', 'login', 'logout', 'auth', 'admin', 'internal', '_app'])(
+  it.each(['dashboard', 'api', 'login', 'logout', 'auth', 'admin', 'internal', '_app', 'report', 'privacy'])(
     'refuses %s because the app owns that path',
     async (name) => {
       const r = await shorten({ longURL: URL_IN, customURL: name });

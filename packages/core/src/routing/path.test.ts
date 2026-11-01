@@ -20,6 +20,7 @@ test.each([
 	'/internal/resolve',
 	'/_edge/purge',
 	'/report',
+	'/privacy',
 	'/media/7/avatar/0b9f1c2e-3d4a-4b5c-8d6e-7f8091a2b3c4.400.webp'
 ])('reserved %s', (p) => expect(classifyPath(p)).toEqual({ kind: 'reserved' }));
 
@@ -28,6 +29,7 @@ test('reserved prefixes match on segment boundaries', () => {
 	expect(classifyPath('/mediax')).toEqual({ kind: 'slug', slug: 'mediax', mode: 'redirect' });
 	expect(classifyPath('/loginx')).toEqual({ kind: 'slug', slug: 'loginx', mode: 'redirect' });
 	expect(classifyPath('/reports')).toEqual({ kind: 'slug', slug: 'reports', mode: 'redirect' });
+	expect(classifyPath('/privacyx')).toEqual({ kind: 'slug', slug: 'privacyx', mode: 'redirect' });
 });
 
 test('/media reserves only its subtree, so a link named media still resolves', () => {
