@@ -23,7 +23,7 @@
       ]
     },
     {
-      "source": "/(favicon.png|favicon.svg|og-image.png|manifest.json)",
+      "source": "/(favicon.png|favicon.svg|icon-512.png|og-image.png|manifest.json)",
       "headers": [
         {
           "key": "Cache-Control",
