@@ -188,6 +188,21 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
+  /* Phones: every option is a 44px target. The default track grows by its
+     padding so each option is drawn 44px tall; the small one keeps its drawn
+     size and gets a 44px hit area, like the small Button. */
+  @media (max-width: 639px) {
+    .seg:not(.sm) { --h: calc(var(--control) + var(--pad) * 2); }
+    .sm .opt::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 44px;
+      transform: translateY(-50%);
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .ready .thumb,
     .opt { transition: none; }
