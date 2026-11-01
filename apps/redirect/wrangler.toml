@@ -15,7 +15,7 @@ ORIGIN_URL = "https://www.iksi.app"
 
 [[kv_namespaces]]
 binding = "LINKS"
-id = "REPLACE_WITH_KV_ID"
+id = "0bf0d92c44cf4fd997d4359696c91996"
 
 [[queues.producers]]
 binding = "CLICKS"
