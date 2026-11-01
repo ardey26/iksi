@@ -54,12 +54,19 @@ What the extension sends, and where:
 
 Nothing else is collected or sent. The extension does not read page content, browsing history or other tabs, and has no analytics. The page title shown in the popup stays on the device. The API key is kept in chrome.storage.sync (which Chrome syncs to the user's other browsers when Chrome sync is on) and is shown again only as its first characters.
 
+What iksi does with it on the server (see https://www.iksi.app/privacy):
+
+- The URL becomes the destination of a short link owned by the user's account. It is stored encrypted (AES-256-GCM), and it is sent to Google Safe Browsing to be checked for malware and phishing, like every iksi link.
+- The key is checked against its stored SHA-256 hash, and the key's last-used time is recorded (to the minute).
+- Like any web request, the shorten request reveals the user's IP address. iksi counts shorten requests per IP address for rate limiting, in a database counter that holds the IP address and is not deleted automatically at the moment. No IP address is stored with the link or its clicks.
+
 Privacy tab answers:
 
 - Data collected: Authentication information (the iksi API key), and Web history only in the narrow sense that the URL the user chooses to shorten is sent to iksi to make the short link.
-- Not collected: personally identifiable information, health, financial, personal communications, location, user activity, website content.
+- Location: the store counts IP address as location data. The extension does not read it, but iksi's server keeps the request's IP address in a rate-limit counter (see above), so declare Location too rather than risk an inaccurate disclosure.
+- Not collected: personally identifiable information, health, financial, personal communications, user activity, website content.
 - Certifications: the data is not sold to third parties; not used or transferred for purposes unrelated to the single purpose; not used or transferred to determine creditworthiness or for lending.
-- Privacy policy: required for an extension that handles authentication information. iksi has no /privacy page yet; publish one and link it here before submitting.
+- Privacy policy: https://www.iksi.app/privacy (its "API keys and the browser extension" section covers the extension). Required for an extension that handles authentication information.
 
 ## Screenshots to capture
 
