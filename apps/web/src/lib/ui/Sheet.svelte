@@ -203,15 +203,23 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  /* Phones: Cancel and the primary action share the row in two equal
+     columns. An action is never narrower than its label, so when the two
+     labels cannot fit side by side they wrap onto rows of their own. */
   .foot {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 16px 20px max(16px, env(safe-area-inset-bottom));
     background-color: var(--surface);
     border-top: 1px solid var(--border);
   }
-  .foot > :global(*) { width: 100%; }
+  .panel .foot > :global([data-ui]) {
+    flex: 1 1 0;
+    min-width: max-content;
+  }
+  /* Anything else (a status line) takes a row of its own. */
+  .panel .foot > :global(:not([data-ui])) { flex: 1 0 100%; }
 
   @media (min-width: 768px) {
     .panel {
@@ -227,11 +235,15 @@
     .head { padding: 24px 20px 16px 24px; }
     .body { padding: 4px 24px 24px; }
     .foot {
-      flex-direction: row;
+      flex-wrap: nowrap;
       justify-content: flex-end;
       padding: 16px 24px;
       border-radius: 0 0 var(--radius-sheet) var(--radius-sheet);
     }
-    .foot > :global(*) { width: auto; }
+    .panel .foot > :global([data-ui]) {
+      flex: none;
+      min-width: 0;
+    }
+    .panel .foot > :global(:not([data-ui])) { flex: 0 1 auto; }
   }
 </style>
