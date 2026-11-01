@@ -45,6 +45,7 @@
   );
   // On a profile subdomain `/` is the profile; iksi's home is on www.
   const home = $derived(appHref('/', page.url?.host ?? '', import.meta.env.DEV));
+  const privacy = $derived(appHref('/privacy', page.url?.host ?? '', import.meta.env.DEV));
 </script>
 
 <Interstitial icon={COPY.icon} title={COPY.title} description={COPY.body}>
@@ -56,6 +57,7 @@
   </div>
   <svelte:fragment slot="below">
     {#if page.url}<a href={reportHref(page.url, import.meta.env.DEV)}>Report this link</a>{/if}
+    <a href={privacy}>Privacy</a>
   </svelte:fragment>
 </Interstitial>
 

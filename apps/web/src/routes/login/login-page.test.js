@@ -53,9 +53,10 @@ describe('login page', () => {
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('links back home', () => {
+  it('links back home and to the privacy policy', () => {
     render(Login, { props: { form: null } });
     expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
   });
 
   it('shows an action error as an alert', () => {

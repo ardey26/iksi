@@ -131,6 +131,12 @@ describe('public markup has no middle dots', () => {
     noDots();
   });
 
+  it('report page links to the privacy policy', () => {
+    page.url = new URL('https://www.iksi.app/report');
+    const { container } = render(ReportPage, { data: { link: '' }, form: null });
+    expect(container.querySelector('a[href="/privacy#reports"]')?.textContent).toBe('Privacy');
+  });
+
   it('privacy page', () => {
     page.url = new URL('https://www.iksi.app/privacy');
     render(PrivacyPage);

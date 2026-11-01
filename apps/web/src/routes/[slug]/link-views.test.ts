@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, cleanup } from '@testing-library/svelte';
 
 const page = vi.hoisted(() => ({
   status: 404,
@@ -80,8 +80,8 @@ describe('+page.svelte preview', () => {
     const { container } = render(LinkPage, { data: { ...base, destination: null, flagged: 'malware' }, form: null } as never);
     expect(container.textContent).toContain('malware');
     expect(container.textContent).toContain('example.com');
-    // Only home and the report form: nothing that leads to the destination.
-    expect(container.querySelector('a:not([href="/"]):not([href^="/report?"])')).toBeNull();
+    // Only home, the report form and the privacy policy: nothing that leads to the destination.
+    expect(container.querySelector('a:not([href="/"]):not([href^="/report?"]):not([href="/privacy"])')).toBeNull();
   });
 
   it('a preview of a link under review says so and has no Continue', () => {
@@ -96,6 +96,20 @@ describe('+page.svelte preview', () => {
     page.url = new URL('https://www.iksi.app/AbC+');
     const { container } = render(LinkPage, { data: base, form: null } as never);
     expect(container.querySelector('a[href="/report?link=iksi.app%2FAbC"]')?.textContent).toBe('Report this link');
+  });
+
+  it('link pages and notices link to the privacy policy, on www from a subdomain', () => {
+    page.url = new URL('https://www.iksi.app/AbC+');
+    const { container } = render(LinkPage, { data: base, form: null } as never);
+    expect(container.querySelector('a[href="/privacy"]')?.textContent).toBe('Privacy');
+    cleanup();
+    page.url = new URL('https://andre.iksi.app/sale+');
+    const sub = render(LinkPage, { data: base, form: null } as never);
+    expect(sub.container.querySelector('a[href="https://www.iksi.app/privacy"]')?.textContent).toBe('Privacy');
+    cleanup();
+    page.url = new URL('https://www.iksi.app/AbC');
+    const notice = renderError(410, { message: 'x', view: 'expired' });
+    expect(notice.container.querySelector('a[href="/privacy"]')?.textContent).toBe('Privacy');
   });
 
   it('the password page links to the report form too', () => {

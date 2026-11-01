@@ -96,6 +96,9 @@
         <Button type="submit" variant="primary" size="lg" full loading={submitting}>Send report</Button>
       </form>
     </Paper>
+    <p class="foot t-caption t-faint">
+      What we keep from a report, and for how long: <a href="/privacy#reports">Privacy</a>
+    </p>
   </Container>
 {/if}
 
@@ -109,6 +112,28 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .foot {
+    margin: 16px 0 0;
+    text-align: center;
+  }
+  /* A quiet text link, like the interstitial footer line. 44px tall to tap. */
+  .foot a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: -14px 0;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    border-radius: 4px;
+    transition: color var(--duration-normal) var(--ease-out);
+  }
+  .foot a:hover { color: var(--text-muted); }
+  .foot a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .trap {
     position: absolute;

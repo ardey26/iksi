@@ -8,6 +8,7 @@
   import { PASSWORD_MAX } from '#lib/password-limits.js';
   import { copyToClipboard } from '#lib/utils/clipboard.js';
   import { reportHref } from '#lib/report.js';
+  import { appHref } from '#lib/subdomains.js';
 
   let { data, form } = $props();
 
@@ -117,6 +118,7 @@
 {#snippet shared()}
   <span>Shared with iksi</span>
   <a href={reportHref(page.url, import.meta.env.DEV)}>Report this link</a>
+  <a href={appHref('/privacy', page.url.host, import.meta.env.DEV)}>Privacy</a>
 {/snippet}
 
 {#if revealed !== null}

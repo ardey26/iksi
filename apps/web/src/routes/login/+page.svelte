@@ -15,6 +15,7 @@
   let pending: 'twitter' | 'google' | null = null;
 
   $: home = appHref('/', page.url?.host ?? '', import.meta.env.DEV);
+  $: privacy = appHref('/privacy', page.url?.host ?? '', import.meta.env.DEV);
 </script>
 
 <svelte:head><title>Sign in | iksi</title></svelte:head>
@@ -50,7 +51,10 @@
     <p class="status t-label" role={form?.error ? 'alert' : undefined}>{form?.error ?? ''}</p>
   </div>
 
-  <a slot="below" class="home" href={home}>Back to home</a>
+  <svelte:fragment slot="below">
+    <a href={home}>Back to home</a>
+    <a href={privacy}>Privacy</a>
+  </svelte:fragment>
 </Interstitial>
 
 <style>
@@ -64,19 +68,5 @@
     margin: 0;
     text-align: center;
     color: var(--error);
-  }
-  .home {
-    color: var(--text-muted);
-    text-decoration: none;
-    font-size: 13px;
-    line-height: 18px;
-    font-weight: 500;
-    padding: 12px 8px;
-    border-radius: var(--radius-control);
-  }
-  .home:hover { color: var(--text-primary); }
-  .home:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 0;
   }
 </style>
