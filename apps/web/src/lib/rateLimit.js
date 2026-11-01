@@ -48,15 +48,21 @@ export async function rateLimit(identifier, maxRequests = 10, windowMs = 60000) 
 	}
 }
 
-// Cleanup old rate limit entries (run periodically via cron or on cold start)
-export async function cleanupRateLimits() {
-	try {
-		await prisma.rateLimit.deleteMany({
-			where: {
-				resetAt: { lt: new Date() }
-			}
-		});
-	} catch (error) {
-		console.error('Rate limit cleanup error:', error);
-	}
+/** How long a counter is kept after its window ends before the daily cleanup deletes it. */
+export const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Deletes rate-limit counters (RateLimit and HandleClaimRateLimit) whose
+ * window ended more than RATE_LIMIT_RETENTION_MS ago. Run daily by the
+ * expire-secrets cron. An expired counter already acts as no counter, so this
+ * never changes a limit; it only stops the rows piling up. Throws on a
+ * database error so the cron run shows as failed.
+ */
+export async function cleanupRateLimits(now = Date.now()) {
+	const before = new Date(now - RATE_LIMIT_RETENTION_MS);
+	const [rateLimits, handleClaims] = await Promise.all([
+		prisma.rateLimit.deleteMany({ where: { resetAt: { lt: before } } }),
+		prisma.handleClaimRateLimit.deleteMany({ where: { resetAt: { lt: before } } })
+	]);
+	return { rateLimits: rateLimits.count, handleClaims: handleClaims.count };
 }
