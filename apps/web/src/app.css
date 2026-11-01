@@ -132,19 +132,6 @@ html[data-theme-switching] :is(div, span, p, input, button, svg, circle, rect, p
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Focus glow effect */
-.glow-accent {
-  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 15%, transparent);
-}
-
-.glow-accent-intense {
-  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-.glow-error {
-  box-shadow: 0 0 20px color-mix(in srgb, var(--error) 15%, transparent);
-}
-
 /* Shake animation for errors */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -156,16 +143,6 @@ html[data-theme-switching] :is(div, span, p, input, button, svg, circle, rect, p
 
 .shake {
   animation: shake var(--duration-slow) var(--ease-out);
-}
-
-/* Fade animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.fade-in {
-  animation: fadeIn var(--duration-slow) var(--ease-out) forwards;
 }
 
 /* Spinner */
