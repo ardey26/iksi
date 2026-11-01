@@ -13,6 +13,8 @@ const link = (id, extra = {}) => ({
 const renderPage = (links) => render(Page, { props: { data: { user: { handle: null }, links } } });
 const gear = () => screen.getByRole('button', { name: 'Link settings' });
 const sheet = () => screen.queryByRole('dialog', { name: 'Link settings' });
+// Svelte sets inert as a DOM property; browsers reflect it to the attribute, jsdom does not.
+const inertPage = () => screen.getByRole('heading', { name: 'Links' }).closest('section').inert === true;
 
 describe('links page settings sheet', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -26,8 +28,12 @@ describe('links page settings sheet', () => {
     renderPage([link(1, { settings })]);
     expect(sheet()).toBeNull();
     expect(gear()).toHaveAttribute('aria-expanded', 'false');
+    expect(inertPage()).toBe(false);
     await fireEvent.click(gear());
     const dialog = sheet();
+    // The page behind the sheet is inert while it is open.
+    expect(inertPage()).toBe(true);
+    expect(dialog.closest('section')).toBeNull();
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(within(dialog).getByText('iksi.app/s1')).toBeInTheDocument();
@@ -45,6 +51,7 @@ describe('links page settings sheet', () => {
     expect(sheet()).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(button));
     expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(inertPage()).toBe(false);
   });
 
   it('closes on backdrop click and on the close button', async () => {
