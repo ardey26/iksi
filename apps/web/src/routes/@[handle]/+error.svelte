@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { appHref } from '#lib/subdomains.js';
 
   const missing = $derived(page.status === 404);
 </script>
@@ -15,6 +16,6 @@
   <div class="text-center space-y-2">
     <h1 class="text-lg font-medium">{page.status}</h1>
     <p class="text-sm" style="color: var(--text-muted);">{missing ? 'This handle does not exist.' : 'Try again in a moment.'}</p>
-    <a href="/" class="text-sm underline" style="color: var(--accent);">Back to iksi</a>
+    <a href={appHref('/', page.url.host, import.meta.env.DEV)} class="text-sm underline" style="color: var(--accent);">Back to iksi</a>
   </div>
 </div>

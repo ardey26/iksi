@@ -6,6 +6,9 @@ import { mediaUrl } from '#lib/server/media-url.js';
 import { tagProfile } from '#lib/server/profile-cache.js';
 import { publicPayMethods, readPayMethods } from '#lib/server/pay-methods.js';
 import { payLabelOf } from '#lib/pay-methods.js';
+import { subdomainsEnabled } from '#lib/server/subdomains.js';
+import { subdomainHandleOf } from '#lib/subdomains.js';
+import { CANONICAL_HOST, parseScopedSlug } from '@iksi/core';
 
 // Popular social domains we recognize on row destinations — used to build
 // Schema.org `sameAs` entries so Google can associate the profile with the
@@ -28,7 +31,19 @@ function extractSameAs(destinations: (string | null)[]): string[] {
 // returns user: null for this route). 60s fresh, 10min stale-while-revalidate.
 const CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=600';
 
-export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
+/**
+ * Where a row's short link points. On the handle's subdomain a bare `/<slug>`
+ * would be read as one of the owner's names, so the owner's names go by path
+ * and every other link goes to iksi.app.
+ */
+function rowHref(shortURL: string, query: string, handle: string, onSubdomain: boolean): string {
+  if (!onSubdomain) return `/${shortURL}${query}`;
+  const scoped = parseScopedSlug(shortURL);
+  if (scoped && scoped.handle === handle) return `/${scoped.name}${query}`;
+  return `https://${CANONICAL_HOST}/${shortURL}${query}`;
+}
+
+export const load: PageServerLoad = async ({ params, url, request, setHeaders }) => {
   const raw = params.handle;
   const handle = (raw.startsWith('@') ? raw.slice(1) : raw).toLowerCase();
 
@@ -92,11 +107,13 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
     )
   );
 
+  // Each host is its own CDN copy, so host-dependent hrefs are safe to cache.
+  const onSubdomain = subdomainHandleOf((url ?? new URL(request.url)).host, import.meta.env.DEV) === handle;
   const rows = visible.map((r) => ({
     id: r.id,
     title: r.title,
     shortURL: r.link?.shortURL ?? null,
-    href: r.link ? `/${r.link.shortURL}?s=profile&p=${p.id}&r=${r.id}` : null,
+    href: r.link ? rowHref(r.link.shortURL, `?s=profile&p=${p.id}&r=${r.id}`, handle, onSubdomain) : null,
     clicks: p.publicClicks && r.link ? r.link.clickCount : null
   }));
 
@@ -129,6 +146,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
     publicClicks: p.publicClicks,
     rows,
     sameAs,
-    pay
+    pay,
+    subdomains: subdomainsEnabled()
   };
 };

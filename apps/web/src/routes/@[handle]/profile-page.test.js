@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent } from '@testing-library/svelte';
 import Page from './+page.svelte';
 
 const base = {
@@ -70,5 +70,46 @@ describe('public profile Pay button', () => {
   it('shows no Pay button without payment methods', () => {
     const { queryByRole } = render(Page, { data: { ...base, backgroundUrl: null, pay: null } });
     expect(queryByRole('button', { name: /^(Pay|Send a tip)$/ })).toBeNull();
+  });
+});
+
+describe('profile canonical and share URL', () => {
+  const head = (data) => {
+    document.head.innerHTML = '';
+    const view = render(Page, { data: { ...base, backgroundUrl: null, ...data } });
+    return {
+      canonical: document.head.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+      ogUrl: document.head.querySelector('meta[property="og:url"]')?.getAttribute('content'),
+      ld: JSON.parse(document.head.querySelector('script[type="application/ld+json"]')?.textContent ?? '{}'),
+      view
+    };
+  };
+
+  it('uses www/@handle while subdomains are off', () => {
+    const { canonical, ogUrl, ld, view } = head({ subdomains: false });
+    expect(canonical).toBe('https://www.iksi.app/@ann');
+    expect(ogUrl).toBe('https://www.iksi.app/@ann');
+    expect(ld.url).toBe('https://www.iksi.app/@ann');
+    expect(view.container.textContent).toContain('iksi.app/@ann');
+  });
+
+  it('uses the subdomain when on', () => {
+    const { canonical, ogUrl, ld, view } = head({ subdomains: true });
+    expect(canonical).toBe('https://ann.iksi.app/');
+    expect(ogUrl).toBe('https://ann.iksi.app/');
+    expect(ld.url).toBe('https://ann.iksi.app/');
+    expect(view.container.textContent).toContain('ann.iksi.app');
+  });
+
+  it('copies the same URL the canonical uses', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { view } = head({ subdomains: true });
+    await fireEvent.click(view.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith('https://ann.iksi.app/');
+  });
+
+  it('keeps www/@handle for a handle that cannot be a hostname', () => {
+    expect(head({ handle: 'a_b', subdomains: true }).canonical).toBe('https://www.iksi.app/@a_b');
   });
 });

@@ -4,6 +4,7 @@
   import UserMenu from '#lib/components/UserMenu.svelte';
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
+  import { appHref, subdomainHandleOf } from '#lib/subdomains.js';
 
   let { data, children } = $props();
 
@@ -55,10 +56,12 @@
         noindex: false
       };
     }
+    // On andre.iksi.app the page lives at that host, not at www.
+    const origin = subdomainHandleOf(host, import.meta.env.DEV) ? `https://${host}` : 'https://www.iksi.app';
     return {
       title: 'iksi — free URL shortener',
       description: 'iksi turns long URLs into clean, shareable short links in seconds.',
-      canonical: `https://www.iksi.app${pathname}`,
+      canonical: `${origin}${pathname}`,
       ogImage: 'https://www.iksi.app/og-image.png',
       structuredData: null,
       noindex: true
@@ -69,7 +72,11 @@
   const isAdminSurface = $derived(page.url.host === 'admin.iksi.app' || page.url.host === 'admin.localhost' || page.url.host.startsWith('admin.localhost:') || page.url.pathname.startsWith('/admin'));
   const onLoginPage = $derived(page.url.pathname === '/login');
   // Only /@handle itself: /@handle/name is a short link and keeps the site chrome.
-  const isProfilePage = $derived(isProfilePath(page.url.pathname));
+  // By route too: on andre.iksi.app the profile is at `/`.
+  const isProfilePage = $derived(page.route?.id === '/@[handle]' || isProfilePath(page.url.pathname));
+  // App links leave a profile subdomain for www, where the session cookie is.
+  const home = $derived(appHref('/', page.url.host, import.meta.env.DEV));
+  const signIn = $derived(appHref('/login', page.url.host, import.meta.env.DEV));
   const isDashboard = $derived(isDashboardPath(page.url.pathname));
   // Public homepage + login use a full-height centered layout.
   // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
@@ -110,7 +117,7 @@
     <!-- Brand mark: top-left -->
 
     <a
-      href="/"
+      href={home}
       class="fixed top-6 left-6 z-50 flex items-center gap-2 hover:opacity-70 transition-opacity"
     >
       <svg
@@ -140,7 +147,7 @@
         {#if data?.user}
           <UserMenu user={data.user} />
         {:else}
-          <a href="/login" class="text-sm hover:opacity-70 transition-opacity" style="color: var(--text-muted);">Sign in</a>
+          <a href={signIn} class="text-sm hover:opacity-70 transition-opacity" style="color: var(--text-muted);">Sign in</a>
         {/if}
       </div>
     {/if}

@@ -167,3 +167,54 @@ describe('profile payment methods', () => {
     expect(findFirst.mock.calls[0][0].select).toMatchObject({ payMethods: true, payLabel: true });
   });
 });
+
+describe('profile on its subdomain', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  const scoped = (id: number, name: string) => ({ ...link(id, 'https://example.com'), shortURL: `@ann/${name}` });
+  const rows = () =>
+    profile([
+      { id: 1, title: 'Global', link: link(1, 'https://example.com') },
+      { id: 2, title: 'Scoped', link: scoped(2, 'sale') }
+    ]);
+
+  const at = (href: string, setHeaders: (h: Record<string, string>) => void = () => {}) =>
+    load({
+      params: { handle: 'ann' },
+      url: new URL(href),
+      request: new Request(href),
+      setHeaders
+    } as never) as Promise<{ rows: { href: string }[]; subdomains: boolean }>;
+
+  it('is cached and tagged by owner like on www, so a purge clears this copy too', async () => {
+    vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
+    findFirst.mockResolvedValue(rows());
+    const headers: Record<string, string> = {};
+    await at('https://ann.iksi.app/', (h) => Object.assign(headers, h));
+    expect(tagProfile).toHaveBeenCalledWith(42);
+    expect(headers['cache-control']).toBe('public, s-maxage=60, stale-while-revalidate=600');
+  });
+
+  it('links its own names by path and global links to iksi.app, which the subdomain would misread', async () => {
+    vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
+    findFirst.mockResolvedValue(rows());
+    const data = await at('https://ann.iksi.app/');
+    expect(data.rows.map((r) => r.href)).toEqual([
+      'https://iksi.app/s1?s=profile&p=1&r=1',
+      '/sale?s=profile&p=1&r=2'
+    ]);
+  });
+
+  it('keeps relative links on www', async () => {
+    findFirst.mockResolvedValue(rows());
+    const data = await at('https://www.iksi.app/@ann');
+    expect(data.rows.map((r) => r.href)).toEqual(['/s1?s=profile&p=1&r=1', '/@ann/sale?s=profile&p=1&r=2']);
+  });
+
+  it('tells the page whether subdomains are on', async () => {
+    findFirst.mockResolvedValue(rows());
+    expect((await at('https://www.iksi.app/@ann')).subdomains).toBe(false);
+    vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
+    expect((await at('https://www.iksi.app/@ann')).subdomains).toBe(true);
+  });
+});

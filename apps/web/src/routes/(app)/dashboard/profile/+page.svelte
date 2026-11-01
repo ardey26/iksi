@@ -2,6 +2,7 @@
   import { invalidateAll } from '$app/navigation';
   import ImageUpload from '#lib/components/ImageUpload.svelte';
   import PaymentMethods from '#lib/components/PaymentMethods.svelte';
+  import { profileLabel } from '#lib/subdomains.js';
 
   export let data;
 
@@ -302,7 +303,7 @@
           {/if}
           <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold tracking-tight leading-tight truncate" style="color: var(--p-text);">{previewName}</div>
-            <div class="text-xs mt-0.5 truncate" style="color: var(--p-accent-text);">iksi.app/@{previewHandle}</div>
+            <div class="text-xs mt-0.5 truncate" style="color: var(--p-accent-text);">{profileLabel(previewHandle, !!data.subdomains)}</div>
           </div>
           <span class="px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
                 style="background: var(--p-text); color: var(--p-bg);">Copy</span>

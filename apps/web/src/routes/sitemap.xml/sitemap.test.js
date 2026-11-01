@@ -1,0 +1,31 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+
+const findMany = vi.hoisted(() => vi.fn());
+vi.mock('#lib/prisma.js', () => ({ prisma: { profile: { findMany } } }));
+
+const day = new Date('2026-10-01T00:00:00Z');
+const profile = (handle) => ({ updatedAt: day, user: { handle: { handle } }, rows: [] });
+
+// The route caches the sitemap in memory, so each case loads it fresh.
+async function sitemap() {
+  vi.resetModules();
+  const { GET } = await import('./+server.js');
+  return (await GET()).text();
+}
+
+afterEach(() => vi.unstubAllEnvs());
+
+describe('sitemap profile URLs', () => {
+  it('lists www/@handle while subdomains are off', async () => {
+    findMany.mockResolvedValue([profile('ann')]);
+    expect(await sitemap()).toContain('<loc>https://www.iksi.app/@ann</loc>');
+  });
+
+  it('lists the canonical subdomain when on, and www/@handle for a handle without one', async () => {
+    vi.stubEnv('SUBDOMAINS_ENABLED', 'true');
+    findMany.mockResolvedValue([profile('ann'), profile('a_b')]);
+    const xml = await sitemap();
+    expect(xml).toContain('<loc>https://ann.iksi.app/</loc>');
+    expect(xml).toContain('<loc>https://www.iksi.app/@a_b</loc>');
+  });
+});

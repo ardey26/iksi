@@ -95,3 +95,16 @@ export function handleSubdomainReport(handles: Iterable<string>): { reserved: st
   }
   return { reserved, noSubdomain };
 }
+
+/**
+ * An app link (home, sign in, dashboard) as seen from `host`. A subdomain
+ * serves only its profile and has no session, so app links go to www there.
+ */
+export function appHref(path: string, host: string, dev = false): string {
+  return subdomainHandleOf(host, dev) ? `${WWW_ORIGIN}${path}` : path;
+}
+
+/** A link to a profile from inside the app: the subdomain when it has one, else the www path. */
+export function profileHref(handle: string, subdomains: boolean): string {
+  return subdomains && hasSubdomain(handle) ? profileUrl(handle, true) : `/@${handle}`;
+}

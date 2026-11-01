@@ -1,15 +1,17 @@
 <script lang="ts">
   import ApiKeys from '#lib/components/ApiKeys.svelte';
+  import { profileHref, profileLabel, profileUrl } from '#lib/subdomains.js';
 
   export let data;
 
-  $: publicUrl = data.user.handle ? `iksi.app/@${data.user.handle}` : null;
+  $: subdomains = !!data.subdomains;
+  $: publicUrl = data.user.handle ? profileLabel(data.user.handle, subdomains) : null;
 
   let copied = false;
   async function copyPublicUrl() {
     if (!data.user.handle) return;
     try {
-      await navigator.clipboard.writeText(`https://www.iksi.app/@${data.user.handle}`);
+      await navigator.clipboard.writeText(profileUrl(data.user.handle, subdomains));
       copied = true;
       setTimeout(() => (copied = false), 1400);
     } catch {}
@@ -27,7 +29,7 @@
     {#if publicUrl}
       <div class="flex items-baseline gap-3 flex-wrap">
         <a
-          href={`/@${data.user.handle}`}
+          href={profileHref(data.user.handle, subdomains)}
           target="_blank"
           rel="noopener"
           class="text-3xl font-semibold tracking-tight hover:opacity-70 transition-opacity"
@@ -77,7 +79,7 @@
       {:then s}
         {#if s.views === 0}
           <p class="stats empty">
-            No one's stopped by yet. Share <span style="color: var(--text-primary);">iksi.app/@{data.user.handle}</span> to get traffic.
+            No one's stopped by yet. Share <span style="color: var(--text-primary);">{publicUrl}</span> to get traffic.
           </p>
         {:else}
           <div class="stats">

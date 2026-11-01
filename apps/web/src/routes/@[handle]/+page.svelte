@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import PayButton from '#lib/components/PayButton.svelte';
+  import { profileLabel, profileUrl as profileUrlOf } from '#lib/subdomains.js';
 
   export let data;
 
@@ -8,7 +9,7 @@
   let avatarBroken = false;
   async function copyProfileUrl() {
     try {
-      await navigator.clipboard.writeText(`https://www.iksi.app/@${data.handle}`);
+      await navigator.clipboard.writeText(profileUrl);
       copied = true;
       setTimeout(() => (copied = false), 1400);
     } catch {}
@@ -119,7 +120,8 @@
   $: bgStyle = bgUrl ? ` background: var(--bg) url("${bgUrl}") center / cover no-repeat fixed;` : ' background: var(--bg);';
 
   // Canonical URL and derived SEO strings for the head.
-  $: profileUrl = `https://www.iksi.app/@${data.handle}`;
+  // <handle>.iksi.app once subdomains are on, www/@handle until then.
+  $: profileUrl = profileUrlOf(data.handle, !!data.subdomains);
   $: ogImageUrl = `https://www.iksi.app/api/@${data.handle}/og`;
   $: seoTitle = `${data.displayName} (@${data.handle}) — iksi`;
   $: seoDescription = data.bio
@@ -213,7 +215,7 @@
       <div class="flex-1 min-w-0">
         <h1 class="text-2xl font-semibold tracking-tight leading-tight truncate"
             style="color: var(--text-primary);">{data.displayName}</h1>
-        <p class="text-sm mt-1 truncate" style="color: var(--accent-text);">iksi.app/@{data.handle}</p>
+        <p class="text-sm mt-1 truncate" style="color: var(--accent-text);">{profileLabel(data.handle, !!data.subdomains)}</p>
       </div>
 
       <button

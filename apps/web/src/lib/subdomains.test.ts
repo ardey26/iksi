@@ -7,7 +7,9 @@ import {
   routedPathname,
   subdomainHandleOf,
   subdomainReroute,
-  handleSubdomainReport
+  handleSubdomainReport,
+  appHref,
+  profileHref
 } from './subdomains';
 
 const at = (host: string, path: string) => new URL(`https://${host}${path}`);
@@ -142,5 +144,25 @@ describe('handleSubdomainReport', () => {
     const copy = [...handles];
     expect(handleSubdomainReport(handles)).toEqual({ reserved: ['blog', 'staging'], noSubdomain: ['my_handle', '-dash'] });
     expect(handles).toEqual(copy);
+  });
+});
+
+describe('appHref', () => {
+  it('points app links at www from a subdomain, where the session cookie lives', () => {
+    expect(appHref('/login', 'andre.iksi.app')).toBe('https://www.iksi.app/login');
+    expect(appHref('/', 'andre.iksi.app')).toBe('https://www.iksi.app/');
+  });
+  it('stays relative everywhere else', () => {
+    expect(appHref('/login', 'www.iksi.app')).toBe('/login');
+    expect(appHref('/dashboard', 'admin.iksi.app')).toBe('/dashboard');
+    expect(appHref('/', 'localhost:5174')).toBe('/');
+  });
+});
+
+describe('profileHref', () => {
+  it('links the subdomain when on, and the www path otherwise', () => {
+    expect(profileHref('andre', true)).toBe('https://andre.iksi.app/');
+    expect(profileHref('andre', false)).toBe('/@andre');
+    expect(profileHref('my_handle', true)).toBe('/@my_handle');
   });
 });
