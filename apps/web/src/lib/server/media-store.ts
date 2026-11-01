@@ -2,10 +2,25 @@
 // Objects are content-addressed by key and never mutated, so they are cached
 // as immutable for a year. Env is read at call time so tests and runtime
 // config changes take effect without a reload.
-import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+	DeleteObjectsCommand,
+	GetObjectCommand,
+	ListObjectsV2Command,
+	PutObjectCommand,
+	S3Client
+} from '@aws-sdk/client-s3';
+import { mediaBase } from './media-url';
+
+export interface MediaObject {
+	body: ReadableStream<Uint8Array>;
+	contentType: string | undefined;
+	contentLength?: number;
+}
 
 export interface MediaStore {
 	put(key: string, body: Uint8Array, contentType: string): Promise<void>;
+	// Null when no object has this key.
+	get(key: string): Promise<MediaObject | null>;
 	// Deletes every object whose key starts with prefix.
 	deletePrefix(prefix: string): Promise<void>;
 	publicUrl(key: string): string;
@@ -14,6 +29,11 @@ export interface MediaStore {
 const CACHE_CONTROL = 'public, max-age=31536000, immutable';
 // DeleteObjects accepts at most 1000 keys per request, matching list page size.
 const DELETE_BATCH = 1000;
+
+function isNotFound(err: unknown): boolean {
+	const e = err as { name?: string; $metadata?: { httpStatusCode?: number } } | null;
+	return e?.name === 'NoSuchKey' || e?.$metadata?.httpStatusCode === 404;
+}
 
 export function createR2Client(): S3Client {
 	return new S3Client({
@@ -47,6 +67,21 @@ export function r2MediaStore(client?: S3Client): MediaStore {
 			);
 		},
 
+		async get(key) {
+			try {
+				const res = await getClient().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+				if (!res.Body) return null;
+				return {
+					body: res.Body.transformToWebStream() as ReadableStream<Uint8Array>,
+					contentType: res.ContentType,
+					contentLength: res.ContentLength
+				};
+			} catch (err) {
+				if (isNotFound(err)) return null;
+				throw err;
+			}
+		},
+
 		async deletePrefix(prefix) {
 			// An empty prefix would list, and delete, the whole bucket.
 			if (!prefix.trim()) throw new Error('deletePrefix requires a non-empty prefix');
@@ -75,8 +110,7 @@ export function r2MediaStore(client?: S3Client): MediaStore {
 		},
 
 		publicUrl(key) {
-			const base = (process.env.MEDIA_BASE_URL || 'https://cdn.iksi.app').replace(/\/+$/, '');
-			return `${base}/${key}`;
+			return `${mediaBase()}/${key}`;
 		}
 	};
 }

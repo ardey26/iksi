@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { MAX_UPLOAD_BYTES, MediaError, mediaBaseKey, processImage, variantKey } from './media';
+import { isMediaKey } from './media-url';
 
 const solid = { create: { background: '#336699', channels: 3 as const } };
 
@@ -129,6 +130,14 @@ describe('keys', () => {
 	it('builds base and variant keys', () => {
 		expect(mediaBaseKey(7, 'avatar', 'u1')).toBe('7/avatar/u1');
 		expect(variantKey('7/avatar/u1', '96')).toBe('7/avatar/u1.96.webp');
+	});
+
+	// The /media route serves only keys isMediaKey accepts; every key an upload writes must pass.
+	it.each(['avatar', 'background'] as const)('every %s variant key is servable', async (kind) => {
+		const base = mediaBaseKey(7, kind, crypto.randomUUID());
+		for (const v of await processImage(await png(1200, 800), kind)) {
+			expect(isMediaKey(variantKey(base, v.name))).toBe(true);
+		}
 	});
 });
 

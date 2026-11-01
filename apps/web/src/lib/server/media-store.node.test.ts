@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+	DeleteObjectsCommand,
+	GetObjectCommand,
+	ListObjectsV2Command,
+	PutObjectCommand
+} from '@aws-sdk/client-s3';
 import type { S3Client } from '@aws-sdk/client-s3';
 import { createR2Client, r2MediaStore } from '#lib/server/media-store.js';
 
@@ -71,6 +76,37 @@ describe('r2MediaStore', () => {
 		expect((sent[2] as ListObjectsV2Command).input.ContinuationToken).toBe('t');
 		const deletes = sent.filter((c) => c instanceof DeleteObjectsCommand);
 		expect(deletes).toHaveLength(2);
+	});
+
+	it('get returns the body stream, content type and length', async () => {
+		delete process.env.R2_MEDIA_BUCKET;
+		const stream = new Response(new Uint8Array([9, 8, 7])).body!;
+		const { client, sent } = fakeClient(() => ({
+			Body: { transformToWebStream: () => stream },
+			ContentType: 'image/webp',
+			ContentLength: 3
+		}));
+		const obj = await r2MediaStore(client).get('7/avatar/u1.400.webp');
+		expect(sent[0]).toBeInstanceOf(GetObjectCommand);
+		expect((sent[0] as GetObjectCommand).input).toEqual({ Bucket: 'iksi-media', Key: '7/avatar/u1.400.webp' });
+		expect(obj).toEqual({ body: stream, contentType: 'image/webp', contentLength: 3 });
+	});
+
+	it.each([
+		['NoSuchKey', Object.assign(new Error('missing'), { name: 'NoSuchKey' })],
+		['HTTP 404', Object.assign(new Error('NotFound'), { name: 'NotFound', $metadata: { httpStatusCode: 404 } })]
+	])('get returns null on %s', async (_label, err) => {
+		const { client } = fakeClient(() => {
+			throw err;
+		});
+		expect(await r2MediaStore(client).get('k')).toBeNull();
+	});
+
+	it('get rethrows other R2 errors', async () => {
+		const { client } = fakeClient(() => {
+			throw Object.assign(new Error('denied'), { name: 'AccessDenied', $metadata: { httpStatusCode: 403 } });
+		});
+		await expect(r2MediaStore(client).get('k')).rejects.toThrow('denied');
 	});
 
 	it('publicUrl uses default and honours MEDIA_BASE_URL', () => {

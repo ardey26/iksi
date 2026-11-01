@@ -21,6 +21,7 @@ function setup(row: { avatarKey: string | null; backgroundKey: string | null } =
 	};
 	const store: MediaStore = {
 		put: vi.fn(async (k: string) => void puts.push(k)),
+		get: vi.fn(async () => null),
 		deletePrefix: vi.fn(async (p: string) => {
 			calls.push('delete');
 			deletes.push(p);
