@@ -60,6 +60,14 @@ describe('safe-browsing sweep purge', () => {
     expect(purgeEdge).toHaveBeenCalledWith(['aa']);
   });
 
+  it('keeps a link held for review or disabled off profiles even when Safe Browsing says safe', async () => {
+    findMany.mockResolvedValue([{ ...link(1, 'aa', 'safe'), moderation: 'review' }, { ...link(2, 'Bb', 'safe'), moderation: 'disabled' }, link(3, 'cc', 'safe')]);
+    checkURLs.mockResolvedValue('safe');
+    await call();
+    expect(findMany.mock.calls[0][0].select).toMatchObject({ moderation: true });
+    expect(updateMany.mock.calls.map((c) => c[0].data.quarantined)).toEqual([true, true, false]);
+  });
+
   it('keeps a flag and its quarantine when Safe Browsing cannot complete the check', async () => {
     findMany.mockResolvedValue([link(1, 'aa', 'malware'), link(2, 'Bb', 'safe')]);
     checkURLs.mockResolvedValue('pending');

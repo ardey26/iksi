@@ -30,6 +30,8 @@ export const GET: RequestHandler = async ({ url, request }) => {
       id: true,
       originalURL: true,
       safeVerdict: true,
+      // Held for review or disabled: the record is flagged, so the edge never redirects it.
+      moderation: true,
       rules: true,
       expiresAt: true,
       expiredAt: true,

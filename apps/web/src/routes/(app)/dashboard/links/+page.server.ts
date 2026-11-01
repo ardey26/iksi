@@ -35,6 +35,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
         clickCount: true,
         createdAt: true,
         safeVerdict: true,
+        // Held for review after reports, or disabled by an admin.
+        moderation: true,
         rules: true,
         expiresAt: true,
         maxClicks: true,

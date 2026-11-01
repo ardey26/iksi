@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ request }) => {
       ],
       profileRows: { some: { enabled: true } }
     },
-    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true, rules: true, settingsVersion: true }
+    select: { id: true, originalURL: true, shortURL: true, safeVerdict: true, rules: true, settingsVersion: true, moderation: true }
   });
 
   let checked = 0;
@@ -50,7 +50,8 @@ export const GET: RequestHandler = async ({ request }) => {
       if (written > 0) {
         await prisma.profileRow.updateMany({
           where: { linkId: l.id },
-          data: { quarantined: verdict !== 'safe' && verdict !== 'pending' }
+          // A link held for review or disabled stays off profiles whatever Safe Browsing says.
+          data: { quarantined: (verdict !== 'safe' && verdict !== 'pending') || l.moderation != null }
         });
         if (verdict !== l.safeVerdict) changed.push(l.shortURL);
         if (changed.length >= 50) await flush();

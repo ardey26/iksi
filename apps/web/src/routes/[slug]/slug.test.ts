@@ -221,6 +221,60 @@ describe('views', () => {
     expect(recordClick).not.toHaveBeenCalled();
   });
 
+  describe('held for review after reports', () => {
+    it('does not redirect: 403 under review, no click and no destination', async () => {
+      findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'safe', moderation: 'review' });
+      const r = await run('/AbC');
+      expect(r.redirect).toBeUndefined();
+      expect(r.error.status).toBe(403);
+      expect(r.error.body).toMatchObject({ message: 'This link is under review.', view: 'flagged', verdict: 'review' });
+      expect(JSON.stringify(r.error.body)).not.toContain('example.com');
+      expect(recordClick).not.toHaveBeenCalled();
+      expect(r.event.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('beats a password: the unlock form is never shown', async () => {
+      findUnique.mockResolvedValue({ ...ROW, passwordHash: HASH, moderation: 'review' });
+      expect((await run('/AbC')).error.body).toMatchObject({ verdict: 'review' });
+    });
+
+    it('the right password still does not redirect', async () => {
+      findUnique.mockResolvedValue({ ...ROW, passwordHash: HASH, moderation: 'review' });
+      const { redirect } = await unlock('/AbC', 'hunter2');
+      expect(redirect).toEqual({ status: 303, location: '/AbC' });
+      expect(recordClick).not.toHaveBeenCalled();
+    });
+
+    it('a Safe Browsing flag on a held link names the verdict', async () => {
+      findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'phishing', moderation: 'review' });
+      expect((await run('/AbC')).error.body).toMatchObject({ verdict: 'phishing' });
+    });
+
+    it('a link an admin disabled is 403 disabled', async () => {
+      findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'safe', moderation: 'disabled' });
+      const r = await run('/AbC');
+      expect(r.error.status).toBe(403);
+      expect(r.error.body).toMatchObject({ message: 'This link has been disabled.', view: 'flagged', verdict: 'disabled' });
+      expect(recordClick).not.toHaveBeenCalled();
+    });
+
+    it('the preview says under review and withholds the destination', async () => {
+      findUnique.mockResolvedValue({ ...ROW, moderation: 'review' });
+      const r = await run('/AbC+');
+      expect(r.data).toMatchObject({ view: 'preview', flagged: 'review', destination: null });
+    });
+
+    it('a held one-time link is never revealed', async () => {
+      findUnique.mockResolvedValue({ ...ROW, oneTime: true, secretKind: 'text', secret: 'enc:vault', moderation: 'review' });
+      const r = await run('/AbC');
+      expect(r.error.body).toMatchObject({ view: 'flagged', verdict: 'review' });
+      const body = new FormData();
+      const event = makeEvent('/AbC', { method: 'POST', body });
+      await expect(actions.reveal(event as never)).rejects.toMatchObject({ status: 303, location: '/AbC' });
+      expect(executeRaw).not.toHaveBeenCalled();
+    });
+  });
+
   it('throws 410 for expired when expiresAt is past', async () => {
     findUnique.mockResolvedValue({ ...ROW, expiresAt: new Date(Date.now() - 1000) });
     const r = await run('/AbC');

@@ -23,6 +23,8 @@ describe('oneTimeState', () => {
     expect(oneTimeState(row({ openedAt: new Date(), expiresAt: new Date(NOW - 1) }), NOW)).toBe('opened'));
   it('flagged beats everything', () =>
     expect(oneTimeState(row({ safeVerdict: 'phishing', openedAt: new Date() }), NOW)).toBe('flagged'));
+  it.each(['review', 'disabled'])('a link with moderation %s is flagged', (moderation) =>
+    expect(oneTimeState({ ...row(), moderation }, NOW)).toBe('flagged'));
   it.each(['safe', 'pending'])('%s verdict is not flagged', (safeVerdict) =>
     expect(oneTimeState(row({ safeVerdict }), NOW)).toBe('sealed'));
 });
@@ -44,6 +46,8 @@ describe('claimOneTime', () => {
     expect(sql).toContain('"expiredAt" IS NULL');
     expect(sql).toMatch(/\("expiresAt" IS NULL OR "expiresAt" > \$\d+\)/);
     expect(sql).toMatch(/\("safeVerdict" IS NULL OR "safeVerdict" NOT IN \(\$\d+,\$\d+,\$\d+\)\)/);
+    // Held for review after reports, or disabled by an admin: never claimed.
+    expect(sql).toContain('"moderation" IS NULL');
     expect(query.values).toEqual([new Date(NOW), 9, new Date(NOW), 'malware', 'phishing', 'unwanted']);
   });
 

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { isHttpUrl, MAX_URL_LENGTH } from '@iksi/core';
-import { FLAGGED_VERDICTS, isFlagged } from '#lib/server/link-record.js';
+import { blockedVerdict, FLAGGED_VERDICTS } from '#lib/server/link-record.js';
 import { ONE_TIME_TEXT_MAX, type OneTimeKind } from '#lib/one-time.js';
 import { PASSWORD_MIN, PASSWORD_MAX } from '#lib/password-limits.js';
 import { addPrefix, isValidURLServer } from '#lib/utils/urlValidation.js';
@@ -18,13 +18,14 @@ export type OneTimeState = 'flagged' | 'opened' | 'expired' | 'sealed';
 export function oneTimeState(
   row: {
     safeVerdict: string | null;
+    moderation?: string | null;
     openedAt: Date | null;
     expiredAt: Date | null;
     expiresAt: Date | null;
   },
   now: number
 ): OneTimeState {
-  if (isFlagged(row.safeVerdict)) return 'flagged';
+  if (blockedVerdict(row) !== null) return 'flagged';
   if (row.openedAt !== null) return 'opened';
   if (row.expiredAt !== null || (row.expiresAt !== null && row.expiresAt.getTime() <= now)) {
     return 'expired';
@@ -53,6 +54,7 @@ export async function claimOneTime(
       AND "expiredAt" IS NULL
       AND ("expiresAt" IS NULL OR "expiresAt" > ${at})
       AND ("safeVerdict" IS NULL OR "safeVerdict" NOT IN (${Prisma.join([...FLAGGED_VERDICTS])}))
+      AND "moderation" IS NULL
   `);
   return affected === 1;
 }

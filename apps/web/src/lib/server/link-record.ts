@@ -6,6 +6,18 @@ export function isFlagged(verdict: string | null | undefined): boolean {
   return verdict != null && FLAGGED_VERDICTS.includes(verdict);
 }
 
+/**
+ * Why a link will not open, or null when nothing blocks it: 'disabled' (by an
+ * admin), a Safe Browsing verdict, or 'review' (held after reports; see
+ * lib/server/reports.ts). Worst first.
+ */
+export function blockedVerdict(row: { safeVerdict: string | null; moderation?: string | null }): string | null {
+  if (row.moderation === 'disabled') return 'disabled';
+  if (isFlagged(row.safeVerdict)) return row.safeVerdict as string;
+  if (row.moderation === 'review') return 'review';
+  return null;
+}
+
 /** What a one-time link's record carries instead of its content. */
 const ONE_TIME_PLACEHOLDER = `https://${CANONICAL_HOST}/`;
 
@@ -21,6 +33,8 @@ export function toLinkRecord(
     clickCount: number;
     maxClicks: number | null;
     oneTime: boolean;
+    /** 'review' or 'disabled' (see blockedVerdict). */
+    moderation: string | null;
   },
   destination: string
 ): LinkRecord {
@@ -36,7 +50,9 @@ export function toLinkRecord(
     // A one-time link's content never leaves the origin: the edge only learns
     // that the link exists, and gets a placeholder that parses as a URL.
     destination: row.oneTime ? ONE_TIME_PLACEHOLDER : destination,
-    flagged: isFlagged(row.safeVerdict),
+    // A held or disabled link is flagged too, so no Worker ever redirects it:
+    // the edge hands it to the origin, which shows why.
+    flagged: blockedVerdict(row) !== null,
     permanent: row.permanent,
     rules,
     expiresAt: row.expiresAt ? row.expiresAt.getTime() : null,

@@ -13,7 +13,7 @@ import { prisma } from '#lib/prisma.js';
 import { rateLimit } from '#lib/rateLimit.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { clientOf } from '#lib/server/client.js';
-import { toLinkRecord } from '#lib/server/link-record.js';
+import { blockedVerdict, toLinkRecord } from '#lib/server/link-record.js';
 import { claimOneTime, oneTimeState } from '#lib/server/one-time.js';
 import { requestContext } from '#lib/server/request-context.js';
 import { recordClick } from '#lib/server/tracking.js';
@@ -46,6 +46,7 @@ const SELECT = {
   id: true,
   originalURL: true,
   safeVerdict: true,
+  moderation: true,
   rules: true,
   expiresAt: true,
   expiredAt: true,
@@ -61,6 +62,19 @@ const SELECT = {
 type Row = NonNullable<Awaited<ReturnType<typeof findRow>>>;
 
 const OPENED = { message: 'This link was already opened.', view: 'opened' } as const;
+
+/**
+ * The 403 for a link that will not open: flagged by Safe Browsing, disabled
+ * by an admin, or held for review after reports. One view, told apart by verdict.
+ */
+function blocked(row: Row): never {
+  const verdict = blockedVerdict(row) as string;
+  error(403, {
+    message: verdict === 'review' ? 'This link is under review.' : 'This link has been disabled.',
+    view: 'flagged',
+    verdict
+  });
+}
 
 /**
  * The link this path names (a slug, or `@handle/name`), or a 404. Read from the
@@ -158,7 +172,7 @@ function oneTimeView(event: RequestEvent, row: Row, mode: 'redirect' | 'preview'
       host: '',
       destination: null,
       hasRules: false,
-      flagged: state === 'flagged' ? (row.safeVerdict as string) : null,
+      flagged: state === 'flagged' ? blockedVerdict(row) : null,
       expired: state === 'expired',
       oneTime: true,
       opened: state === 'opened'
@@ -167,7 +181,7 @@ function oneTimeView(event: RequestEvent, row: Row, mode: 'redirect' | 'preview'
 
   switch (state) {
     case 'flagged':
-      error(403, { message: 'This link has been disabled.', view: 'flagged', verdict: row.safeVerdict as string });
+      blocked(row);
     case 'opened':
       // After a no-JS reveal SvelteKit renders this POST through load: the page
       // shows the action's result, so this must not become an error page.
@@ -202,7 +216,7 @@ export const load = async (event: RequestEvent) => {
       host: record.protected ? '' : new URL(record.destination).host,
       destination: decision === 'redirect' || decision === 'protected' ? (record.protected ? null : record.destination) : null,
       hasRules: (record.rules ?? []).length > 0,
-      flagged: decision === 'flagged' ? (row.safeVerdict as string) : null,
+      flagged: decision === 'flagged' ? blockedVerdict(row) : null,
       expired: decision === 'expired',
       oneTime: false,
       opened: false
@@ -211,11 +225,7 @@ export const load = async (event: RequestEvent) => {
 
   switch (decision) {
     case 'flagged':
-      error(403, {
-        message: 'This link has been disabled.',
-        view: 'flagged',
-        verdict: row.safeVerdict as string
-      });
+      blocked(row);
     case 'expired':
       error(410, { message: 'This link has expired.', view: 'expired' });
     case 'protected':

@@ -23,6 +23,10 @@ function validTheme(v: unknown): v is string {
 }
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
+/** Held for review after reports, or disabled by an admin (see lib/server/reports.ts). */
+const moderationError = (moderation: string) =>
+  moderation === 'review' ? 'This link is under review and cannot go on your page' : 'This link was disabled and cannot go on your page';
+
 /** A public row would let the first visitor burn the link. */
 const ONE_TIME_ROW = 'One-time links cannot go on your page';
 
@@ -118,6 +122,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
       const link = await prisma.longURL.findUnique({ where: { id: linkId } });
       if (!link || link.userId !== uid) return json({ error: 'Link not owned' }, { status: 403 });
       if (link.oneTime) return json({ error: ONE_TIME_ROW }, { status: 400 });
+      if (link.moderation) return json({ error: moderationError(link.moderation) }, { status: 422 });
       const stale = !link.safeCheckedAt || (Date.now() - link.safeCheckedAt.getTime()) > 86400000;
       if (stale) {
         const verdict = await recheckVerdict(prisma, link);
@@ -148,6 +153,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
       if (link.oneTime) return json({ error: ONE_TIME_ROW }, { status: 400 });
 
       // Safe-browsing gate applies only when going public.
+      if (enabled && link.moderation) return json({ error: moderationError(link.moderation) }, { status: 422 });
       if (enabled) {
         const stale = !link.safeCheckedAt || (Date.now() - link.safeCheckedAt.getTime()) > 86400000;
         if (stale) {

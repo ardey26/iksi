@@ -4,6 +4,7 @@ const findUnique = vi.hoisted(() => vi.fn());
 vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findUnique } } }));
 vi.mock('#lib/server/crypto.js', () => ({ decodeURL: vi.fn(async (s: string) => s) }));
 
+import { decideLink, parseLinkRecord } from '@iksi/core';
 import { GET } from './+server';
 
 function call(slug: string | null, headers: Record<string, string> = {}) {
@@ -113,5 +114,30 @@ describe('GET /internal/resolve', () => {
   it('400s for a missing slug', async () => {
     const res = await call(null, { 'x-iksi-internal': 'edge' });
     expect(res.status).toBe(400);
+  });
+
+  describe('a link held for review or disabled', () => {
+    it.each(['review', 'disabled'])('%s: the record is flagged, so the edge never redirects it', async (moderation) => {
+      findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'safe', moderation });
+      const res = await call('AbC', { 'x-iksi-internal': 'edge' });
+      const { record } = await res.json();
+      expect(record.flagged).toBe(true);
+      // What the Worker does with it: parse, decide, and only 'redirect' is answered at the edge.
+      const parsed = parseLinkRecord(record);
+      expect(parsed).not.toBeNull();
+      expect(decideLink(parsed!, Date.now())).toBe('flagged');
+    });
+
+    it('reads moderation from the database', async () => {
+      findUnique.mockResolvedValue({ ...ROW, moderation: null });
+      await call('AbC', { 'x-iksi-internal': 'edge' });
+      expect(findUnique.mock.calls[0][0].select).toMatchObject({ moderation: true });
+    });
+
+    it('a link with the hold lifted redirects at the edge again', async () => {
+      findUnique.mockResolvedValue({ ...ROW, safeVerdict: 'safe', moderation: null });
+      const { record } = await (await call('AbC', { 'x-iksi-internal': 'edge' })).json();
+      expect(decideLink(parseLinkRecord(record)!, Date.now())).toBe('redirect');
+    });
   });
 });

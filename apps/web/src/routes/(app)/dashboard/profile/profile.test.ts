@@ -77,6 +77,27 @@ describe.each(actions)('%s refuses a one-time link', (_name, body) => {
   });
 });
 
+describe.each(actions)('%s refuses a link held for review or disabled', (_name, body) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    profileFindUnique.mockResolvedValue({ id: 1, userId: 7 });
+    rowAggregate.mockResolvedValue({ _max: { position: null } });
+    rowFindFirst.mockResolvedValue(null);
+  });
+
+  it.each([
+    ['review', 'This link is under review and cannot go on your page'],
+    ['disabled', 'This link was disabled and cannot go on your page']
+  ])('%s: 422 without creating a row', async (moderation, message) => {
+    linkFindUnique.mockResolvedValue({ ...staleLink('safe'), oneTime: false, moderation });
+    const r = await call(body);
+    expect(r.status).toBe(422);
+    expect((await r.json()).error).toBe(message);
+    expect(rowCreate).not.toHaveBeenCalled();
+    expect(rowUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('dashboard profile verdict changes purge the edge', () => {
   beforeEach(() => {
     vi.clearAllMocks();

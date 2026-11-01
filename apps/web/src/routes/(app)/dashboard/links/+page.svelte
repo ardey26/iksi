@@ -39,6 +39,7 @@
     clickCount: number;
     createdAt: string | Date;
     safeVerdict: string | null;
+    moderation?: string | null;
     profileRow: { id: number; title: string; enabled: boolean; position: number } | null;
     settings?: LinkSettingsData;
     // Set for burn-after-reading links: no settings, never on the page, content never sent here.
@@ -432,6 +433,8 @@
 {/snippet}
 
 {#snippet badges(l: Link)}
+  {#if l.moderation === 'disabled'}<Badge variant="error">Disabled</Badge>
+  {:else if l.moderation === 'review'}<Badge variant="warning">Under review</Badge>{/if}
   {#if verdictLabel(l.safeVerdict)}<Badge variant="error">{verdictLabel(l.safeVerdict)}</Badge>{/if}
   {#if l.settings}
     <span class="states" role="list" aria-label="Link state">
