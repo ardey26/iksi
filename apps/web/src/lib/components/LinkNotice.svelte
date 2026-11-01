@@ -1,9 +1,11 @@
 <script>
   // Why a short link will not open: expired (410), already opened (410) or
-  // flagged (403). Shared by the link page and its error page.
+  // flagged (403: Safe Browsing, disabled after a review, or under review
+  // after reports). Shared by the link page and its error page.
   import { page } from '$app/state';
   import { Button } from '#lib/ui/index.js';
   import { appHref } from '#lib/subdomains.js';
+  import { reportHref } from '#lib/report.js';
   import Interstitial from '#lib/components/Interstitial.svelte';
 
   let { view, verdict = null, host = null } = $props();
@@ -23,11 +25,23 @@
             title: 'This link was already opened',
             body: 'One-time links open once. Ask the sender for a new one.'
           }
-        : {
-            icon: 'alert',
-            title: 'Link disabled',
-            body: `This link was flagged by Google Safe Browsing as ${VERDICTS[verdict] ?? verdict} and has been disabled.`
-          }
+        : verdict === 'review'
+          ? {
+              icon: 'alert',
+              title: 'Link under review',
+              body: "This link was reported and is under review. It won't open until the review is done."
+            }
+          : verdict === 'disabled'
+            ? {
+                icon: 'alert',
+                title: 'Link disabled',
+                body: 'This link was disabled after a review.'
+              }
+            : {
+                icon: 'alert',
+                title: 'Link disabled',
+                body: `This link was flagged by Google Safe Browsing as ${VERDICTS[verdict] ?? verdict} and has been disabled.`
+              }
   );
   // On a profile subdomain `/` is the profile; iksi's home is on www.
   const home = $derived(appHref('/', page.url?.host ?? '', import.meta.env.DEV));
@@ -40,6 +54,9 @@
     {/if}
     <Button variant="secondary" size="lg" full href={home}>Go to iksi</Button>
   </div>
+  <svelte:fragment slot="below">
+    {#if page.url}<a href={reportHref(page.url, import.meta.env.DEV)}>Report this link</a>{/if}
+  </svelte:fragment>
 </Interstitial>
 
 <style>

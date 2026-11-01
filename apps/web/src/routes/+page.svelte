@@ -190,6 +190,14 @@
       </div>
     </Container>
   </section>
+
+  <footer class="band site-foot">
+    <Container width="wide">
+      <div class="foot-inner">
+        <a href="/report">Report a link</a>
+      </div>
+    </Container>
+  </footer>
 </div>
 
 <style>
@@ -299,6 +307,27 @@
     gap: 16px;
     padding: 32px 0 48px;
   }
+  .foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 0 16px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-faint);
+  }
+  .foot-inner a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    transition: color var(--duration-normal) var(--ease-out);
+  }
+  .foot-inner a:hover { color: var(--text-primary); }
   .cta-text {
     margin: 0;
     font-size: 15px;

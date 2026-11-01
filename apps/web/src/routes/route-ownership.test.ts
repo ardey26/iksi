@@ -33,6 +33,10 @@ describe('route ownership', () => {
 		expect(files.map(routeOf)).toContain('/[slug]');
 	});
 
+	it('gives /report to the report form; SvelteKit ranks the static route over [slug]', () => {
+		expect(routesMatching('/report')).toEqual(['/[slug]', '/report']);
+	});
+
 	it('leaves a bare /media to the short-link route', () => {
 		expect(routesMatching('/media')).toEqual(['/[slug]']);
 		expect(routesMatching('/media/')).toEqual([]);

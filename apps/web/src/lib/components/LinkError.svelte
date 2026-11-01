@@ -12,7 +12,9 @@
       : view === 'opened'
         ? 'Link opened'
         : view === 'flagged'
-          ? 'Link disabled'
+          ? page.error?.verdict === 'review'
+            ? 'Link under review'
+            : 'Link disabled'
           : 'Not found'
   );
   // On a profile subdomain `/` is the profile; the shortener is on www.

@@ -7,6 +7,7 @@
   import LinkNotice from '#lib/components/LinkNotice.svelte';
   import { PASSWORD_MAX } from '#lib/password-limits.js';
   import { copyToClipboard } from '#lib/utils/clipboard.js';
+  import { reportHref } from '#lib/report.js';
 
   let { data, form } = $props();
 
@@ -32,7 +33,9 @@
             : data.view === 'password'
               ? 'Password required'
               : data.flagged
-                ? 'Link disabled'
+                ? data.flagged === 'review'
+                  ? 'Link under review'
+                  : 'Link disabled'
                 : data.expired
                   ? 'Link expired'
                   : 'Link preview'
@@ -111,7 +114,10 @@
   </Input>
 {/snippet}
 
-{#snippet shared()}<span>Shared with iksi</span>{/snippet}
+{#snippet shared()}
+  <span>Shared with iksi</span>
+  <a href={reportHref(page.url, import.meta.env.DEV)}>Report this link</a>
+{/snippet}
 
 {#if revealed !== null}
   <Interstitial

@@ -41,6 +41,24 @@ describe('+error.svelte', () => {
     expect(document.title).toBe('Link opened | iksi');
   });
 
+  it('renders the under review view: no redirect, no link to the slug, a way to report', () => {
+    page.url = new URL('https://www.iksi.app/AbC');
+    const { container } = renderError(403, { message: 'This link is under review.', view: 'flagged', verdict: 'review' });
+    expect(screen.getByRole('heading', { name: 'Link under review' })).toBeTruthy();
+    expect(container.textContent).toContain('This link was reported and is under review');
+    expect(container.textContent).not.toContain('Safe Browsing');
+    expect(container.querySelector('a[href="/AbC"]')).toBeNull();
+    expect(container.querySelector('a[href="/report?link=iksi.app%2FAbC"]')?.textContent).toBe('Report this link');
+    expect(document.title).toBe('Link under review | iksi');
+  });
+
+  it('renders a link an admin disabled without naming Safe Browsing', () => {
+    const { container } = renderError(403, { message: 'x', view: 'flagged', verdict: 'disabled' });
+    expect(screen.getByRole('heading', { name: 'Link disabled' })).toBeTruthy();
+    expect(container.textContent).toContain('This link was disabled after a review.');
+    expect(container.textContent).not.toContain('Safe Browsing');
+  });
+
   it('keeps the 404 copy', () => {
     renderError(404, { message: 'not found' });
     expect(screen.getByText('Nothing here')).toBeTruthy();
@@ -62,7 +80,28 @@ describe('+page.svelte preview', () => {
     const { container } = render(LinkPage, { data: { ...base, destination: null, flagged: 'malware' }, form: null } as never);
     expect(container.textContent).toContain('malware');
     expect(container.textContent).toContain('example.com');
-    expect(container.querySelector('a:not([href="/"])')).toBeNull();
+    // Only home and the report form: nothing that leads to the destination.
+    expect(container.querySelector('a:not([href="/"]):not([href^="/report?"])')).toBeNull();
+  });
+
+  it('a preview of a link under review says so and has no Continue', () => {
+    page.url = new URL('https://www.iksi.app/AbC+');
+    const { container } = render(LinkPage, { data: { ...base, destination: null, flagged: 'review' }, form: null } as never);
+    expect(screen.getByRole('heading', { name: 'Link under review' })).toBeTruthy();
+    expect(container.querySelector('a[href="/AbC"]')).toBeNull();
+    expect(document.title).toBe('Link under review | iksi');
+  });
+
+  it('every preview links to the report form with the link filled in', () => {
+    page.url = new URL('https://www.iksi.app/AbC+');
+    const { container } = render(LinkPage, { data: base, form: null } as never);
+    expect(container.querySelector('a[href="/report?link=iksi.app%2FAbC"]')?.textContent).toBe('Report this link');
+  });
+
+  it('the password page links to the report form too', () => {
+    page.url = new URL('https://www.iksi.app/AbC');
+    const { container } = render(LinkPage, { data: { view: 'password', error: null }, form: null } as never);
+    expect(container.querySelector('a[href="/report?link=iksi.app%2FAbC"]')).not.toBeNull();
   });
 
   it('expired preview says so and has no Continue', () => {

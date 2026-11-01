@@ -31,6 +31,7 @@ import LinkPage from './[slug]/+page.svelte';
 import LinkErrorPage from './[slug]/+error.svelte';
 import Profile from './@[handle]/+page.svelte';
 import ProfileError from './@[handle]/+error.svelte';
+import ReportPage from './report/+page.svelte';
 
 const DOT = /·|&middot;|&#183;|&#xb7;/i;
 
@@ -93,7 +94,9 @@ describe('public markup has no middle dots', () => {
     [404, { message: 'not found' }],
     [410, { message: 'x', view: 'expired' }],
     [410, { message: 'x', view: 'opened' }],
-    [403, { message: 'x', view: 'flagged', verdict: 'phishing' }]
+    [403, { message: 'x', view: 'flagged', verdict: 'phishing' }],
+    [403, { message: 'x', view: 'flagged', verdict: 'review' }],
+    [403, { message: 'x', view: 'flagged', verdict: 'disabled' }]
   ])('link error %s %j', (status, error) => {
     page.status = status;
     page.error = error;
@@ -108,10 +111,21 @@ describe('public markup has no middle dots', () => {
     [{ view: 'opened' }, { text: 'hello' }],
     [{ view: 'preview', host: 'example.com', destination: 'https://example.com/a', hasRules: true, flagged: null, expired: false }, null],
     [{ view: 'preview', host: '', destination: null, hasRules: false, flagged: null, expired: false, oneTime: true, opened: false }, null],
-    [{ view: 'preview', host: 'example.com', destination: null, hasRules: false, flagged: 'malware', expired: false }, null]
+    [{ view: 'preview', host: 'example.com', destination: null, hasRules: false, flagged: 'malware', expired: false }, null],
+    [{ view: 'preview', host: 'example.com', destination: null, hasRules: false, flagged: 'review', expired: false }, null]
   ])('link page %j', (data, form) => {
     page.url = new URL('https://www.iksi.app/AbC+');
     render(LinkPage, { data, form });
+    noDots();
+  });
+
+  it.each([
+    [{ link: 'iksi.app/abc' }, null],
+    [{ link: '' }, { errors: { link: 'Enter the short link.', reason: 'Choose a reason.', form: 'Try again later.' }, values: { link: '', reason: '', details: '', email: '' } }],
+    [{ link: '' }, { sent: true }]
+  ])('report page %j %j', (data, form) => {
+    page.url = new URL('https://www.iksi.app/report');
+    render(ReportPage, { data, form });
     noDots();
   });
 
