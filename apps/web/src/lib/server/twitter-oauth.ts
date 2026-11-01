@@ -38,7 +38,10 @@ export function buildAuthorizeURL(opts: {
     response_type: 'code',
     client_id: opts.clientId,
     redirect_uri: opts.redirectUri,
-    scope: 'users.read tweet.read offline.access',
+    // Only what GET /2/users/me needs: X requires tweet.read alongside
+    // users.read for it, though no posts are read. No offline.access: the
+    // token is used once at sign-in, so no refresh token is wanted.
+    scope: 'users.read tweet.read',
     state: opts.state,
     code_challenge: opts.codeChallenge,
     code_challenge_method: 'S256'

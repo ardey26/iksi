@@ -43,6 +43,13 @@ describe('buildAuthorizeURL', () => {
     expect(url).toContain('code_challenge=CHALLENGE');
     expect(url).toContain('code_challenge_method=S256');
     expect(url).toContain('response_type=code');
-    expect(url).toContain('scope=users.read+tweet.read+offline.access');
+    expect(new URL(url).searchParams.get('scope')).toBe('users.read tweet.read');
+  });
+
+  it('asks only for what reading the profile needs, never offline access', () => {
+    const url = buildAuthorizeURL({ clientId: 'CID', redirectUri: 'https://x.test/cb', state: 'S', codeChallenge: 'C' });
+    const scopes = new URL(url).searchParams.get('scope')!.split(' ');
+    expect(scopes).not.toContain('offline.access');
+    expect(scopes.some((s) => s.endsWith('.write'))).toBe(false);
   });
 });
