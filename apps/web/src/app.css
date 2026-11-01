@@ -8,13 +8,31 @@
 :root,
 [data-theme="dark"] {
   --bg: #0A0A0B;
-  --surface: #141416;
-  --border: #27272A;
+  --surface: #131315;
+  --surface-2: #1A1A1D;
+  --border: #26262A;
+  --border-strong: #3A3A40;
   --border-focus: #3B82F6;
   --text-primary: #FAFAFA;
   --text-muted: #A1A1AA;
+  --text-faint: #71717A;
   --accent: #3B82F6;
   --error: #EF4444;
+  --success: #22C55E;
+  --warning: #F59E0B;
+
+  /* App UI system (DESIGN.md › App UI system) */
+  --paper-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --overlay-shadow: 0 24px 64px rgb(0 0 0 / 0.6);
+  --scrim: rgb(0 0 0 / 0.64);
+  --track: #1A1A1D;
+  --thumb: #2C2C31;
+  --thumb-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --switch-off: #3A3A40;
+  --skeleton: #222226;
+  --chip: #FFFFFF;
+  --chip-border: rgb(255 255 255 / 0.08);
+  color-scheme: dark;
 
   /* Data visualization */
   --chart-1: var(--accent);
@@ -26,14 +44,32 @@
 
 /* Light theme */
 [data-theme="light"] {
-  --bg: #FAFAFA;
+  --bg: #F4F4F5;
   --surface: #FFFFFF;
+  --surface-2: #F8F8F9;
   --border: #E4E4E7;
+  --border-strong: #D4D4D8;
   --border-focus: #2563EB;
   --text-primary: #09090B;
   --text-muted: #52525B;
+  --text-faint: #71717A;
   --accent: #2563EB;
   --error: #DC2626;
+  --success: #16A34A;
+  --warning: #B45309;
+
+  /* App UI system (DESIGN.md › App UI system) */
+  --paper-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04);
+  --overlay-shadow: 0 24px 64px rgb(0 0 0 / 0.16);
+  --scrim: rgb(9 9 11 / 0.32);
+  --track: #EFEFF1;
+  --thumb: #FFFFFF;
+  --thumb-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 0 0 1px rgb(0 0 0 / 0.04);
+  --switch-off: #D4D4D8;
+  --skeleton: #EBEBED;
+  --chip: #FFFFFF;
+  --chip-border: rgb(0 0 0 / 0.08);
+  color-scheme: light;
 
   /* Data visualization */
   --chart-1: var(--accent);
@@ -151,11 +187,12 @@ html[data-theme-switching] :is(div, span, p, input, button, svg, circle, rect, p
 }
 
 /* Button hover/active states */
-button:not(:disabled):hover {
+/* Kit components (src/lib/ui, marked data-ui) draw their own states. */
+button:not(:disabled):where(:not([data-ui])):hover {
   filter: brightness(1.1);
 }
 
-button:not(:disabled):active {
+button:not(:disabled):where(:not([data-ui])):active {
   opacity: 0.8;
 }
 
@@ -166,17 +203,17 @@ button:focus-visible,
 }
 
 /* Input focus styles */
-input:focus {
+input:where(:not([data-ui])):focus {
   border-color: var(--accent) !important;
 }
 
-input::placeholder {
+input:where(:not([data-ui]))::placeholder {
   color: var(--text-muted) !important;
   opacity: 0.5;
 }
 
 /* Link hover */
-a:hover, button.text-sm:hover {
+a:where(:not([data-ui])):hover, button.text-sm:where(:not([data-ui])):hover {
   opacity: 0.8;
 }
 
@@ -185,7 +222,7 @@ a:hover, button.text-sm:hover {
    inset it. Two URIs because a data-URI SVG cannot read currentColor;
    the strokes are --text-muted for each theme. Component styles must set
    background-color, never the background shorthand, or the chevron is lost. */
-select {
+select:where(:not([data-ui])) {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -205,7 +242,7 @@ select {
   cursor: pointer;
   color-scheme: dark;
 }
-[data-theme="light"] select {
+[data-theme="light"] select:where(:not([data-ui])) {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2352525B' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
   color-scheme: light;
 }
@@ -228,7 +265,7 @@ select[size]:not([size="1"]) {
   background-image: none;
 }
 @media (max-width: 639px) {
-  select {
+  select:where(:not([data-ui])) {
     min-height: 44px;
   }
 }
@@ -549,3 +586,189 @@ select.d-field { padding-right: 40px; }
     transition: none;
   }
 }
+
+/* ------------------------------------------------------------------------
+   App UI system (DESIGN.md › App UI system)
+   Scale and type roles shared by the src/lib/ui kit. Colour tokens live in
+   the theme blocks at the top of this file.
+   ------------------------------------------------------------------------ */
+:root {
+  /* Radii */
+  --radius-control: 10px;
+  --radius-paper: 14px;
+  --radius-sheet: 20px;
+  --radius-badge: 6px;
+  --radius-pill: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Layout */
+  --gutter: 16px;
+  --width-narrow: 480px;
+  --width-form: 720px;
+  --width-wide: 960px;
+
+  /* Controls: 40px, 44px on phones so every target is tappable. */
+  --control: 40px;
+  --control-sm: 32px;
+  --control-lg: 48px;
+
+  /* Motion */
+  --duration-sheet: 220ms;
+
+  /* Type */
+  --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (min-width: 768px) {
+  :root { --gutter: 32px; }
+}
+@media (max-width: 639px) {
+  :root { --control: 44px; }
+}
+
+/* Type roles. Sentence case everywhere; no uppercase labels. */
+.t-display {
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+@media (min-width: 768px) {
+  .t-display { font-size: 44px; line-height: 48px; }
+}
+.t-title {
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.t-body {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.t-label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.t-caption {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.t-readout {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: 0.93em;
+  letter-spacing: -0.01em;
+}
+.t-primary { color: var(--text-primary); }
+.t-muted { color: var(--text-muted); }
+.t-faint { color: var(--text-faint); }
+.t-tabular { font-variant-numeric: tabular-nums; }
+
+/* Icons never shrink inside flex rows. */
+.ui-icon {
+  display: block;
+  flex: none;
+}
+
+/* Field box shared by Input, Textarea and Select (src/lib/ui). The box draws
+   the border and focus ring; the native control inside is transparent. */
+.ui-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: var(--control);
+  padding: 0 12px;
+  color: var(--text-primary);
+  background-color: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+.ui-box:hover { border-color: var(--border-strong); }
+.ui-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.ui-box[data-invalid] { border-color: var(--error); }
+.ui-box[data-invalid]:focus-within { box-shadow: 0 0 0 1px var(--error); }
+.ui-box[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-box[data-disabled]:hover { border-color: var(--border); }
+.ui-box > .ui-icon,
+.ui-box > .ui-affix {
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.ui-affix {
+  flex: none;
+  font-size: 15px;
+  line-height: 22px;
+}
+.ui-native {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: calc(var(--control) - 2px);
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 22px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+.ui-native:focus { outline: none; box-shadow: none; }
+.ui-native::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
+}
+.ui-native:disabled { cursor: not-allowed; opacity: 1; }
+textarea.ui-native {
+  height: auto;
+  padding: 9px 0;
+  resize: none;
+}
+.ui-box:has(> textarea) { align-items: stretch; }
+/* iOS zooms into any field under 16px; phones get 16. */
+@media (max-width: 639px) {
+  .ui-native { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-box { transition: none; }
+}
+/* An icon button inside a field (show password, clear) sits flush with the
+   box's right padding. */
+.ui-box > button[data-ui] { margin-right: -8px; }
