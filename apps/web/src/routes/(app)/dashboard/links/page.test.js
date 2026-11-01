@@ -25,7 +25,6 @@ describe('links page settings toggle', () => {
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     await fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'true');
-    await fireEvent.click(screen.getByRole('button', { name: /^Destination/ }));
     await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: saved.destination } });
     await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(screen.getByTitle('https://changed.example.org/b')).toBeInTheDocument());

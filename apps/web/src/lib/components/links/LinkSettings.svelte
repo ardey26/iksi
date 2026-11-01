@@ -9,9 +9,6 @@
 
   const dispatch = createEventDispatcher<{ saved: LinkSettingsData }>();
 
-  type Section = 'destination' | 'rules' | 'expiry' | 'password' | 'permanent';
-  let open: Record<Section, boolean> = { destination: false, rules: false, expiry: false, password: false, permanent: false };
-
   function pad(n: number) { return String(n).padStart(2, '0'); }
   // The date-time input works in the browser's zone; the server stores UTC.
   function toLocalInput(iso: string | null): string {
@@ -57,8 +54,6 @@
   let saving = false;
   let error = '';
 
-  function toggle(s: Section) { open[s] = !open[s]; }
-
   async function save() {
     if (!dirty || saving) return;
     error = '';
@@ -67,14 +62,14 @@
     if (destinationDirty) body.destination = destination.trim();
     if (rulesDirty) {
       const built = fromForm(ruleForms);
-      if (!built.ok) { error = built.error; open.rules = true; return; }
+      if (!built.ok) { error = built.error; return; }
       body.rules = built.rules;
     }
     if (expiryDirty) {
       if (expiresLocal === '') body.expiresAt = null;
       else {
         const d = new Date(expiresLocal);
-        if (Number.isNaN(d.getTime())) { error = 'Enter a valid expiry date'; open.expiry = true; return; }
+        if (Number.isNaN(d.getTime())) { error = 'Enter a valid expiry date'; return; }
         body.expiresAt = d.toISOString();
       }
     }
@@ -83,7 +78,7 @@
       if (t === '') body.maxClicks = null;
       else {
         const n = Number(t);
-        if (!Number.isInteger(n) || n < 1) { error = 'Max clicks must be a whole number above 0'; open.expiry = true; return; }
+        if (!Number.isInteger(n) || n < 1) { error = 'Click limit must be a whole number above 0'; return; }
         body.maxClicks = n;
       }
     }
@@ -91,7 +86,6 @@
     else if (newPassword !== '') {
       if (newPassword.length < PASSWORD_MIN || newPassword.length > PASSWORD_MAX) {
         error = `Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters`;
-        open.password = true;
         return;
       }
       body.password = newPassword;
@@ -120,241 +114,143 @@
   }
 
   $: rulesSummary = ruleForms.length === 0 ? 'None' : `${ruleForms.length} ${ruleForms.length === 1 ? 'rule' : 'rules'}`;
-  $: expirySummary = expiresLocal || maxClicks.trim() ? [expiresLocal && 'Date set', maxClicks.trim() && `${maxClicks.trim()} clicks`].filter(Boolean).join(', ') : 'None';
-  $: passwordSummary = removePassword ? 'Will be removed' : newPassword ? 'Will be changed' : current.hasPassword ? 'Set' : 'None';
 </script>
 
-<div class="panel">
-  <!-- Destination -->
-  <div class="section">
-    <button type="button" class="head" aria-expanded={open.destination} aria-controls={`ls-${id}-destination`} on:click={() => toggle('destination')}>
-      <span>Destination</span>
-      <span class="sum">{open.destination ? '' : destination}</span>
-    </button>
-    {#if open.destination}
-      <div class="body" id={`ls-${id}-destination`}>
-        <label class="label" for={`ls-${id}-dest-input`}>Destination</label>
-        <input id={`ls-${id}-dest-input`} class="field" type="text" inputmode="url" maxlength="2048" bind:value={destination} />
-        <p class="hint mt-1">https:// is added if missing</p>
+<div class="ls d-scope">
+  <div class="d-spec d-flush">
+    <div class="d-row">
+      <label class="d-label" for={`ls-${id}-dest`}>Destination</label>
+      <div class="d-control">
+        <input id={`ls-${id}-dest`} class="d-field" type="text" inputmode="url" maxlength="2048" aria-describedby={`ls-${id}-dest-hint`} bind:value={destination} />
+        <p class="d-hint" id={`ls-${id}-dest-hint`}>https:// is added if missing</p>
       </div>
-    {/if}
-  </div>
+    </div>
 
-  <!-- Routing rules -->
-  <div class="section">
-    <button type="button" class="head" aria-expanded={open.rules} aria-controls={`ls-${id}-rules`} on:click={() => toggle('rules')}>
-      <span>Routing rules</span>
-      <span class="sum">{rulesSummary}</span>
-    </button>
-    {#if open.rules}
-      <div class="body" id={`ls-${id}-rules`}>
-        <p class="hint mb-3">The first rule that matches wins. Otherwise visitors go to the destination above.</p>
-        <RulesEditor bind:rules={ruleForms} />
-      </div>
-    {/if}
-  </div>
-
-  <!-- Expiry -->
-  <div class="section">
-    <button type="button" class="head" aria-expanded={open.expiry} aria-controls={`ls-${id}-expiry`} on:click={() => toggle('expiry')}>
-      <span>Expiry</span>
-      <span class="sum">{expirySummary}</span>
-    </button>
-    {#if open.expiry}
-      <div class="body space-y-3" id={`ls-${id}-expiry`}>
-        <div>
-          <label class="label" for={`ls-${id}-expires`}>Expires on</label>
-          <div class="flex items-center gap-2">
-            <input id={`ls-${id}-expires`} class="field" type="datetime-local" bind:value={expiresLocal} />
-            <button type="button" class="ghost" disabled={expiresLocal === ''} on:click={() => (expiresLocal = '')}>Clear</button>
-          </div>
-          <p class="hint mt-1">In your time zone.</p>
+    <div class="d-row">
+      <label class="d-label" for={`ls-${id}-expires`}>Expiry</label>
+      <div class="d-control">
+        <div class="flex items-center gap-3">
+          <input id={`ls-${id}-expires`} class="d-field min-w-0 flex-1" type="datetime-local" aria-describedby={`ls-${id}-expires-hint`} bind:value={expiresLocal} />
+          <button type="button" class="d-btn d-btn-text" disabled={expiresLocal === ''} on:click={() => (expiresLocal = '')}>Clear</button>
         </div>
-        <div>
-          <label class="label" for={`ls-${id}-max`}>Max clicks</label>
-          <input id={`ls-${id}-max`} class="field" type="text" inputmode="numeric" placeholder="No limit" bind:value={maxClicks} />
+        <p class="d-hint" id={`ls-${id}-expires-hint`}>In your time zone. Empty means it never expires.</p>
+      </div>
+    </div>
+
+    <div class="d-row">
+      <label class="d-label" for={`ls-${id}-max`}>Click limit</label>
+      <div class="d-control">
+        <div class="d-unit-field limit">
+          <input id={`ls-${id}-max`} class="d-field" type="text" inputmode="numeric" placeholder="No limit" bind:value={maxClicks} />
+          {#if maxClicks.trim()}<span class="d-unit" aria-hidden="true">clicks</span>{/if}
         </div>
       </div>
-    {/if}
-  </div>
+    </div>
 
-  <!-- Password -->
-  <div class="section">
-    <button type="button" class="head" aria-expanded={open.password} aria-controls={`ls-${id}-password`} on:click={() => toggle('password')}>
-      <span>Password</span>
-      <span class="sum">{passwordSummary}</span>
-    </button>
-    {#if open.password}
-      <div class="body space-y-3" id={`ls-${id}-password`}>
-        {#if current.hasPassword}
-          {#if removePassword}
-            <p class="text-sm" style="color: var(--text-primary);">Password will be removed on save.</p>
-            <button type="button" class="ghost" on:click={() => (removePassword = false)}>Undo</button>
-          {:else}
-            <p class="text-sm" style="color: var(--text-primary);">Password set</p>
-            {#if !changePassword}
-              <div class="flex gap-2">
-                <button type="button" class="ghost" on:click={() => (changePassword = true)}>Change password</button>
-                <button type="button" class="ghost" on:click={() => { removePassword = true; changePassword = false; newPassword = ''; }}>Remove password</button>
-              </div>
-            {/if}
-          {/if}
-        {/if}
-        {#if !current.hasPassword || (changePassword && !removePassword)}
-          <div>
-            <label class="label" for={`ls-${id}-pw`}>New password</label>
-            <input id={`ls-${id}-pw`} class="field" type="password" autocomplete="new-password" maxlength={PASSWORD_MAX} bind:value={newPassword} />
-            <p class="hint mt-1">{PASSWORD_MIN} to {PASSWORD_MAX} characters. Visitors enter it before they are redirected.</p>
+    <div class="d-row">
+      <span class="d-label">Password</span>
+      <div class="d-control">
+        {#if current.hasPassword && removePassword}
+          <div class="d-inline">
+            <span class="state"><span class="d-dot" aria-hidden="true"></span>Removed on save</span>
+            <button type="button" class="d-btn d-btn-text" on:click={() => (removePassword = false)}>Undo</button>
           </div>
+        {:else if current.hasPassword && !changePassword}
+          <div class="d-inline">
+            <span class="state"><span class="d-dot on" aria-hidden="true"></span>Password set</span>
+            <span class="flex items-center gap-4">
+              <button type="button" class="d-btn d-btn-text" on:click={() => (changePassword = true)}>Change password</button>
+              <button type="button" class="d-btn d-btn-text d-btn-danger" on:click={() => { removePassword = true; changePassword = false; newPassword = ''; }}>Remove password</button>
+            </span>
+          </div>
+        {:else}
+          <label class="sr-only" for={`ls-${id}-pw`}>New password</label>
+          <input id={`ls-${id}-pw`} class="d-field" type="password" autocomplete="new-password" maxlength={PASSWORD_MAX} placeholder={current.hasPassword ? 'New password' : 'Not set'} aria-describedby={`ls-${id}-pw-hint`} bind:value={newPassword} />
+          <p class="d-hint" id={`ls-${id}-pw-hint`}>{PASSWORD_MIN} to {PASSWORD_MAX} characters. Visitors enter it before they are redirected.</p>
         {/if}
       </div>
-    {/if}
+    </div>
+
+    <div class="d-row">
+      <span class="d-label">Permanent redirect</span>
+      <div class="d-control">
+        <div class="d-inline">
+          <button
+            type="button"
+            role="switch"
+            class="d-switch"
+            aria-checked={permanent}
+            aria-label="Permanent redirect"
+            aria-describedby={`ls-${id}-perm-hint`}
+            on:click={() => (permanent = !permanent)}
+          ></button>
+          <span class="d-readout code">{permanent ? '301' : '302'}</span>
+        </div>
+        <p class="d-hint" id={`ls-${id}-perm-hint`}>Browsers cache 301s. Only use this if the destination will never change.</p>
+      </div>
+    </div>
   </div>
 
-  <!-- Permanent redirect -->
-  <div class="section">
-    <button type="button" class="head" aria-expanded={open.permanent} aria-controls={`ls-${id}-permanent`} on:click={() => toggle('permanent')}>
-      <span>Permanent redirect</span>
-      <span class="sum">{permanent ? 'On' : 'Off'}</span>
-    </button>
-    {#if open.permanent}
-      <div class="body flex items-start gap-3" id={`ls-${id}-permanent`}>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={permanent}
-          aria-label="Permanent redirect"
-          on:click={() => (permanent = !permanent)}
-          class="relative inline-flex items-center h-5 w-9 rounded-full shrink-0 mt-0.5 transition-colors"
-          style="background: {permanent ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
-        >
-          <span class="inline-block w-4 h-4 rounded-full transition-transform" style="background: white; transform: translateX({permanent ? '18px' : '2px'});"></span>
-        </button>
-        <p class="hint">Browsers cache 301s. Only use this if the destination will never change.</p>
-      </div>
-    {/if}
-  </div>
+  <section class="rules" aria-labelledby={`ls-${id}-rules-title`}>
+    <div class="d-section-head">
+      <h3 class="d-title" id={`ls-${id}-rules-title`}>Routing rules</h3>
+      <span class="d-readout count">{rulesSummary}</span>
+    </div>
+    <p class="d-desc">The first rule that matches wins. Everyone else goes to the destination.</p>
+    <RulesEditor bind:rules={ruleForms} />
+  </section>
 
   <div class="footer">
     <p class="err" role="alert">{error}</p>
-    <button type="button" class="save" disabled={!dirty || saving} on:click={save}>{saving ? 'Saving' : 'Save'}</button>
+    <button type="button" class="d-btn d-btn-primary" disabled={!dirty || saving} on:click={save}>{saving ? 'Saving' : 'Save'}</button>
   </div>
 </div>
 
 <style>
-  .panel {
-    padding: 0.5rem 1rem 1rem;
-    background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+  .limit {
+    width: 168px;
+    max-width: 100%;
+    --d-unit-pad: 60px;
   }
-  .section {
-    border-bottom: 1px solid var(--border);
-  }
-  .head {
-    display: flex;
-    width: 100%;
+  .state {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.75rem 0;
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-align: left;
-    background: transparent;
-    border: none;
-    cursor: pointer;
+    gap: 8px;
+    font-size: 14px;
     color: var(--text-primary);
   }
-  .head:focus-visible,
-  .ghost:focus-visible,
-  .save:focus-visible {
-    outline: 2px solid var(--border-focus);
-    outline-offset: 2px;
-  }
-  .sum {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.75rem;
-    font-weight: 400;
+  .code {
+    font-size: 13px;
     color: var(--text-muted);
   }
-  .body {
-    padding-bottom: 1rem;
-  }
-  .label {
-    display: block;
-    font-size: 0.75rem;
-    margin-bottom: 0.25rem;
+  .count {
+    font-size: 13px;
     color: var(--text-muted);
   }
-  .hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-  .field {
-    display: block;
-    width: 100%;
-    font-size: 0.875rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    color: var(--text-primary);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .field:focus {
-    outline: none;
-    border-color: var(--border-focus);
-  }
-  .field::placeholder {
-    color: var(--text-muted);
-    opacity: 0.7;
-  }
-  .ghost {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    white-space: nowrap;
-    background: transparent;
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    cursor: pointer;
-  }
-  .ghost:hover:not(:disabled) {
-    border-color: var(--text-muted);
-  }
-  .ghost:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  .rules {
+    margin-top: 48px;
   }
   .footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding-top: 0.75rem;
+    gap: 16px;
+    margin: 48px calc(-1 * var(--ls-pad, 0px)) 0;
+    padding: 16px var(--ls-pad, 0px);
+    background-color: var(--bg);
+    border-top: 1px solid var(--border);
   }
   .err {
-    min-height: 1.25rem;
-    font-size: 0.875rem;
+    min-width: 0;
+    min-height: 18px;
+    font-size: 13px;
+    line-height: 18px;
     color: var(--error);
   }
-  .save {
-    flex: none;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: 8px;
-    background: var(--text-primary);
-    color: var(--bg);
-    border: none;
-    cursor: pointer;
-    transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .save:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
+  .footer .d-btn {
+    min-width: 96px;
   }
 </style>

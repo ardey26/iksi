@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/svelte';
 import RulesEditor from './RulesEditor.svelte';
 
 const mk = (id, extra = {}) => ({ id, conditions: [], mode: 'single', destination: `https://${id}.example.com`, split: [], ...extra });
@@ -42,14 +42,37 @@ describe('RulesEditor', () => {
 
   it('focuses the new condition input', async () => {
     render(RulesEditor, { props: { rules: [mk('aaaaaaa1')] } });
-    await fireEvent.change(screen.getByLabelText('Add condition'), { target: { value: 'country' } });
+    await click('Add condition');
+    await click('Country');
     await waitFor(() => expect(focused()).toBe(screen.getByLabelText('Countries')));
+  });
+
+  it('opens the condition picker with only the unused kinds', async () => {
+    render(RulesEditor, { props: { rules: [mk('aaaaaaa1', { conditions: [{ kind: 'country', values: 'SG' }] })] } });
+    const add = screen.getByRole('button', { name: 'Add condition' });
+    expect(add).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Condition type' })).toBeNull();
+    await fireEvent.click(add);
+    expect(add).toHaveAttribute('aria-expanded', 'true');
+    const picker = screen.getByRole('group', { name: 'Condition type' });
+    const kinds = within(picker).getAllByRole('button').map((b) => b.textContent.trim());
+    expect(kinds).toEqual(['Continent', 'Device', 'Operating system', 'Referrer', 'Time of day']);
+    await waitFor(() => expect(focused()).toBe(within(picker).getByRole('button', { name: 'Continent' })));
+  });
+
+  it('closes the picker on Escape and returns focus to Add condition', async () => {
+    render(RulesEditor, { props: { rules: [mk('aaaaaaa1')] } });
+    await click('Add condition');
+    const picker = screen.getByRole('group', { name: 'Condition type' });
+    await fireEvent.keyDown(within(picker).getByRole('button', { name: 'Country' }), { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: 'Condition type' })).toBeNull();
+    await waitFor(() => expect(focused()).toBe(screen.getByRole('button', { name: 'Add condition' })));
   });
 
   it('focuses Add condition after removing a condition', async () => {
     render(RulesEditor, { props: { rules: [mk('aaaaaaa1', { conditions: [{ kind: 'country', values: 'SG' }] })] } });
     await click('Remove Country condition');
-    await waitFor(() => expect(focused()).toBe(screen.getByLabelText('Add condition')));
+    await waitFor(() => expect(focused()).toBe(screen.getByRole('button', { name: 'Add condition' })));
   });
 
   it('focuses a neighbour after removing a split row', async () => {

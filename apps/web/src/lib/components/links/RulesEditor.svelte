@@ -103,11 +103,25 @@
     rules = next;
     focusAfter(ruleSel(next[j].id, by === -1 ? 'up' : 'down'), ruleSel(next[j].id, by === -1 ? 'down' : 'up'));
   }
-  function addCondition(rule: RuleForm, e: Event) {
-    const select = e.currentTarget as HTMLSelectElement;
-    const kind = select.value as ConditionForm['kind'];
-    select.value = '';
-    if (!kind) return;
+  // Condition picker: "Add condition" is a quiet text button that reveals
+  // the kinds still available for that rule. One picker open at a time.
+  let pickerFor: string | null = null;
+  function togglePicker(rule: RuleForm) {
+    pickerFor = pickerFor === rule.id ? null : rule.id;
+    if (pickerFor) focusAfter(`[data-rule="${rule.id}"] [data-kind]`);
+  }
+  function closePicker(rule: RuleForm) {
+    pickerFor = null;
+    focusAfter(`[data-rule="${rule.id}"] [data-act="add-condition"]`);
+  }
+  function onPickerKey(e: KeyboardEvent, rule: RuleForm) {
+    if (e.key !== 'Escape') return;
+    // Keep Escape from also closing a surrounding dialog.
+    e.stopPropagation();
+    closePicker(rule);
+  }
+  function addCondition(rule: RuleForm, kind: ConditionForm['kind']) {
+    pickerFor = null;
     rule.conditions = [...rule.conditions, defaultCondition(kind)];
     rules = rules;
     focusAfter(`[data-cond="${rule.id}-${kind}"] input, [data-cond="${rule.id}-${kind}"] select`);
@@ -155,294 +169,369 @@
   function kindLabel(kind: string) {
     return KINDS.find((k) => k.kind === kind)?.label ?? kind;
   }
+  /** Empty cells that complete the last row of a key grid. */
+  function fillers(count: number, cols: number): number[] {
+    return Array.from({ length: (cols - (count % cols)) % cols }, (_, i) => i);
+  }
 </script>
 
-<div class="space-y-3" bind:this={root}>
+<div class="editor" bind:this={root}>
   {#if rules.length === 0}
-    <p class="text-sm" style="color: var(--text-muted);">No rules. Everyone goes to the main destination.</p>
+    <p class="empty">No rules yet. Everyone goes to the destination.</p>
+  {:else}
+    <ol class="list">
+      {#each rules as rule, i (rule.id)}
+        <li class="rule">
+          <span class="num" aria-hidden="true">{i + 1}</span>
+          <fieldset class="body" aria-label={`Rule ${i + 1}`} data-rule={rule.id}>
+            <div class="head">
+              <span class="head-label">When</span>
+              <div class="tools">
+                <button type="button" class="d-icon" data-act="up" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} on:click={() => move(i, -1)}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
+                </button>
+                <button type="button" class="d-icon" data-act="down" aria-label={`Move rule ${i + 1} down`} disabled={i === rules.length - 1} on:click={() => move(i, 1)}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <button type="button" class="d-icon danger" data-act="remove" aria-label={`Remove rule ${i + 1}`} on:click={() => removeRule(i)}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {#if rule.conditions.length === 0}
+              <p class="always">Always, unless an earlier rule matched.</p>
+            {/if}
+
+            {#each rule.conditions as c, ci (c.kind)}
+              <div class="row" data-cond={`${rule.id}-${c.kind}`}>
+                <span class="name">{kindLabel(c.kind)}</span>
+                <div class="values">
+                  {#if c.kind === 'country'}
+                    <label class="sr-only" for={`${rule.id}-country`}>Countries</label>
+                    <input id={`${rule.id}-country`} class="d-field" type="text" placeholder="SG, MY, ID" bind:value={c.values} />
+                    <p class="d-hint">Two-letter codes, separated by commas.</p>
+                  {:else if c.kind === 'referrer'}
+                    <label class="sr-only" for={`${rule.id}-referrer`}>Referrer hosts</label>
+                    <input id={`${rule.id}-referrer`} class="d-field" type="text" placeholder="x.com, news.ycombinator.com" bind:value={c.values} />
+                    <p class="d-hint">Subdomains match too. Separate with commas.</p>
+                  {:else if c.kind === 'continent'}
+                    <div class="d-keys" style="--cols: 2;" role="group" aria-label="Continents">
+                      {#each CONTINENTS as o}
+                        <label class="d-key">
+                          <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
+                                 on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
+                          <span>{o.label}</span>
+                        </label>
+                      {/each}
+                      {#each fillers(CONTINENTS.length, 2) as _}<span class="d-key-fill" aria-hidden="true"></span>{/each}
+                    </div>
+                  {:else if c.kind === 'device'}
+                    <div class="d-keys" style="--cols: 3;" role="group" aria-label="Devices">
+                      {#each DEVICES as o}
+                        <label class="d-key">
+                          <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
+                                 on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
+                          <span>{o.label}</span>
+                        </label>
+                      {/each}
+                    </div>
+                  {:else if c.kind === 'os'}
+                    <div class="d-keys" style="--cols: 3;" role="group" aria-label="Operating systems">
+                      {#each OSES as o}
+                        <label class="d-key">
+                          <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
+                                 on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
+                          <span>{o.label}</span>
+                        </label>
+                      {/each}
+                      {#each fillers(OSES.length, 3) as _}<span class="d-key-fill" aria-hidden="true"></span>{/each}
+                    </div>
+                  {:else}
+                    <div class="d-keys days" style="--cols: 7;" role="group" aria-label="Days">
+                      {#each DAYS as d, di}
+                        <label class="d-key">
+                          <input type="checkbox" class="sr-only" checked={c.days.includes(di)}
+                                 on:change={() => { c.days = toggleDay(c.days, di); rules = rules; }} />
+                          <span>{d}</span>
+                        </label>
+                      {/each}
+                    </div>
+                    <div class="range">
+                      <label class="sr-only" for={`${rule.id}-start`}>Start</label>
+                      <input id={`${rule.id}-start`} class="d-field" type="time" bind:value={c.start} />
+                      <span class="to" aria-hidden="true">to</span>
+                      <label class="sr-only" for={`${rule.id}-end`}>End</label>
+                      <input id={`${rule.id}-end`} class="d-field" type="time" bind:value={c.end} />
+                    </div>
+                    <label class="sr-only" for={`${rule.id}-tz`}>Time zone</label>
+                    <select id={`${rule.id}-tz`} class="d-field tz" bind:value={c.tz}>
+                      {#each zonesWith(c.tz) as z}<option value={z}>{z}</option>{/each}
+                    </select>
+                    <p class="d-hint">No days means every day. Overnight windows count from their start day.</p>
+                  {/if}
+                </div>
+                <button type="button" class="d-icon remove" aria-label={`Remove ${kindLabel(c.kind)} condition`} on:click={() => removeCondition(rule, ci)}>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+              </div>
+            {/each}
+
+            {#if available(rule).length > 0}
+              <div class="add">
+                <button type="button" class="d-btn d-btn-text" data-act="add-condition"
+                        aria-expanded={pickerFor === rule.id} aria-controls={`${rule.id}-picker`}
+                        on:click={() => togglePicker(rule)}>Add condition</button>
+                {#if pickerFor === rule.id}
+                  <!-- Escape closes the picker; the keys inside are the interactive parts. -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                  <div class="picker" id={`${rule.id}-picker`} role="group" aria-label="Condition type" on:keydown={(e) => onPickerKey(e, rule)}>
+                    {#each available(rule) as k}
+                      <button type="button" class="d-btn d-btn-secondary pick" data-kind={k.kind} on:click={() => addCondition(rule, k.kind)}>{k.label}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+
+            <div class="row goto">
+              <span class="name">Go to</span>
+              <div class="values">
+                <div class="d-seg" role="radiogroup" aria-label={`Rule ${i + 1} destination type`}>
+                  <label class="d-key">
+                    <input type="radio" class="sr-only" name={`${rule.id}-mode`} value="single" checked={rule.mode === 'single'} on:change={() => setMode(rule, 'single')} />
+                    <span>One URL</span>
+                  </label>
+                  <label class="d-key">
+                    <input type="radio" class="sr-only" name={`${rule.id}-mode`} value="split" checked={rule.mode === 'split'} on:change={() => setMode(rule, 'split')} />
+                    <span>A/B split</span>
+                  </label>
+                </div>
+
+                {#if rule.mode === 'single'}
+                  <label class="sr-only" for={`${rule.id}-dest`}>Go to</label>
+                  <input id={`${rule.id}-dest`} class="d-field" type="text" inputmode="url" placeholder="https://example.com" bind:value={rule.destination} />
+                {:else}
+                  {#each rule.split as s, si}
+                    <div class="split">
+                      <input class="d-field url" type="text" inputmode="url" placeholder="https://example.com" data-split={si} aria-label={`Split destination ${si + 1}`} bind:value={s.destination} />
+                      <div class="d-unit-field weight">
+                        <input class="d-field" type="text" inputmode="numeric" placeholder="0" aria-label={`Split weight ${si + 1}`} bind:value={s.weight} />
+                        <span class="d-unit" aria-hidden="true">%</span>
+                      </div>
+                      <button type="button" class="d-icon" aria-label={`Remove split row ${si + 1}`} disabled={rule.split.length <= MIN_SPLIT} on:click={() => removeSplit(rule, si)}>
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
+                      </button>
+                    </div>
+                  {/each}
+                  <div class="split-foot">
+                    <button type="button" class="d-btn d-btn-text" data-act="add-split" disabled={rule.split.length >= MAX_SPLIT} on:click={() => addSplit(rule)}>Add split row</button>
+                    <p class="total" class:ok={total(rule) === 100} aria-live="polite">
+                      {total(rule)} of 100{total(rule) === 100 ? '' : ', must add up to 100'}
+                    </p>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          </fieldset>
+        </li>
+      {/each}
+    </ol>
   {/if}
 
-  {#each rules as rule, i (rule.id)}
-    <fieldset class="rule space-y-3" aria-label={`Rule ${i + 1}`} data-rule={rule.id}>
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-xs font-medium uppercase tracking-wider" style="color: var(--text-muted);">Rule {i + 1}</span>
-        <div class="flex items-center gap-1">
-          <button type="button" class="icon" data-act="up" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} on:click={() => move(i, -1)}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg>
-          </button>
-          <button type="button" class="icon" data-act="down" aria-label={`Move rule ${i + 1} down`} disabled={i === rules.length - 1} on:click={() => move(i, 1)}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <button type="button" class="icon" data-act="remove" aria-label={`Remove rule ${i + 1}`} on:click={() => removeRule(i)}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- When -->
-      <div class="space-y-2">
-        <p class="label">When</p>
-        {#if rule.conditions.length === 0}
-          <p class="hint">Always, unless an earlier rule matched.</p>
-        {/if}
-        {#each rule.conditions as c, ci (c.kind)}
-          <div class="cond space-y-2" data-cond={`${rule.id}-${c.kind}`}>
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium" style="color: var(--text-primary);">{kindLabel(c.kind)}</span>
-              <button type="button" class="icon" aria-label={`Remove ${kindLabel(c.kind)} condition`} on:click={() => removeCondition(rule, ci)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-              </button>
-            </div>
-
-            {#if c.kind === 'country'}
-              <label class="sr-only" for={`${rule.id}-country`}>Countries</label>
-              <input id={`${rule.id}-country`} class="field" type="text" placeholder="SG, MY, ID" bind:value={c.values} />
-              <p class="hint">Two-letter country codes, separated by commas.</p>
-            {:else if c.kind === 'referrer'}
-              <label class="sr-only" for={`${rule.id}-referrer`}>Referrer hosts</label>
-              <input id={`${rule.id}-referrer`} class="field" type="text" placeholder="x.com, news.ycombinator.com" bind:value={c.values} />
-              <p class="hint">Also matches subdomains. Separate with commas.</p>
-            {:else if c.kind === 'continent'}
-              <div class="flex flex-wrap gap-2" role="group" aria-label="Continents">
-                {#each CONTINENTS as o}
-                  <label class="chip">
-                    <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
-                           on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
-                    <span>{o.label}</span>
-                  </label>
-                {/each}
-              </div>
-            {:else if c.kind === 'device'}
-              <div class="flex flex-wrap gap-2" role="group" aria-label="Devices">
-                {#each DEVICES as o}
-                  <label class="chip">
-                    <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
-                           on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
-                    <span>{o.label}</span>
-                  </label>
-                {/each}
-              </div>
-            {:else if c.kind === 'os'}
-              <div class="flex flex-wrap gap-2" role="group" aria-label="Operating systems">
-                {#each OSES as o}
-                  <label class="chip">
-                    <input type="checkbox" class="sr-only" checked={c.values.includes(o.value)}
-                           on:change={() => { c.values = toggle(c.values, o.value); rules = rules; }} />
-                    <span>{o.label}</span>
-                  </label>
-                {/each}
-              </div>
-            {:else}
-              <div class="flex flex-wrap gap-2" role="group" aria-label="Days">
-                {#each DAYS as d, di}
-                  <label class="chip">
-                    <input type="checkbox" class="sr-only" checked={c.days.includes(di)}
-                           on:change={() => { c.days = toggleDay(c.days, di); rules = rules; }} />
-                    <span>{d}</span>
-                  </label>
-                {/each}
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="label" for={`${rule.id}-start`}>Start</label>
-                  <input id={`${rule.id}-start`} class="field" type="time" bind:value={c.start} />
-                </div>
-                <div>
-                  <label class="label" for={`${rule.id}-end`}>End</label>
-                  <input id={`${rule.id}-end`} class="field" type="time" bind:value={c.end} />
-                </div>
-              </div>
-              <div>
-                <label class="label" for={`${rule.id}-tz`}>Time zone</label>
-                <select id={`${rule.id}-tz`} class="field" bind:value={c.tz}>
-                  {#each zonesWith(c.tz) as z}<option value={z}>{z}</option>{/each}
-                </select>
-              </div>
-              <p class="hint">No days selected means every day. Overnight windows count from their start day.</p>
-            {/if}
-          </div>
-        {/each}
-
-        {#if available(rule).length > 0}
-          <select class="field add-select" data-act="add-condition" aria-label="Add condition" on:change={(e) => addCondition(rule, e)}>
-            <option value="">Add condition</option>
-            {#each available(rule) as k}<option value={k.kind}>{k.label}</option>{/each}
-          </select>
-        {/if}
-      </div>
-
-      <!-- Go to -->
-      <div class="space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <p class="label">Go to</p>
-          <div class="seg" role="group" aria-label={`Rule ${i + 1} destination type`}>
-            <button type="button" aria-pressed={rule.mode === 'single'} class:on={rule.mode === 'single'} on:click={() => setMode(rule, 'single')}>One URL</button>
-            <button type="button" aria-pressed={rule.mode === 'split'} class:on={rule.mode === 'split'} on:click={() => setMode(rule, 'split')}>A/B split</button>
-          </div>
-        </div>
-
-        {#if rule.mode === 'single'}
-          <label class="sr-only" for={`${rule.id}-dest`}>Go to</label>
-          <input id={`${rule.id}-dest`} class="field" type="text" inputmode="url" placeholder="https://example.com" bind:value={rule.destination} />
-          <p class="hint">https:// is added if missing</p>
-        {:else}
-          {#each rule.split as s, si}
-            <div class="flex items-center gap-2">
-              <input class="field flex-1 min-w-0" type="text" inputmode="url" placeholder="https://example.com" data-split={si} aria-label={`Split destination ${si + 1}`} bind:value={s.destination} />
-              <input class="field weight" type="text" inputmode="numeric" placeholder="%" aria-label={`Split weight ${si + 1}`} bind:value={s.weight} />
-              <button type="button" class="icon" aria-label={`Remove split row ${si + 1}`} disabled={rule.split.length <= MIN_SPLIT} on:click={() => removeSplit(rule, si)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
-              </button>
-            </div>
-          {/each}
-          <div class="flex items-center justify-between gap-2">
-            <button type="button" class="ghost" data-act="add-split" disabled={rule.split.length >= MAX_SPLIT} on:click={() => addSplit(rule)}>Add split row</button>
-            <p class="text-xs tabular-nums" aria-live="polite" style="color: {total(rule) === 100 ? 'var(--accent)' : 'var(--error)'};">
-              {total(rule)} of 100{total(rule) === 100 ? '' : ', must add up to 100'}
-            </p>
-          </div>
-        {/if}
-      </div>
-    </fieldset>
-  {/each}
-
-  <div class="flex items-center justify-between gap-2">
-    <button type="button" class="ghost" data-act="add-rule" disabled={rules.length >= MAX_RULES} on:click={addRule}>Add rule</button>
-    <span class="text-xs tabular-nums" style="color: var(--text-muted);">{rules.length} of {MAX_RULES}</span>
+  <div class="foot">
+    <button type="button" class="d-btn d-btn-secondary" data-act="add-rule" disabled={rules.length >= MAX_RULES} on:click={addRule}>Add rule</button>
+    <span class="d-readout cap">{rules.length} of {MAX_RULES}</span>
   </div>
 </div>
 
 <style>
+  .editor {
+    margin-top: 16px;
+  }
+  .empty {
+    padding: 20px 0;
+    font-size: 14px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid var(--border);
+  }
   .rule {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.75rem;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 16px 0 20px;
+    border-top: 1px solid var(--border);
+  }
+  .num {
+    line-height: 32px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  .body {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+  }
+  .head-label,
+  .name {
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+  }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: -6px;
+  }
+  .d-icon.danger:hover:not(:disabled) {
+    color: var(--error);
+  }
+  .always {
+    padding: 4px 0 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* Condition and destination rows: name | values | remove. */
+  .row {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) 32px;
+    grid-template-areas: 'name values remove';
+    column-gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+  }
+  .row .name {
+    grid-area: name;
+    display: flex;
+    align-items: center;
+    min-height: var(--d-ctl);
+    color: var(--text-primary);
+  }
+  .goto .name {
+    color: var(--text-muted);
+  }
+  .values {
+    grid-area: values;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     min-width: 0;
   }
-  .cond {
-    border-radius: 8px;
-    padding: 0.5rem 0.625rem;
-    background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  .values .d-hint {
+    margin-top: 0;
   }
-  .label {
-    display: block;
-    font-size: 0.75rem;
-    margin-bottom: 0.25rem;
+  .remove {
+    grid-area: remove;
+    margin-top: calc((var(--d-ctl) - 32px) / 2);
+  }
+  .days .d-key > span {
+    padding: 0;
+    font-size: 12px;
+  }
+  .range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .range .d-field {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .to {
+    font-size: 13px;
     color: var(--text-muted);
   }
-  .hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
+  .add {
+    padding: 4px 0 8px;
   }
-  .field {
-    display: block;
-    width: 100%;
-    font-size: 0.875rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    color: var(--text-primary);
-    background-color: var(--bg);
-    border: 1px solid var(--border);
-    transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  .picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
   }
-  select.field {
-    height: auto;
-    padding-right: 40px;
+  .pick {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
   }
-  .field:focus {
-    outline: none;
-    border-color: var(--border-focus);
+  .d-seg {
+    align-self: flex-start;
   }
-  .field::placeholder {
-    color: var(--text-muted);
-    opacity: 0.7;
+  .split {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .split .url {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .weight {
-    width: 4rem;
     flex: none;
+    width: 76px;
+    --d-unit-pad: 28px;
+  }
+  .split-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .total {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
     text-align: right;
+    color: var(--error);
   }
-  .add-select {
-    width: auto;
-    max-width: 100%;
+  .total.ok {
+    color: var(--accent);
   }
-  .chip {
-    display: inline-flex;
-    cursor: pointer;
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 16px;
   }
-  .chip span {
-    font-size: 0.8125rem;
-    padding: 0.25rem 0.625rem;
-    border-radius: 9999px;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-    background: var(--bg);
-    transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .chip input:checked + span {
-    color: var(--text-primary);
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-  }
-  .chip input:focus-visible + span {
-    outline: 2px solid var(--border-focus);
-    outline-offset: 2px;
-  }
-  .icon {
-    display: inline-flex;
-    padding: 0.375rem;
-    border-radius: 6px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
+  .cap {
+    font-size: 13px;
     color: var(--text-muted);
   }
-  .icon:hover:not(:disabled) {
-    color: var(--text-primary);
-  }
-  .icon:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-  .ghost {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    padding: 0.375rem 0.75rem;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    cursor: pointer;
-  }
-  .ghost:hover:not(:disabled) {
-    border-color: var(--text-muted);
-  }
-  .ghost:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-  .seg {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .seg button {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.625rem;
-    background: transparent;
-    color: var(--text-muted);
-    border: none;
-    cursor: pointer;
-  }
-  .seg button.on {
-    background: var(--text-primary);
-    color: var(--bg);
-  }
-  .icon:focus-visible,
-  .ghost:focus-visible,
-  .seg button:focus-visible {
-    outline: 2px solid var(--border-focus);
-    outline-offset: 2px;
+
+  @media (max-width: 639px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: 'name remove' 'values values';
+      row-gap: 4px;
+    }
+    .row .name {
+      min-height: 44px;
+    }
+    .remove {
+      margin-top: 0;
+    }
+    .pick {
+      height: 44px;
+    }
   }
 </style>

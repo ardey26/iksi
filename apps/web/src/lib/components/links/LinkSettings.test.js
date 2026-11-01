@@ -23,23 +23,28 @@ function mockFetch(response) {
 
 const sent = (fn) => JSON.parse(fn.mock.calls[0][1].body);
 const saveBtn = () => screen.getByRole('button', { name: 'Save' });
-const open = (name) => fireEvent.click(screen.getByRole('button', { name }));
+const addCondition = async (label) => {
+  await fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+  await fireEvent.click(screen.getByRole('button', { name: label }));
+};
 
 describe('LinkSettings', () => {
   beforeEach(() => vi.unstubAllGlobals());
   afterEach(() => vi.unstubAllGlobals());
 
-  it('starts collapsed and shows the destination once opened', async () => {
+  it('shows every setting as a row without expanding anything', () => {
     render(LinkSettings, { props: { id: 7, settings: base } });
-    expect(screen.queryByLabelText('Destination')).toBeNull();
-    await open(/Destination/);
     expect(screen.getByLabelText('Destination')).toHaveValue('https://example.com/start');
+    expect(screen.getByLabelText('Expiry')).toHaveValue('');
+    expect(screen.getByLabelText('Click limit')).toHaveValue('');
+    expect(screen.getByLabelText('New password')).toHaveValue('');
+    expect(screen.getByRole('switch', { name: 'Permanent redirect' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('heading', { name: 'Routing rules' })).toBeInTheDocument();
   });
 
   it('keeps Save disabled with no changes', async () => {
     render(LinkSettings, { props: { id: 7, settings: base } });
     expect(saveBtn()).toBeDisabled();
-    await open(/Destination/);
     await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: 'https://example.com/new' } });
     expect(saveBtn()).toBeEnabled();
     await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: base.destination } });
@@ -53,9 +58,8 @@ describe('LinkSettings', () => {
     };
     const fetchFn = mockFetch({ body: { ok: true, settings: saved } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Routing rules/);
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
-    await fireEvent.change(screen.getByLabelText('Add condition'), { target: { value: 'country' } });
+    await addCondition('Country');
     await fireEvent.input(screen.getByLabelText('Countries'), { target: { value: 'sg' } });
     await fireEvent.input(screen.getByLabelText('Go to'), { target: { value: 'https://sg.example.com' } });
     await fireEvent.click(saveBtn());
@@ -76,7 +80,6 @@ describe('LinkSettings', () => {
   it('keeps rule edits after a 400', async () => {
     mockFetch({ status: 400, body: { error: 'Rule 1: destination is not allowed' } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Routing rules/);
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     await fireEvent.input(screen.getByLabelText('Go to'), { target: { value: 'https://x.example.com' } });
     await fireEvent.click(saveBtn());
@@ -89,7 +92,6 @@ describe('LinkSettings', () => {
     mockFetch({ body: { ok: true, settings: saved } });
     const events = { saved: vi.fn() };
     render(LinkSettings, { props: { id: 7, settings: base }, events });
-    await open(/Permanent redirect/);
     await fireEvent.click(screen.getByRole('switch', { name: 'Permanent redirect' }));
     await fireEvent.click(saveBtn());
     await waitFor(() => expect(events.saved).toHaveBeenCalled());
@@ -99,9 +101,8 @@ describe('LinkSettings', () => {
   it('builds a time condition with days, start, end and zone', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Routing rules/);
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
-    await fireEvent.change(screen.getByLabelText('Add condition'), { target: { value: 'time' } });
+    await addCondition('Time of day');
     await fireEvent.click(screen.getByLabelText('Fri'));
     await fireEvent.click(screen.getByLabelText('Mon'));
     await fireEvent.input(screen.getByLabelText('Start'), { target: { value: '22:00' } });
@@ -116,15 +117,14 @@ describe('LinkSettings', () => {
   it('enters an A/B split with a live total', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Routing rules/);
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
-    const one = screen.getByRole('button', { name: 'One URL' });
-    const ab = screen.getByRole('button', { name: 'A/B split' });
-    expect(one).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('radiogroup', { name: 'Rule 1 destination type' })).toBeInTheDocument();
+    const one = screen.getByRole('radio', { name: 'One URL' });
+    const ab = screen.getByRole('radio', { name: 'A/B split' });
+    expect(one).toBeChecked();
     await fireEvent.click(ab);
-    expect(ab).toHaveAttribute('aria-pressed', 'true');
-    expect(one).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByRole('radio')).toBeNull();
+    expect(ab).toBeChecked();
+    expect(one).not.toBeChecked();
     await fireEvent.input(screen.getByLabelText('Split destination 1'), { target: { value: 'https://a.example.com' } });
     await fireEvent.input(screen.getByLabelText('Split destination 2'), { target: { value: 'https://b.example.com' } });
     await fireEvent.input(screen.getByLabelText('Split weight 1'), { target: { value: '60' } });
@@ -142,14 +142,12 @@ describe('LinkSettings', () => {
 
   it('hints that https:// is added', async () => {
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Destination/);
     expect(screen.getByText('https:// is added if missing')).toBeInTheDocument();
   });
 
   it('shows the server error and keeps the edits', async () => {
     mockFetch({ status: 400, body: { error: 'Rule 1: weights must add up to 100' } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Destination/);
     await fireEvent.input(screen.getByLabelText('Destination'), { target: { value: 'https://example.com/new' } });
     await fireEvent.click(saveBtn());
     expect(await screen.findByText('Rule 1: weights must add up to 100')).toBeInTheDocument();
@@ -160,7 +158,6 @@ describe('LinkSettings', () => {
   it('shows a rule error without calling the server', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Routing rules/);
     await fireEvent.click(screen.getByRole('button', { name: 'Add rule' }));
     await fireEvent.click(saveBtn());
     expect(await screen.findByText('Rule 1: add a destination')).toBeInTheDocument();
@@ -170,7 +167,6 @@ describe('LinkSettings', () => {
   it('removes a password', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: { ...base, hasPassword: false } } });
     render(LinkSettings, { props: { id: 7, settings: { ...base, hasPassword: true } } });
-    await open(/Password/);
     expect(screen.getByText('Password set')).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('button', { name: 'Remove password' }));
     await fireEvent.click(saveBtn());
@@ -181,10 +177,8 @@ describe('LinkSettings', () => {
   it('sets a password and max clicks', async () => {
     const fetchFn = mockFetch({ body: { ok: true, settings: base } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Password/);
     await fireEvent.input(screen.getByLabelText('New password'), { target: { value: 'hunter22' } });
-    await open(/Expiry/);
-    await fireEvent.input(screen.getByLabelText('Max clicks'), { target: { value: '50' } });
+    await fireEvent.input(screen.getByLabelText('Click limit'), { target: { value: '50' } });
     await fireEvent.click(saveBtn());
     await waitFor(() => expect(fetchFn).toHaveBeenCalled());
     expect(sent(fetchFn)).toEqual({ id: 7, password: 'hunter22', maxClicks: 50 });
@@ -194,7 +188,6 @@ describe('LinkSettings', () => {
     const saved = { ...base, permanent: true };
     const fetchFn = mockFetch({ body: { ok: true, settings: saved } });
     render(LinkSettings, { props: { id: 7, settings: base } });
-    await open(/Permanent redirect/);
     expect(screen.getByText(/Browsers cache 301s/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('switch', { name: 'Permanent redirect' }));
     await fireEvent.click(saveBtn());
