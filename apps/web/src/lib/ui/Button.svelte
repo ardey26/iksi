@@ -12,7 +12,7 @@
   export let disabled = false;
   /** Disables the button and shows a spinner; the label keeps its width. */
   export let loading = false;
-  /** Leading icon name. */
+  /** Leading icon name. For artwork outside the kit set (a provider's mark), use the `icon` slot. */
   export let icon = undefined;
   /** Trailing icon name. */
   export let iconEnd = undefined;
@@ -27,7 +27,7 @@
     data-ui
     class="btn {variant} {size} {className}"
     class:full
-    class:lead={icon}
+    class:lead={icon || $$slots.icon}
     class:trail={iconEnd}
     href={disabled ? undefined : href}
     aria-disabled={disabled || undefined}
@@ -36,7 +36,7 @@
     on:click
   >
     <span class="content">
-      {#if icon}<Icon name={icon} />{/if}
+      {#if $$slots.icon}<span class="glyph"><slot name="icon" /></span>{:else if icon}<Icon name={icon} />{/if}
       <span class="label"><slot /></span>
       {#if iconEnd}<Icon name={iconEnd} />{/if}
     </span>
@@ -47,7 +47,7 @@
     class="btn {variant} {size} {className}"
     class:full
     class:loading
-    class:lead={icon}
+    class:lead={icon || $$slots.icon}
     class:trail={iconEnd}
     {type}
     disabled={disabled || loading}
@@ -56,7 +56,7 @@
     on:click
   >
     <span class="content">
-      {#if icon}<Icon name={icon} />{/if}
+      {#if $$slots.icon}<span class="glyph"><slot name="icon" /></span>{:else if icon}<Icon name={icon} />{/if}
       <span class="label"><slot /></span>
       {#if iconEnd}<Icon name={iconEnd} />{/if}
     </span>
@@ -100,6 +100,10 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+  }
+  .glyph {
+    display: inline-flex;
+    flex: none;
   }
   .label {
     overflow: hidden;

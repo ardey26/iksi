@@ -3,6 +3,7 @@
   import { ThemeToggle, SEO } from '../lib/components';
   import { Button } from '#lib/ui/index.js';
   import UserMenu from '#lib/components/UserMenu.svelte';
+  import BrandMark from '#lib/components/BrandMark.svelte';
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
   import { appHref, subdomainHandleOf } from '#lib/subdomains.js';
@@ -115,13 +116,7 @@
     <!-- In the page flow, so nothing scrolls under it at any width. -->
     <header class="site-header">
       <a href={home} class="brand" data-ui aria-label="iksi home">
-        <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="11" fill="currentColor"></circle>
-          <g transform="rotate(-45 12 12)" stroke="var(--bg)" stroke-width="1.5" fill="none">
-            <rect x="4" y="10" width="7" height="4" rx="2"></rect>
-            <rect x="13" y="10" width="7" height="4" rx="2"></rect>
-          </g>
-        </svg>
+        <BrandMark size={20} />
         <span class="brand-name">iksi</span>
       </a>
 
@@ -137,9 +132,7 @@
       </div>
     </header>
 
-    {#if onLoginPage}
-      <main class="flex-1 flex items-center justify-center px-4 pb-16">{@render children()}</main>
-    {:else if isDashboard}
+    {#if isDashboard}
       <main class="flex-1 flex flex-col pt-8 pb-24 px-4 dash-main">{@render children()}</main>
     {:else}
       <main class="site-main">{@render children()}</main>
@@ -179,11 +172,6 @@
   .brand:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 0;
-  }
-  .brand-mark {
-    width: 20px;
-    height: 20px;
-    color: var(--text-muted);
   }
   .brand-name {
     font-size: 14px;

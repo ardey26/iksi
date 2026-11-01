@@ -14,7 +14,12 @@
 </script>
 
 <div class="empty {variant}">
-  <span class="icon"><Icon name={icon} size={20} /></span>
+  {#if $$slots.media}
+    <!-- Artwork that brings its own shape (the brand mark): no tile. -->
+    <span class="media"><slot name="media" /></span>
+  {:else}
+    <span class="icon"><Icon name={icon} size={20} /></span>
+  {/if}
   {#if variant === 'page'}
     <svelte:element this={`h${level}`} class="title t-title">{title}</svelte:element>
   {:else}
@@ -60,6 +65,11 @@
     color: var(--text-muted);
     text-wrap: balance;
   }
+  .media {
+    display: inline-flex;
+    margin-bottom: 16px;
+    color: var(--text-muted);
+  }
   .action { margin-top: 20px; }
 
   .page { padding: 16px 0 0; }
@@ -69,6 +79,7 @@
     margin-bottom: 20px;
     border-radius: 14px;
   }
+  .page .media { margin-bottom: 20px; }
   .page .title {
     font-size: 20px;
     line-height: 26px;

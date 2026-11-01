@@ -1,6 +1,7 @@
 <script>
   // A public interstitial (DESIGN.md › Layout): a centered 480 column, one
-  // paper, an icon, a Title, one line and one action (the default slot).
+  // paper, an icon (or the `media` slot: the brand mark), a Title, one line
+  // and one action (the default slot).
   // Used by every short-link page and the error pages.
   import { Container, EmptyState, Paper, Stack } from '#lib/ui/index.js';
 
@@ -12,7 +13,12 @@
 <Container width="narrow" class="interstitial">
   <Stack gap={16}>
     <Paper>
-      {#if $$slots.default}
+      {#if $$slots.media}
+        <EmptyState variant="page" {icon} {title} {description}>
+          <svelte:fragment slot="media"><slot name="media" /></svelte:fragment>
+          <slot />
+        </EmptyState>
+      {:else if $$slots.default}
         <EmptyState variant="page" {icon} {title} {description}><slot /></EmptyState>
       {:else}
         <EmptyState variant="page" {icon} {title} {description} />
