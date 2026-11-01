@@ -1,5 +1,5 @@
 <script>
-  // The page lives in LinkPage so other short-link routes can share it.
+  // The page is shared with the other short-link route; see LinkPage.
   import LinkPage from '#lib/components/LinkPage.svelte';
 
   let { data, form } = $props();

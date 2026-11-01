@@ -953,3 +953,17 @@ describe('routing and decisions at the edge', () => {
 		expect(res.status).toBe(301);
 	});
 });
+
+test('a profile-scoped link is left to origin and never looked up at the edge', async () => {
+	const { upstream, seen } = recordingUpstream(() => new Response(null, { status: 302 }));
+	const { store, calls } = memoryStore();
+	const res = await createHandler(deps(upstream, store))(
+		new Request('https://www.iksi.app/@andre/sale'),
+		testEnv(),
+		ctx
+	);
+	expect(res.headers.get('x-iksi-route')).toBe('scoped');
+	expect(seen).toHaveLength(1);
+	expect(new URL(seen[0].url).pathname).toBe('/@andre/sale');
+	expect(calls).toEqual([]);
+});

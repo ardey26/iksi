@@ -1,5 +1,5 @@
 <script>
-  // A short link's page: password, preview, one-time reveal.
+  // A short link's page (password, preview, one-time reveal) at /[slug] and /@[handle]/[name].
   import { applyAction, enhance } from '$app/forms';
   import { page } from '$app/state';
   import LinkNotice from '#lib/components/LinkNotice.svelte';

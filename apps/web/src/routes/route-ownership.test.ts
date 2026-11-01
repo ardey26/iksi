@@ -43,4 +43,11 @@ describe('route ownership', () => {
 			'/media/[uid]/[kind]/[file]'
 		]);
 	});
+
+	it('keeps /@handle the profile page and gives /@handle/name to the scoped link route', () => {
+		// [slug] also matches the shape; SvelteKit ranks the static "@" prefix first.
+		expect(routesMatching('/@andre')).toEqual(['/@[handle]', '/[slug]']);
+		expect(routesMatching('/@andre/sale')).toEqual(['/@[handle]/[name]']);
+		expect(routesMatching('/@andre/sale+')).toEqual(['/@[handle]/[name]']);
+	});
 });

@@ -1,4 +1,11 @@
-export { classifyPath, RESERVED_PREFIXES, type PathClass } from './routing/path';
+export {
+	classifyPath,
+	parseScopedSlug,
+	RESERVED_PREFIXES,
+	scopedSlug,
+	type PathClass,
+	type SlugMode
+} from './routing/path';
 export {
 	CANONICAL_HOST,
 	normalizeHost,

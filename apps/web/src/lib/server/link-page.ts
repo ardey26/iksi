@@ -1,7 +1,8 @@
 /**
  * What a short link does when visited: redirect, ask for a password, show an
- * expired, flagged or one-time page, or preview it (`+`). Lives outside the
- * route so every route that serves a short link decides through this one code path.
+ * expired, flagged or one-time page, or preview it (`+`). Shared by `/[slug]`
+ * and profile-scoped `/@[handle]/[name]`, so both decide through this one code
+ * path. A scoped link is stored under `@handle/name`, so that is its slug here.
  */
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import bcrypt from 'bcrypt';
@@ -60,10 +61,10 @@ type Row = NonNullable<Awaited<ReturnType<typeof findRow>>>;
 
 const OPENED = { message: 'This link was already opened.', view: 'opened' } as const;
 
-/** The link this path names, or a 404. */
+/** The link this path names (a slug, or `@handle/name`), or a 404. */
 function linkPathOf(event: RequestEvent): { slug: string; mode: 'redirect' | 'preview' } {
   const path = classifyPath(event.url.pathname);
-  if (path.kind !== 'slug' || path.mode === 'stats') error(404, 'not found');
+  if ((path.kind !== 'slug' && path.kind !== 'scoped') || path.mode === 'stats') error(404, 'not found');
   return { slug: path.slug, mode: path.mode };
 }
 

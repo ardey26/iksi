@@ -3,6 +3,7 @@
   import { ThemeToggle, SEO } from '../lib/components';
   import UserMenu from '#lib/components/UserMenu.svelte';
   import { page, navigating } from '$app/state';
+  import { isProfilePath } from '#lib/utils/route-kind.js';
 
   let { data, children } = $props();
 
@@ -67,7 +68,8 @@
   const seo = $derived(seoForRoute(page.url.pathname, page.url.host));
   const isAdminSurface = $derived(page.url.host === 'admin.iksi.app' || page.url.host === 'admin.localhost' || page.url.host.startsWith('admin.localhost:') || page.url.pathname.startsWith('/admin'));
   const onLoginPage = $derived(page.url.pathname === '/login');
-  const isProfilePage = $derived(page.url.pathname.startsWith('/@'));
+  // Only /@handle itself: /@handle/name is a short link and keeps the site chrome.
+  const isProfilePage = $derived(isProfilePath(page.url.pathname));
   // Public homepage + login use a full-height centered layout.
   // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
   const centerContent = $derived(page.url.pathname === '/' || onLoginPage);

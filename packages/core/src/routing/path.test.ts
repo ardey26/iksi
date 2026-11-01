@@ -1,4 +1,4 @@
-import { classifyPath, RESERVED_PREFIXES } from './path';
+import { classifyPath, parseScopedSlug, RESERVED_PREFIXES, scopedSlug } from './path';
 
 test('root', () => expect(classifyPath('/')).toEqual({ kind: 'root' }));
 
@@ -49,3 +49,47 @@ test.each(['/abc/', '/abc/def', '/a b', '/abc%2F', '/' + 'a'.repeat(65), '/abc+o
 
 test('every reserved prefix starts with a slash', () =>
 	RESERVED_PREFIXES.forEach((p) => expect(p.startsWith('/')).toBe(true)));
+
+describe('profile-scoped links', () => {
+	test('a single segment after /@ stays the profile page', () => {
+		expect(classifyPath('/@andre')).toEqual({ kind: 'reserved' });
+		expect(classifyPath('/@andre/')).toEqual({ kind: 'reserved' });
+	});
+
+	test('a name under a handle is a scoped link keyed by its stored name', () => {
+		expect(classifyPath('/@andre/sale')).toEqual({
+			kind: 'scoped',
+			handle: 'andre',
+			name: 'sale',
+			slug: '@andre/sale',
+			mode: 'redirect'
+		});
+		expect(classifyPath('/@andre/sale+')).toMatchObject({ kind: 'scoped', slug: '@andre/sale', mode: 'preview' });
+		expect(classifyPath('/@andre/sale+stats')).toMatchObject({ kind: 'scoped', mode: 'stats' });
+	});
+
+	test('the handle is case-insensitive, the name keeps its case', () => {
+		expect(classifyPath('/@AnDre/Sale')).toMatchObject({ kind: 'scoped', handle: 'andre', name: 'Sale', slug: '@andre/Sale' });
+	});
+
+	test('a name the app would reserve at the top level is fine under a handle', () => {
+		expect(classifyPath('/@andre/dashboard')).toMatchObject({ kind: 'scoped', slug: '@andre/dashboard' });
+	});
+
+	test.each(['/@andre/a/b', '/@andre/a b', '/@andre/+', '/@andre/a+x', '/@ab/sale', '/@' + 'a'.repeat(31) + '/sale'])(
+		'not a scoped link: %s',
+		(p) => expect(classifyPath(p).kind).not.toBe('scoped')
+	);
+
+	test('scopedSlug builds the stored name with a lowercase handle', () => {
+		expect(scopedSlug('Andre', 'Sale')).toBe('@andre/Sale');
+	});
+
+	test('parseScopedSlug reads a requested scoped name', () => {
+		expect(parseScopedSlug('@Andre/sale')).toEqual({ handle: 'andre', name: 'sale' });
+		expect(parseScopedSlug('@andre/sale/x')).toBeNull();
+		expect(parseScopedSlug('@andre/')).toBeNull();
+		expect(parseScopedSlug('andre/sale')).toBeNull();
+		expect(parseScopedSlug('@andre/sa le')).toBeNull();
+	});
+});
