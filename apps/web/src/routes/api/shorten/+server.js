@@ -10,6 +10,8 @@ import { classifyPath } from '@iksi/core';
 import { clientOf } from '#lib/server/client.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
+import { API_KEY_RATE, authenticateApiKey, readBearer } from '#lib/server/api-keys.js';
+import { extensionPreflight, withExtensionCors } from '#lib/server/extension-cors.js';
 
 /** What anonymous dedupe needs to know about the row already holding a urlHash. */
 const DEDUPE_SELECT = {
@@ -81,7 +83,37 @@ const generateShortURL = async (retries = SHORT_URL.retries) => {
 };
 
 
-export const POST = async (event) => {
+const jsonError = (status, error, extra = {}) =>
+	new Response(JSON.stringify({ error, ...extra }), {
+		status,
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+/**
+ * Who is shortening: an API key's owner, the signed-in user, or nobody.
+ * A request that sends an Authorization header is judged by that header
+ * alone. A bad or revoked key is refused, never treated as anonymous, and the
+ * session cookie is ignored.
+ */
+async function identify(request, cookies) {
+	const bearer = readBearer(request.headers.get('authorization'));
+	if (bearer.kind === 'none') return { uid: verifyUserSession(cookies.get('user_session')) };
+
+	const invalid = { response: jsonError(401, 'Invalid API key', { code: 'invalid_key' }) };
+	if (bearer.kind === 'bad') return invalid;
+	const key = await authenticateApiKey(bearer.key);
+	if (!key) return invalid;
+
+	const limit = await rateLimit(`apikey:${key.id}`, API_KEY_RATE.requests, API_KEY_RATE.windowMs);
+	if (!limit.allowed) return { response: jsonError(429, 'Too many requests for this key. Please wait a minute.') };
+	return { uid: key.userId };
+}
+
+export const OPTIONS = async ({ request }) => extensionPreflight(request);
+
+export const POST = async (event) => withExtensionCors(event.request, await shorten(event));
+
+const shorten = async (event) => {
 	const { request, cookies } = event;
 	try {
 		// Rate limiting
@@ -108,8 +140,11 @@ export const POST = async (event) => {
 			});
 		}
 
+		const who = await identify(request, cookies);
+		if (who.response) return who.response;
+		const uid = who.uid;
+
 		const { longURL, customURL } = await request.json();
-		const uid = verifyUserSession(cookies.get('user_session'));
 
 		// Input validation
 		if (!longURL || typeof longURL !== 'string') {
