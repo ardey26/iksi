@@ -19,13 +19,17 @@ export interface Institution {
 }
 
 /** Keyed by the BIC in sub-tag 01 of a QR Ph merchant account template (tags 26–51). */
+const MAYA: Institution = { id: 'maya', name: 'Maya', logo: '/brands/maya.svg', aspect: 112 / 33, wordmark: true };
+
 const BY_BIC: Record<string, Institution> = {
 	GXCHPHM2XXX: { id: 'gcash', name: 'GCash', logo: '/brands/gcash.svg', aspect: 72 / 61 },
-	LAUIPHM2XXX: { id: 'maribank', name: 'MariBank', logo: '/brands/maribank.png', aspect: 152 / 128 }
+	LAUIPHM2XXX: { id: 'maribank', name: 'MariBank', logo: '/brands/maribank.png', aspect: 152 / 128 },
+	// Read from a real Maya QR Ph code (merchant template, GUID ph.ppmi.p2m).
+	PAPHPHM1XXX: MAYA
 };
 
 /**
- * Banks whose BIC is not confirmed, known only when a merchant account GUID
+ * Fallback for QR codes without a known BIC: banks known when a merchant account GUID
  * spells out their name as a word of its own ("com.paymaya", "ph.maya.qr").
  * Never matched against the account holder's name (tag 59): Maya is a common
  * first name, so "MAYA SANTOS" says nothing about the bank.
@@ -33,7 +37,7 @@ const BY_BIC: Record<string, Institution> = {
 const BY_GUID: { pattern: RegExp; institution: Institution }[] = [
 	{
 		pattern: /(^|[^a-z0-9])(pay)?maya([^a-z0-9]|$)/i,
-		institution: { id: 'maya', name: 'Maya', logo: '/brands/maya.svg', aspect: 112 / 33, wordmark: true }
+		institution: MAYA
 	}
 ];
 
@@ -41,7 +45,13 @@ const BIC_MAP = new Map(Object.entries(BY_BIC));
 const BY_ID = new Map<string, Institution>(
 	[...Object.values(BY_BIC), ...BY_GUID.map((m) => m.institution)].map((i) => [i.id, i])
 );
-const BIC_KEYED = new Set(Object.values(BY_BIC).map((i) => i.id));
+/**
+ * Banks whose every QR is named by one known BIC, so an owner's stored choice
+ * can never override the QR. Maya is left out: its personal (Maya Bank) codes
+ * may carry a BIC other than PAPHPHM1XXX, so an owner's "Maya" choice stands
+ * when the QR's BIC is unknown.
+ */
+const BIC_KEYED = new Set(Object.values(BY_BIC).map((i) => i.id).filter((id) => id !== MAYA.id));
 
 /** What an unknown bank's QR is called until its owner renames it. */
 export const FALLBACK_QR_LABEL = 'Bank QR';

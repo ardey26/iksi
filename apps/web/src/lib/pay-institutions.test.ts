@@ -47,10 +47,18 @@ describe('identifyInstitution', () => {
 		expect(identifyInstitution(accounts)).toBeNull();
 	});
 
-	describe('Maya, whose BIC is unconfirmed', () => {
-		it('is never guessed from a BIC', () => {
-			// Plausible-looking Maya codes: none of them may be assumed to be Maya's.
-			for (const bic of ['PAPHPHM1XXX', 'MAYAPHM2XXX', 'PYMYPHM2XXX']) {
+	describe('Maya', () => {
+		it('knows Maya by its confirmed BIC (read from a real Maya QR Ph code)', () => {
+			expect(identifyInstitution([account('ph.ppmi.p2m', 'PAPHPHM1XXX')])).toMatchObject({
+				id: 'maya',
+				name: 'Maya',
+				logo: '/brands/maya.svg',
+				wordmark: true
+			});
+		});
+
+		it('is still never guessed from an unconfirmed BIC', () => {
+			for (const bic of ['MAYAPHM2XXX', 'PYMYPHM2XXX']) {
 				expect(identifyInstitution([account('com.p2pqrpay', bic)])).toBeNull();
 			}
 		});

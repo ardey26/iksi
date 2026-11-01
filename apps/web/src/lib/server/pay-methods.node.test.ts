@@ -48,8 +48,13 @@ describe('methodFromImage', () => {
 		expect(m).not.toHaveProperty('institution');
 	});
 
-	it('does not take a Maya-looking BIC for Maya', async () => {
-		const m = await methodFromImage(await qrPng(payQrPayload({ bic: 'PAPHPHM1XXX' })), newId);
+	it('names a Maya QR by its confirmed BIC', async () => {
+		const m = await methodFromImage(await qrPng(payQrPayload({ guid: 'ph.ppmi.p2m', bic: 'PAPHPHM1XXX' })), newId);
+		expect(m).toMatchObject({ label: 'Maya', institution: 'maya' });
+	});
+
+	it('does not take a Maya-looking but unconfirmed BIC for Maya', async () => {
+		const m = await methodFromImage(await qrPng(payQrPayload({ bic: 'MAYAPHM2XXX' })), newId);
 		expect(m).toMatchObject({ label: 'Bank QR' });
 		expect(m).not.toHaveProperty('institution');
 	});

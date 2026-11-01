@@ -189,9 +189,10 @@ describe('qrBankOf', () => {
 		});
 	});
 
-	it('knows Maya only when the GUID names it', () => {
+	it('knows Maya by its BIC or a GUID that names it', () => {
+		expect(qrBankOf(payQrPayload({ guid: 'ph.ppmi.p2m', bic: 'PAPHPHM1XXX' })).institution?.id).toBe('maya');
 		expect(qrBankOf(payQrPayload({ guid: 'com.paymaya', bic: 'BOPIPHMMXXX' })).institution?.id).toBe('maya');
-		expect(qrBankOf(payQrPayload({ bic: 'PAPHPHM1XXX' })).institution).toBeNull();
+		expect(qrBankOf(payQrPayload({ bic: 'MAYAPHM2XXX' })).institution).toBeNull();
 	});
 
 	it('never reads the bank from the account holder name', () => {
