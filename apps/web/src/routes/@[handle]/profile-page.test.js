@@ -55,8 +55,8 @@ describe('public profile background', () => {
   it('keeps avatar dimensions', () => {
     const { container } = render(Page, { data: { ...base, backgroundUrl: BG } });
     const img = container.querySelector('img');
-    expect(img.getAttribute('width')).toBe('56');
-    expect(img.getAttribute('height')).toBe('56');
+    expect(img.getAttribute('width')).toBe('72');
+    expect(img.getAttribute('height')).toBe('72');
   });
 });
 

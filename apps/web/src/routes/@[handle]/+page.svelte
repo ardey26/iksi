@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import PayButton from '#lib/components/PayButton.svelte';
+  import { Button, IconButton, List, Paper, Row } from '#lib/ui/index.js';
   import { profileLabel, profileUrl as profileUrlOf } from '#lib/subdomains.js';
 
   export let data;
@@ -15,23 +16,11 @@
     } catch {}
   }
 
-  function fmtClicks(n: number) {
-    if (n < 1000) return n.toString();
-    if (n < 10000) return (n / 1000).toFixed(1) + 'k';
-    if (n < 1000000) return Math.round(n / 1000) + 'k';
-    return (n / 1000000).toFixed(1) + 'M';
-  }
-
-  function hostOf(u: string) {
-    try { return new URL(u).hostname.replace(/^www\./, ''); }
-    catch { return u; }
-  }
-
+  // Up to two initials, letters or digits only; never punctuation like "@".
   function initials(name: string) {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '·';
-    if (parts.length === 1) return parts[0].slice(0, 2).toLowerCase();
-    return (parts[0][0] + parts[1][0]).toLowerCase();
+    const words = name.match(/[\p{L}\p{N}]+/gu) ?? [];
+    if (words.length === 0) return '?';
+    return (words.length === 1 ? words[0].slice(0, 1) : words[0][0] + words[1][0]).toUpperCase();
   }
 
   // --- Share popup state ---
@@ -103,7 +92,21 @@
      --surface: oklch(from ${data.accent} ${sL} 0.014 h);
      --border: oklch(from ${data.accent} ${brL} 0.050 h);
      --text-primary: oklch(from ${data.accent} ${tL} 0.008 h);
-     --text-muted: oklch(from ${data.accent} ${mL} 0.018 h);`;
+     --text-muted: oklch(from ${data.accent} ${mL} 0.018 h);` + kitTokens;
+
+  // The UI kit's remaining tokens, derived from the same palette so kit
+  // components (rows, buttons, the pay sheet) match the owner's colours.
+  $: kitTokens = `
+     --surface-2: oklch(from ${data.accent} ${isLight ? Math.max(0, sL - 0.02) : Math.min(1, sL + 0.03)} 0.014 h);
+     --skeleton: oklch(from ${data.accent} ${isLight ? Math.max(0, sL - 0.05) : Math.min(1, sL + 0.06)} 0.014 h);
+     --border-strong: oklch(from ${data.accent} ${isLight ? Math.max(0, brL - 0.08) : Math.min(1, brL + 0.08)} 0.050 h);
+     --text-faint: oklch(from ${data.accent} ${isLight ? Math.min(0.62, mL + 0.1) : Math.max(0.5, mL - 0.1)} 0.018 h);
+     --track: oklch(from ${data.accent} ${isLight ? Math.max(0, sL - 0.03) : Math.min(1, sL + 0.03)} 0.014 h);
+     --thumb: var(--surface);
+     --paper-shadow: ${isLight ? '0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04)' : 'inset 0 1px 0 rgb(255 255 255 / 0.04)'};
+     --overlay-shadow: ${isLight ? '0 24px 64px rgb(0 0 0 / 0.16)' : '0 24px 64px rgb(0 0 0 / 0.6)'};
+     --scrim: ${isLight ? 'rgb(9 9 11 / 0.32)' : 'rgb(0 0 0 / 0.64)'};
+     color-scheme: ${isLight ? 'light' : 'dark'};`;
 
   // backgroundUrl lands in an inline style: accept only https URLs with none
   // of the characters that could end the quoted url() string or the declaration.
@@ -185,177 +188,271 @@
   {@html `<script type="application/ld+json">${personLdJson}</script>`}
 </svelte:head>
 
-<div class="iksi-profile min-h-screen flex items-center justify-center p-4 sm:p-8"
-     style="{paletteStyle}{bgStyle} color: var(--text-primary);">
-
+<div class="iksi-profile" data-palette style="{paletteStyle}{bgStyle} color: var(--text-primary);">
   {#if bgUrl}
     <!-- Solid scrim (no gradient) so the photo never fights the palette. -->
     <div class="profile-scrim" aria-hidden="true"
          style="background: color-mix(in srgb, var(--bg) 72%, transparent);"></div>
   {/if}
 
-  <div class="w-full max-w-lg rounded-[2rem] overflow-visible profile-card"
-       style="background: var(--surface); border: 1px solid var(--border);">
-
-    <!-- Header -->
-    <div class="p-7 sm:p-8 flex items-start gap-4">
+  <main class="profile">
+    <header class="head">
       {#if data.avatarUrl && !avatarBroken}
         <!-- Hot-linked avatars (LinkedIn, Twitter CDNs) expire; fall back to initials instead of a broken image. -->
-        <img src={data.avatarUrl} alt="" class="w-14 h-14 rounded-full object-cover shrink-0"
-             width="56" height="56"
-             style="border: 1px solid var(--border);"
+        <img src={data.avatarUrl} alt="" class="avatar" width="72" height="72"
              on:error={() => (avatarBroken = true)} />
       {:else}
-        <div class="w-14 h-14 rounded-full shrink-0 flex items-center justify-center text-lg font-semibold"
-             style="background: oklch(from var(--accent) 0.90 max(c, 0.08) h); color: var(--accent-text);">
-          {initials(data.displayName)}
-        </div>
+        <div class="avatar avatar-initials" aria-hidden="true">{initials(data.displayName)}</div>
       {/if}
 
-      <div class="flex-1 min-w-0">
-        <h1 class="text-2xl font-semibold tracking-tight leading-tight truncate"
-            style="color: var(--text-primary);">{data.displayName}</h1>
-        <p class="text-sm mt-1 truncate" style="color: var(--accent-text);">{profileLabel(data.handle, !!data.subdomains)}</p>
+      <h1 class="name">{data.displayName}</h1>
+      <div class="handle">
+        <span class="handle-url">{profileLabel(data.handle, !!data.subdomains)}</span>
+        <Button size="sm" variant="ghost" icon={copied ? 'check' : 'copy'} on:click={copyProfileUrl}>
+          <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
+        </Button>
       </div>
 
-      <button
-        on:click={copyProfileUrl}
-        class="px-4 py-2 rounded-full text-sm font-medium transition-opacity hover:opacity-90 shrink-0"
-        style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
-      >{copied ? 'Copied' : 'Copy'}</button>
-    </div>
+      {#if data.bio}
+        <p class="bio">{data.bio}</p>
+      {/if}
 
-    <!-- Bio -->
-    {#if data.bio}
-      <div class="px-7 sm:px-8 pb-8">
-        <p class="text-2xl leading-tight font-medium" style="color: var(--text-primary);">
-          {data.bio}
-        </p>
-      </div>
-    {/if}
+      {#if data.pay}
+        <div class="pay">
+          <PayButton handle={data.handle} displayName={data.displayName} label={data.pay.label} methods={data.pay.methods} />
+        </div>
+      {/if}
+    </header>
 
-    {#if data.pay}
-      <div class="px-7 sm:px-8 pb-8">
-        <PayButton handle={data.handle} displayName={data.displayName} label={data.pay.label} methods={data.pay.methods} />
-      </div>
-    {/if}
-
-    {#if data.rows.length === 0}
-      <div class="px-7 sm:px-8 pb-8 pt-6" style="border-top: 1px solid var(--border);">
-        <p class="text-sm" style="color: var(--text-muted);">Nothing here yet.</p>
-      </div>
-    {:else}
-      <ul>
-        {#each data.rows as row, i}
-          <li class="row-item relative flex items-stretch" style="border-top: 1px solid var(--border);">
+    <Paper padding="none" class="links">
+      {#if data.rows.length === 0}
+        <p class="empty">Nothing here yet.</p>
+      {:else}
+        <List label="Links">
+          {#each data.rows as row (row.id)}
             {#if row.href}
-              <a href={row.href}
-                 class="row group flex items-center gap-4 flex-1 min-w-0 pl-7 sm:pl-8 pr-3 py-5 transition-colors"
-                 style="color: var(--text-primary);">
-                <span class="text-sm tabular-nums shrink-0" style="color: var(--text-muted); opacity: 0.6;">
-                  {i + 1}.
-                </span>
-                <div class="text-lg font-semibold tracking-tight truncate min-w-0 flex-1"
-                     style="color: var(--text-primary);">
-                  {row.title}
-                </div>
-              </a>
-
-              <!-- Kebab button, first-class sibling of the anchor -->
-              <button
-                type="button"
-                on:click|preventDefault|stopPropagation={() => toggleShare(row.id)}
-                aria-label="Share options"
-                aria-expanded={openShareId === row.id}
-                class="kebab-btn shrink-0 pr-6 sm:pr-7 pl-3 py-5 transition-opacity"
-                style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
-              >
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <circle cx="12" cy="5" r="2"/>
-                  <circle cx="12" cy="12" r="2"/>
-                  <circle cx="12" cy="19" r="2"/>
-                </svg>
-              </button>
-
-              {#if openShareId === row.id}
-                <div class="share-menu absolute right-4 top-full z-20 mt-1 min-w-[220px] rounded-xl overflow-hidden py-1"
-                     style="background: var(--surface); border: 1px solid var(--border); box-shadow: 0 12px 32px -8px oklch(from var(--accent) 0.15 0.05 h / 0.35), 0 4px 12px -4px oklch(from var(--accent) 0.15 0.03 h / 0.2);">
-                  <button type="button"
-                          on:click={() => copyRowUrl(row)}
-                          class="menu-item w-full text-left px-4 py-2.5 text-sm transition-colors"
-                          style="color: var(--text-primary); background: transparent; border: none; cursor: pointer;">
-                    {copiedRowId === row.id ? 'Copied!' : 'Copy link'}
-                  </button>
-                  <a href={tweetIntent(row)} target="_blank" rel="noopener"
-                     class="menu-item block px-4 py-2.5 text-sm transition-colors"
-                     style="color: var(--text-primary);">Share on X</a>
-                  <a href={fbShare(row)} target="_blank" rel="noopener"
-                     class="menu-item block px-4 py-2.5 text-sm transition-colors"
-                     style="color: var(--text-primary);">Share on Facebook</a>
-                  <div class="mx-4 my-1" style="border-top: 1px solid var(--border);"></div>
-                  <a href="https://www.iksi.app/" target="_blank" rel="noopener"
-                     class="menu-item block px-4 py-2.5 text-sm transition-colors"
-                     style="color: var(--text-muted);">Try iksi →</a>
-                </div>
-              {/if}
+              <Row interactive class="link-row">
+                <a href={row.href} class="row-link">{row.title}</a>
+                <svelte:fragment slot="actions">
+                  <span class="share" class:open={openShareId === row.id}>
+                    <IconButton
+                      icon="more"
+                      label="Share {row.title}"
+                      class="kebab-btn"
+                      aria-haspopup="true"
+                      aria-expanded={openShareId === row.id}
+                      on:click={(e) => { e.preventDefault(); e.stopPropagation(); toggleShare(row.id); }}
+                    />
+                    {#if openShareId === row.id}
+                      <div class="share-menu">
+                        <button data-ui type="button" class="menu-item" on:click={() => copyRowUrl(row)}>
+                          {copiedRowId === row.id ? 'Copied' : 'Copy link'}
+                        </button>
+                        <a data-ui href={tweetIntent(row)} target="_blank" rel="noopener" class="menu-item">Share on X</a>
+                        <a data-ui href={fbShare(row)} target="_blank" rel="noopener" class="menu-item">Share on Facebook</a>
+                        <div class="menu-sep" role="separator"></div>
+                        <a data-ui href="https://www.iksi.app/" target="_blank" rel="noopener" class="menu-item muted">Try iksi</a>
+                      </div>
+                    {/if}
+                  </span>
+                </svelte:fragment>
+              </Row>
             {:else}
-              <div class="flex items-center gap-4 flex-1 px-7 sm:px-8 py-5"
-                   style="color: var(--text-muted); opacity: 0.5;">
-                <span class="text-sm tabular-nums opacity-60">{i + 1}.</span>
-                <div class="text-lg font-semibold tracking-tight truncate flex-1">{row.title}</div>
-                <span class="text-xs uppercase tracking-wider opacity-60">unavailable</span>
-              </div>
+              <Row muted title={row.title}>
+                <span slot="meta" class="t-caption">Unavailable</span>
+              </Row>
             {/if}
-          </li>
-        {/each}
-        <li class="py-3" style="border-top: 1px solid var(--border);"></li>
-      </ul>
-    {/if}
+          {/each}
+        </List>
+      {/if}
+    </Paper>
 
-    <!-- Footer -->
-    <div class="px-7 sm:px-8 pb-6 pt-2 text-center">
-      <span class="text-sm" style="color: var(--text-muted);">
-        {data.handle} shortens links with
-        <a href="https://www.iksi.app/" target="_blank" rel="noopener"
-           class="underline decoration-1 underline-offset-2 transition-colors hover:opacity-70"
-           style="color: var(--text-primary);">iksi</a>
-      </span>
-    </div>
-
-  </div>
+    <footer class="foot">
+      @{data.handle} shortens links with
+      <a href="https://www.iksi.app/" target="_blank" rel="noopener" class="foot-link">iksi</a>
+    </footer>
+  </main>
 </div>
 
 <style>
-  .iksi-profile { position: relative; isolation: isolate; }
+  .iksi-profile {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
   .profile-scrim { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-  .profile-card { position: relative; z-index: 1; }
 
-  /* Soft, accent-tinted drop shadow — layered for depth */
-  .profile-card {
-    box-shadow:
-      0 24px 60px -20px oklch(from var(--accent) 0.15 0.08 h / 0.35),
-      0 8px 24px -6px oklch(from var(--accent) 0.15 0.04 h / 0.18);
+  /* Public page column: 480, generous top space (DESIGN.md › Layout). */
+  .profile {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: calc(var(--width-narrow) + var(--gutter) * 2);
+    margin: 0 auto;
+    padding: 48px var(--gutter) 40px;
+  }
+  @media (min-width: 768px) {
+    .profile { padding-top: 96px; }
   }
 
-  /* Tint the whole li (including the kebab sibling) when hovered. */
-  .row-item:hover {
-    background: color-mix(in srgb, var(--accent) 5%, transparent);
+  .head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 32px;
+    text-align: center;
   }
-  .kebab-btn:hover {
+  .avatar {
+    flex: none;
+    width: 72px;
+    height: 72px;
+    margin-bottom: 16px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .avatar-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: oklch(from var(--accent) 0.36 max(c, 0.09) h);
+    background-color: oklch(from var(--accent) 0.90 max(c, 0.08) h);
+  }
+  .name {
+    max-width: 100%;
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 28px;
+    line-height: 32px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
     color: var(--text-primary);
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
-  .menu-item:hover {
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  .handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    max-width: 100%;
+    margin-top: 6px;
+  }
+  .handle-url {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 500;
+    color: var(--accent-text);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .bio {
+    max-width: 400px;
+    margin: 16px 0 0;
+    font-size: 17px;
+    line-height: 26px;
+    color: var(--text-primary);
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+  }
+  .pay {
+    width: 100%;
+    margin-top: 24px;
   }
 
-  /* Skeleton shimmer for streaming rows */
-  .skeleton {
-    background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-    animation: shimmer 1.4s ease-in-out infinite;
+  .empty {
+    margin: 0;
+    padding: 20px 16px;
+    font-size: 15px;
+    line-height: 22px;
+    color: var(--text-muted);
+    text-align: center;
   }
-  @keyframes shimmer {
-    0%, 100% { opacity: 0.35; }
-    50% { opacity: 0.6; }
+
+  /* The whole row is the link; the share button sits above it. */
+  :global(.link-row) { position: relative; }
+  .row-link {
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+  .row-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .row-link:focus-visible { outline: none; }
+  .row-link:focus-visible::after {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .share {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+  }
+  /* Above the next rows' share buttons. */
+  .share.open { z-index: 30; }
+  .share-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    width: 220px;
+    padding: 4px;
+    text-align: left;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-paper);
+    box-shadow: var(--overlay-shadow);
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    text-decoration: none;
+    color: var(--text-primary);
+    background-color: transparent;
+    border: 0;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+  }
+  .menu-item:hover { background-color: var(--surface-2); }
+  .menu-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .menu-item.muted { color: var(--text-muted); }
+  .menu-sep {
+    height: 1px;
+    margin: 4px 6px;
+    background-color: var(--border);
+  }
+  @media (max-width: 639px) {
+    .menu-item { min-height: 44px; }
+  }
+
+  .foot {
+    margin-top: 32px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .foot-link {
+    color: var(--text-primary);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
   }
 </style>
