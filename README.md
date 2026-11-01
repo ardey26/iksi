@@ -27,7 +27,7 @@ flowchart LR
     KV[("KV<br/>link records")]
     Q[["Queue<br/>iksi-clicks"]]
     DLQ[["Dead-letter queue"]]
-    R2M[("R2 iksi-media<br/>cdn.iksi.app")]
+    R2M[("R2 iksi-media<br/>served at /media")]
     R2B[("R2 iksi-backups<br/>30-day retention")]
   end
 
@@ -61,8 +61,7 @@ flowchart LR
   Q -. "after 10 retries" .-> DLQ
   APP --> PG
   INT --> PG
-  APP -- "upload" --> R2M
-  B -- "images" --> R2M
+  APP -- "upload, serve /media" --> R2M
   APP -- "purge on edit" --> W
   APP --> GSB
   CRON --> GSB
