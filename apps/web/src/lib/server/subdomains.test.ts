@@ -33,14 +33,26 @@ describe('subdomainsEnabled', () => {
 describe('on a profile subdomain', () => {
   const sub = (over: Partial<Input>) => req({ host: 'andre.iksi.app', ...over });
 
-  it('404s everything while subdomains are off', () => {
-    for (const r of [
-      sub({ enabled: false, routeId: '/@[handle]', handle: 'andre' }),
-      sub({ enabled: false, pathname: '/sale', routeId: '/@[handle]/[name]', handle: 'andre' }),
-      sub({ enabled: false, pathname: '/dashboard', routeId: '/(app)/dashboard' }),
-      sub({ enabled: false, pathname: '/nope', routeId: null })
-    ]) {
-      expect(subdomainDecision(r)).toEqual({ kind: 'not-found' });
+  it('sends a subdomain back to www/@handle while subdomains are off, never cached', () => {
+    const back = (location: string) => ({ kind: 'redirect', status: 302, location, cacheControl: 'no-store' });
+    expect(subdomainDecision(sub({ enabled: false, routeId: '/@[handle]', handle: 'andre' }))).toEqual(
+      back('https://www.iksi.app/@andre')
+    );
+    expect(subdomainDecision(sub({ enabled: false, pathname: '/sale', search: '?s=x', routeId: '/@[handle]/[name]', handle: 'andre' }))).toEqual(
+      back('https://www.iksi.app/@andre/sale?s=x')
+    );
+    expect(subdomainDecision(sub({ enabled: false, pathname: '/sale+', routeId: '/@[handle]/[name]', handle: 'andre' }))).toEqual(
+      back('https://www.iksi.app/@andre/sale+')
+    );
+    expect(subdomainDecision(sub({ enabled: false, pathname: '/dashboard', routeId: '/(app)/dashboard' }))).toEqual(
+      back('https://www.iksi.app/dashboard')
+    );
+    expect(subdomainDecision(sub({ enabled: false, pathname: '/a/b', routeId: null }))).toEqual(back('https://www.iksi.app/a/b'));
+  });
+
+  it('leaves reserved and invalid hosts alone while off', () => {
+    for (const host of ['admin.iksi.app', 'cdn.iksi.app', 'my_handle.iksi.app', 'xn--abc.iksi.app', 'a.b.iksi.app']) {
+      expect(subdomainDecision(req({ host, enabled: false, pathname: '/x', routeId: '/[slug]' }))).toEqual(PASS);
     }
   });
 

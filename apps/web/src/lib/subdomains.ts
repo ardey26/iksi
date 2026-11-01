@@ -62,9 +62,13 @@ export function subdomainHandleOf(host: string, dev = false): string | null {
  */
 export function subdomainReroute(url: URL, dev = false): string | undefined {
   const handle = subdomainHandleOf(url.host, dev);
-  if (!handle) return undefined;
-  if (url.pathname === '/') return `/@${handle}`;
-  return classifyPath(url.pathname).kind === 'slug' ? `/@${handle}${url.pathname}` : undefined;
+  return handle ? handlePath(handle, url.pathname) : undefined;
+}
+
+/** `pathname` on `<handle>.iksi.app` as an @handle path, or undefined when the app owns it. */
+export function handlePath(handle: string, pathname: string): string | undefined {
+  if (pathname === '/') return `/@${handle}`;
+  return classifyPath(pathname).kind === 'slug' ? `/@${handle}${pathname}` : undefined;
 }
 
 /** The path a request was routed by (`event.url` keeps the one the visitor asked for). */

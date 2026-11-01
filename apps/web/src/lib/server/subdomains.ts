@@ -1,10 +1,10 @@
 /**
  * Server side of `<handle>.iksi.app` (see lib/subdomains.ts for the mapping).
- * Everything here is inert until SUBDOMAINS_ENABLED=true: before the wildcard
- * domain and its certificate exist, a subdomain request is a 404 and www never
- * redirects.
+ * Everything here is inert until SUBDOMAINS_ENABLED=true: www never redirects,
+ * and a subdomain request is sent back to the same page on www, uncached, so a
+ * switch-off also catches browsers that still hold the www -> subdomain 301.
  */
-import { WWW_HOST, WWW_ORIGIN, APEX, hasSubdomain, subdomainHandleOf } from '#lib/subdomains.js';
+import { WWW_HOST, WWW_ORIGIN, APEX, handlePath, hasSubdomain, subdomainHandleOf } from '#lib/subdomains.js';
 
 export const subdomainsEnabled = (): boolean => process.env.SUBDOMAINS_ENABLED === 'true';
 
@@ -18,9 +18,8 @@ const PROFILE_ROUTES = new Set(['/@[handle]', '/@[handle]/[name]']);
 
 export type SubdomainDecision =
   | { kind: 'pass' }
-  | { kind: 'not-found' }
   | { kind: 'redirect'; status: 301; location: string; cacheControl: string }
-  | { kind: 'redirect'; status: 302; location: string };
+  | { kind: 'redirect'; status: 302; location: string; cacheControl?: string };
 
 const PASS: SubdomainDecision = { kind: 'pass' };
 
@@ -44,7 +43,10 @@ export function subdomainDecision(req: {
 }): SubdomainDecision {
   const sub = subdomainHandleOf(req.host, req.dev);
   if (sub) {
-    if (!req.enabled) return { kind: 'not-found' };
+    if (!req.enabled) {
+      const path = handlePath(sub, req.pathname) ?? req.pathname;
+      return { kind: 'redirect', status: 302, location: `${WWW_ORIGIN}${path}${req.search}`, cacheControl: 'no-store' };
+    }
     if (servedOnSubdomain(sub, req.pathname, req.routeId, req.handle)) return PASS;
     // Unmatched paths 404 as usual; app pages live on www, where the session cookie is.
     if (req.routeId === null) return PASS;

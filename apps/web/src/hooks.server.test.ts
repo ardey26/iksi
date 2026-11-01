@@ -25,9 +25,11 @@ afterEach(() => {
 });
 
 describe('subdomain gate', () => {
-  it('404s a subdomain request while SUBDOMAINS_ENABLED is unset', async () => {
-    const res = await run(event('https://andre.iksi.app/', '/@[handle]', { handle: 'andre' }));
-    expect(res.status).toBe(404);
+  it('302s a subdomain request back to www/@handle, uncached, while SUBDOMAINS_ENABLED is unset', async () => {
+    const res = await run(event('https://andre.iksi.app/sale+', '/@[handle]/[name]', { handle: 'andre', name: 'sale+' }));
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('https://www.iksi.app/@andre/sale+');
+    expect(res.headers.get('cache-control')).toBe('no-store');
     expect(resolve).not.toHaveBeenCalled();
   });
 

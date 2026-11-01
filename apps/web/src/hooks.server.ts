@@ -38,7 +38,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // 1b. Profile subdomains (<handle>.iksi.app, rerouted in hooks.ts) and the
-    //     www/@handle -> subdomain redirect. Inert unless SUBDOMAINS_ENABLED=true.
+    //     www/@handle -> subdomain redirect. Off, a subdomain 302s back to www.
     const sub = subdomainDecision({
         host,
         pathname: event.url.pathname,
@@ -49,12 +49,11 @@ export const handle: Handle = async ({ event, resolve }) => {
         enabled: subdomainsEnabled(),
         dev: import.meta.env.DEV
     });
-    if (sub.kind === 'not-found') return new Response('Not Found', { status: 404 });
     if (sub.kind === 'redirect') {
         // A client-side navigation fetches __data.json and needs SvelteKit's JSON redirect.
-        if (sub.status === 302 || event.isDataRequest) redirect(sub.status, sub.location, { external: true });
+        if (!sub.cacheControl || event.isDataRequest) redirect(sub.status, sub.location, { external: true });
         return new Response(null, {
-            status: 301,
+            status: sub.status,
             headers: { Location: sub.location, 'Cache-Control': sub.cacheControl }
         });
     }
