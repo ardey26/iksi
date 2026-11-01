@@ -23,6 +23,9 @@ function validTheme(v: unknown): v is string {
 }
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
+/** A public row would let the first visitor burn the link. */
+const ONE_TIME_ROW = 'One-time links cannot go on your page';
+
 type Db = Awaited<ReturnType<typeof requireProfile>>['prisma'];
 type CheckedLink = {
   id: number;
@@ -107,6 +110,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
       if (!Number.isInteger(linkId) || !title || title.length > 80) return json({ error: 'Invalid' }, { status: 400 });
       const link = await prisma.longURL.findUnique({ where: { id: linkId } });
       if (!link || link.userId !== uid) return json({ error: 'Link not owned' }, { status: 403 });
+      if (link.oneTime) return json({ error: ONE_TIME_ROW }, { status: 400 });
       const stale = !link.safeCheckedAt || (Date.now() - link.safeCheckedAt.getTime()) > 86400000;
       if (stale) {
         const verdict = await recheckVerdict(prisma, link);
@@ -134,6 +138,7 @@ const handlePost: RequestHandler = async ({ request, cookies }) => {
 
       const link = await prisma.longURL.findUnique({ where: { id: linkId } });
       if (!link || link.userId !== uid) return json({ error: 'Link not owned' }, { status: 403 });
+      if (link.oneTime) return json({ error: ONE_TIME_ROW }, { status: 400 });
 
       // Safe-browsing gate applies only when going public.
       if (enabled) {

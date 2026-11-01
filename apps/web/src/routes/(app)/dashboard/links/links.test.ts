@@ -49,6 +49,14 @@ describe('dashboard links purge', () => {
     expect(order).toEqual(['update', 'purge']);
   });
 
+  it('PATCH refuses to change a one-time link', async () => {
+    findUnique.mockResolvedValue({ id: 5, userId: 7, shortURL: 'Xy', oneTime: true, originalURL: '' });
+    const r = await call(PATCH, { id: 5, destination: 'https://e.com', rules: [] });
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toBe('One-time links cannot be changed');
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it('DELETE purges the slug after the delete', async () => {
     findUnique.mockResolvedValue({ id: 5, userId: 7, shortURL: 'Xy' });
     const order: string[] = [];

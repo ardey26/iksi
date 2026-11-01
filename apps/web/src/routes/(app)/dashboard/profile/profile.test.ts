@@ -56,6 +56,25 @@ const actions = [
   ['upsertRow', { action: 'upsertRow', linkId: 5, title: 'T', enabled: true }]
 ] as const;
 
+describe.each(actions)('%s refuses a one-time link', (_name, body) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    profileFindUnique.mockResolvedValue({ id: 1, userId: 7 });
+    rowAggregate.mockResolvedValue({ _max: { position: null } });
+    rowFindFirst.mockResolvedValue(null);
+  });
+
+  it('400s without creating a row or checking Safe Browsing', async () => {
+    linkFindUnique.mockResolvedValue({ ...staleLink('safe'), oneTime: true, originalURL: '' });
+    const r = await call(body);
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toBe('One-time links cannot go on your page');
+    expect(rowCreate).not.toHaveBeenCalled();
+    expect(rowUpdate).not.toHaveBeenCalled();
+    expect(checkURLs).not.toHaveBeenCalled();
+  });
+});
+
 describe('dashboard profile verdict changes purge the edge', () => {
   beforeEach(() => {
     vi.clearAllMocks();

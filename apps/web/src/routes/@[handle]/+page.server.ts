@@ -63,7 +63,9 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
               originalURL: true,
               clickCount: true,
               // Read only to keep a protected destination out of sameAs; never returned.
-              passwordHash: true
+              passwordHash: true,
+              // A one-time link is never shown on a profile (see below).
+              oneTime: true
             }
           }
         }
@@ -73,6 +75,11 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
 
   if (!p) error(404, 'not found');
 
+  // A one-time link opens once, so listing it publicly would let the first
+  // visitor burn it. The dashboard refuses to add one; this covers any row
+  // that points at one anyway.
+  const visible = p.rows.filter((r) => !r.link?.oneTime);
+
   // Decode originalURL once per row so we can (a) compute the social sameAs
   // list for JSON-LD and (b) not send the encrypted ciphertext to the client.
   // The decoded destination is deliberately NOT returned to the client — the
@@ -80,12 +87,12 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
   // server-side avoids leaking anything the redirect endpoint doesn't already.
   // A password-protected link's destination is secret, so it is never decoded here.
   const decoded = await Promise.all(
-    p.rows.map((r) =>
+    visible.map((r) =>
       r.link && r.link.passwordHash === null ? decodeURL(r.link.originalURL) : Promise.resolve(null)
     )
   );
 
-  const rows = p.rows.map((r, i) => ({
+  const rows = visible.map((r) => ({
     id: r.id,
     title: r.title,
     shortURL: r.link?.shortURL ?? null,

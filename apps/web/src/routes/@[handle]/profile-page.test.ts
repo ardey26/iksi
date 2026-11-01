@@ -10,12 +10,13 @@ vi.mock('#lib/server/profile-cache.js', () => ({ tagProfile }));
 import { load } from './+page.server';
 import { payQrPayload } from '../../test/pay-qr';
 
-const link = (id: number, originalURL: string, passwordHash: string | null = null) => ({
+const link = (id: number, originalURL: string, passwordHash: string | null = null, oneTime = false) => ({
   id,
   shortURL: `s${id}`,
   originalURL,
   clickCount: 0,
-  passwordHash
+  passwordHash,
+  oneTime
 });
 
 function profile(rows: { id: number; title: string; link: ReturnType<typeof link> }[]) {
@@ -73,6 +74,27 @@ describe('profile JSON-LD sameAs', () => {
     findFirst.mockResolvedValue(profile([]));
     await run();
     expect(findFirst.mock.calls[0][0].select.rows.select.link.select).toMatchObject({ passwordHash: true });
+  });
+});
+
+describe('one-time links on a profile', () => {
+  it('never shows a one-time link, even if a row points at one', async () => {
+    findFirst.mockResolvedValue(
+      profile([
+        { id: 1, title: 'GitHub', link: link(1, 'https://github.com/ann') },
+        { id: 2, title: 'Secret', link: link(2, '', null, true) }
+      ])
+    );
+    const data = await run();
+    expect(data.rows).toHaveLength(1);
+    expect(JSON.stringify(data)).not.toContain('Secret');
+    expect(JSON.stringify(data)).not.toContain('s2');
+  });
+
+  it('selects the one-time mark', async () => {
+    findFirst.mockResolvedValue(profile([]));
+    await run();
+    expect(findFirst.mock.calls[0][0].select.rows.select.link.select).toMatchObject({ oneTime: true });
   });
 });
 

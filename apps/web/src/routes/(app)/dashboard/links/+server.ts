@@ -22,6 +22,8 @@ const handlePatch: RequestHandler = async ({ request, cookies }) => {
   const { prisma } = await import('#lib/prisma.js');
   const link = await prisma.longURL.findUnique({ where: { id } });
   if (!link || link.userId !== uid) return json({ error: 'Not found' }, { status: 404 });
+  // Its content is sealed at creation and erased on opening; there is nothing to edit.
+  if (link.oneTime) return json({ error: 'One-time links cannot be changed' }, { status: 400 });
 
   let currentDestination: string | undefined;
   try {

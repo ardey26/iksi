@@ -41,9 +41,10 @@ export const GET: RequestHandler = async (event) => {
           profile: {
             include: {
               rows: {
-                where: { enabled: true, quarantined: false, NOT: { linkId: null } },
+                // A one-time link is never public: the first visitor would burn it.
+                where: { enabled: true, quarantined: false, NOT: { linkId: null }, link: { is: { oneTime: false } } },
                 orderBy: { position: 'asc' },
-                include: { link: { select: { shortURL: true, clickCount: true } } }
+                include: { link: { select: { shortURL: true, clickCount: true, oneTime: true } } }
               }
             }
           }
@@ -61,7 +62,7 @@ export const GET: RequestHandler = async (event) => {
     avatarUrl: p.avatarUrl ? mediaUrl(normalizeAvatarUrl(p.avatarUrl)) : null,
     theme: p.theme,
     accent: p.accent,
-    rows: p.rows.map((r) => ({
+    rows: p.rows.filter((r) => !r.link!.oneTime).map((r) => ({
       title: r.title,
       url: `https://iksi.app/${r.link!.shortURL}`,
       ...(p.publicClicks ? { clicks: r.link!.clickCount } : {})
