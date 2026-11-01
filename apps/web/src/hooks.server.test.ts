@@ -76,3 +76,16 @@ describe('subdomain gate', () => {
     expect((await run(event('https://www.iksi.app/admin', '/(admin)/admin'))).status).toBe(404);
   });
 });
+
+describe('referrer policy', () => {
+  it('defaults to strict-origin-when-cross-origin', async () => {
+    const res = await run(event('https://www.iksi.app/', '/'));
+    expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('keeps a stricter policy a route set (the extension connect page)', async () => {
+    resolve.mockImplementationOnce(async () => new Response('page', { headers: { 'referrer-policy': 'no-referrer' } }));
+    const res = await run(event('https://www.iksi.app/connect/extension', '/connect/extension'));
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+});

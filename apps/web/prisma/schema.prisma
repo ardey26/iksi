@@ -182,6 +182,8 @@ model ApiKey {
   hash       String    @unique
   /// The key's first characters ("iksi_ab12"), so the owner can tell keys apart.
   prefix     String
+  /// "manual" (made in the dashboard) or "extension" (made by Connect to iksi).
+  kind       String    @default("manual")
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
   revokedAt  DateTime?

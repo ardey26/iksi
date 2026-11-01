@@ -56,3 +56,20 @@ describe('dashboard traffic', () => {
     expect(await view.findByText('No visits yet. Share your page to get some.')).toBeInTheDocument();
   });
 });
+
+describe('dashboard connected apps', () => {
+  it('shows the connected extension in a Connected apps section, keys made by hand below', () => {
+    const now = new Date().toISOString();
+    const apiKeys = [
+      { id: 2, name: 'Chrome extension', prefix: 'iksi_ef56', kind: 'extension', createdAt: now, lastUsedAt: null },
+      { id: 1, name: 'Laptop', prefix: 'iksi_ab12', kind: 'manual', createdAt: now, lastUsedAt: null }
+    ];
+    const view = render(Page, { props: { data: { user: { id: 1, handle: 'ana', profileId: 3 }, apiKeys, streamed: null, subdomains: false } } });
+    expect(view.getByRole('heading', { name: 'Connected apps' })).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'API keys' })).toBeNull();
+    expect(view.getByRole('list', { name: 'Connected apps' })).toHaveTextContent('Chrome extension');
+    expect(view.getByText('Connected just now')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Disconnect Chrome extension' })).toBeInTheDocument();
+    expect(view.getByRole('list', { name: 'API keys' })).toHaveTextContent('Laptop');
+  });
+});

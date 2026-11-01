@@ -16,8 +16,8 @@ export const MENU = {
 };
 
 export const ERRORS = {
-  no_key: 'Add your iksi key in the extension options.',
-  bad_key: 'iksi did not accept your key. It may have been revoked. Paste a new one in the extension options.',
+  no_key: 'Connect the extension to iksi in its options.',
+  bad_key: 'iksi did not accept your key. It may have been disconnected. Connect again in the extension options.',
   rate_limited: 'Too many links at once. Wait a minute and try again.',
   bad_url: 'iksi cannot shorten that link.',
   unsupported: 'Only web pages (http and https) can be shortened.',

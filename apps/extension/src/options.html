@@ -16,6 +16,13 @@
       .hint { margin-top: 8px; }
       .saved { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: var(--ctl); }
       .status { margin-top: 8px; }
+      .disclose { margin-top: 24px; }
+      /* Progressive disclosure: height and opacity, so nothing jumps. */
+      .reveal { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+                transition: grid-template-rows 150ms var(--ease-out), opacity 150ms var(--ease-out), visibility 0s linear 150ms; }
+      .reveal.open { grid-template-rows: 1fr; opacity: 1; visibility: visible; transition-delay: 0s; }
+      .reveal > div { min-height: 0; overflow: hidden; padding: 2px; margin: -2px; }
+      @media (prefers-reduced-motion: reduce) { .reveal { transition: none; } }
       @media (max-width: 639px) {
         :root { --ctl: 44px; }
         .row { grid-template-columns: minmax(0, 1fr); row-gap: 8px; padding: 16px 0; }
@@ -28,30 +35,52 @@
       <span class="brand"><img src="../icons/icon-32.png" alt="" />iksi</span>
       <h1 class="title" style="margin-top: 32px">Extension options</h1>
       <p class="muted" style="margin-top: 4px">
-        The extension shortens links as you, using an API key from your
-        <a href="https://www.iksi.app/dashboard" target="_blank" rel="noopener">iksi dashboard</a>.
+        The extension shortens links as you. Connect it to your iksi account once, and you are set.
       </p>
 
       <p class="status error" id="reason" role="alert"></p>
 
       <div class="spec">
-        <div class="row" id="saved-row" hidden>
-          <span class="label">Saved key</span>
-          <div class="saved">
-            <span class="mono" id="saved-prefix"></span>
-            <button type="button" class="btn btn-text btn-danger" id="remove">Remove key</button>
+        <div class="row" id="connect-row">
+          <span class="label">Account</span>
+          <div>
+            <div class="inline">
+              <button type="button" class="btn btn-primary" id="connect">Connect to iksi</button>
+            </div>
+            <p class="muted hint">Opens iksi in a window. Sign in if asked, then choose Allow.</p>
+            <p class="status" id="connect-status" role="status"></p>
           </div>
         </div>
-        <div class="row">
-          <label class="label" for="key" id="key-label">API key</label>
+        <div class="row" id="saved-row" hidden>
+          <span class="label">Account</span>
           <div>
-            <form class="inline" id="form">
-              <input class="field mono" id="key" type="password" autocomplete="off" spellcheck="false"
-                     placeholder="iksi_…" aria-describedby="key-hint" />
-              <button type="submit" class="btn btn-primary" id="save">Save key</button>
-            </form>
-            <p class="muted hint" id="key-hint">In the dashboard, open API keys, create a key and paste it here.</p>
-            <p class="status" id="status" role="status"></p>
+            <div class="saved">
+              <span>Connected <span class="mono muted" id="saved-prefix"></span></span>
+              <button type="button" class="btn btn-text btn-danger" id="remove">Remove key</button>
+            </div>
+            <p class="muted hint">Disconnect it for good in your
+              <a href="https://www.iksi.app/dashboard" target="_blank" rel="noopener">iksi dashboard</a>, under Connected apps.</p>
+            <p class="status" id="saved-status" role="status"></p>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-text disclose" id="use-key" aria-expanded="false" aria-controls="paste">Use an API key instead</button>
+      <div class="reveal" id="paste" aria-hidden="true" inert>
+        <div>
+          <div class="spec">
+            <div class="row">
+              <label class="label" for="key" id="key-label">API key</label>
+              <div>
+                <form class="inline" id="form">
+                  <input class="field mono" id="key" type="password" autocomplete="off" spellcheck="false"
+                         placeholder="iksi_…" aria-describedby="key-hint" />
+                  <button type="submit" class="btn btn-secondary" id="save">Save key</button>
+                </form>
+                <p class="muted hint" id="key-hint">In the dashboard, open Connected apps, then API keys. Create a key and paste it here.</p>
+                <p class="status" id="status" role="status"></p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

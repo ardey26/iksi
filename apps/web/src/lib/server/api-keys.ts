@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { prisma } from '#lib/prisma.js';
-import { API_KEY_NAME_MAX, MAX_API_KEYS, type ApiKeyView } from '#lib/api-keys.js';
+import { API_KEY_NAME_MAX, EXTENSION_KEY_NAME, MAX_API_KEYS, type ApiKeyKind, type ApiKeyView } from '#lib/api-keys.js';
 
 // Keys let the browser extension (or a script) shorten links as their owner.
 // A key is "iksi_" + 32 random bytes in base64url. Only its SHA-256 is stored:
@@ -84,19 +84,25 @@ export async function authenticateApiKey(
 	return { id: row.id, userId: row.userId };
 }
 
-const VIEW_SELECT = { id: true, name: true, prefix: true, createdAt: true, lastUsedAt: true } as const;
+const VIEW_SELECT = { id: true, name: true, prefix: true, kind: true, createdAt: true, lastUsedAt: true } as const;
 
-function toView(row: { id: number; name: string; prefix: string; createdAt: Date; lastUsedAt: Date | null }): ApiKeyView {
+type ViewRow = { id: number; name: string; prefix: string; kind: string; createdAt: Date; lastUsedAt: Date | null };
+
+function toView(row: ViewRow): ApiKeyView {
 	return {
 		id: row.id,
 		name: row.name,
 		prefix: row.prefix,
+		kind: (row.kind === 'extension' ? 'extension' : 'manual') satisfies ApiKeyKind,
 		createdAt: row.createdAt.toISOString(),
 		lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null
 	};
 }
 
 const activeOf = (userId: number) => ({ userId, revokedAt: null });
+
+const limit = () =>
+	new ApiKeyError('limit', `You have ${MAX_API_KEYS} keys, the most you can have. Revoke one to create another.`);
 
 export async function listApiKeys(userId: number): Promise<ApiKeyView[]> {
 	const rows = await prisma.apiKey.findMany({
@@ -113,8 +119,6 @@ export async function createApiKey(userId: number, rawName: string): Promise<{ s
 	if (!name) throw new ApiKeyError('name', 'Give the key a name.');
 	if (name.length > API_KEY_NAME_MAX) throw new ApiKeyError('name', `Names can be up to ${API_KEY_NAME_MAX} characters.`);
 
-	const limit = () =>
-		new ApiKeyError('limit', `You have ${MAX_API_KEYS} keys, the most you can have. Revoke one to create another.`);
 	if ((await prisma.apiKey.count({ where: activeOf(userId) })) >= MAX_API_KEYS) throw limit();
 
 	const { secret, hash, prefix } = generateApiKey();
@@ -134,4 +138,34 @@ export async function revokeApiKey(userId: number, id: number, now: Date = new D
 		data: { revokedAt: now }
 	});
 	return count === 1;
+}
+
+/**
+ * The key behind "Connect to iksi": an extension-kind key named "Chrome
+ * extension". It replaces any earlier extension key of the user, so
+ * reconnecting never piles keys up, and the one it replaces does not count
+ * toward the limit. One transaction: if the new key cannot be made, the old
+ * one keeps working.
+ */
+export async function connectExtensionKey(
+	userId: number,
+	now: Date = new Date()
+): Promise<{ secret: string; key: ApiKeyView }> {
+	return prisma.$transaction(async (tx) => {
+		const others = await tx.apiKey.count({ where: { ...activeOf(userId), kind: { not: 'extension' } } });
+		if (others >= MAX_API_KEYS) throw limit();
+
+		const { secret, hash, prefix } = generateApiKey();
+		const row = await tx.apiKey.create({
+			data: { userId, name: EXTENSION_KEY_NAME, hash, prefix, kind: 'extension' },
+			select: VIEW_SELECT
+		});
+		await tx.apiKey.updateMany({
+			where: { ...activeOf(userId), kind: 'extension', id: { not: row.id } },
+			data: { revokedAt: now }
+		});
+		// A concurrent create landed over the limit: throwing rolls this one back.
+		if ((await tx.apiKey.count({ where: activeOf(userId) })) > MAX_API_KEYS) throw limit();
+		return { secret, key: toView(row) };
+	});
 }

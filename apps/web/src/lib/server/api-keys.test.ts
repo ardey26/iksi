@@ -9,11 +9,13 @@ const apiKey = vi.hoisted(() => ({
 	delete: vi.fn(),
 	updateMany: vi.fn()
 }));
-vi.mock('#lib/prisma.js', () => ({ prisma: { apiKey } }));
+const $transaction = vi.hoisted(() => vi.fn());
+vi.mock('#lib/prisma.js', () => ({ prisma: { apiKey, $transaction } }));
 
 import {
 	ApiKeyError,
 	authenticateApiKey,
+	connectExtensionKey,
 	createApiKey,
 	generateApiKey,
 	hashApiKey,
@@ -138,6 +140,7 @@ describe('createApiKey', () => {
 		apiKey.count.mockResolvedValue(0);
 		apiKey.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
 			id: 1,
+			kind: 'manual',
 			createdAt: new Date('2026-11-01T00:00:00Z'),
 			lastUsedAt: null,
 			...data
@@ -153,6 +156,7 @@ describe('createApiKey', () => {
 			id: 1,
 			name: 'Chrome on laptop',
 			prefix: secret.slice(0, 9),
+			kind: 'manual',
 			createdAt: '2026-11-01T00:00:00.000Z',
 			lastUsedAt: null
 		});
@@ -185,10 +189,10 @@ describe('createApiKey', () => {
 describe('listApiKeys', () => {
 	it("lists the user's active keys, newest first, without hashes", async () => {
 		apiKey.findMany.mockResolvedValue([
-			{ id: 2, name: 'b', prefix: 'iksi_bbbb', createdAt: new Date(2000), lastUsedAt: new Date(3000) }
+			{ id: 2, name: 'b', prefix: 'iksi_bbbb', kind: 'extension', createdAt: new Date(2000), lastUsedAt: new Date(3000) }
 		]);
 		expect(await listApiKeys(42)).toEqual([
-			{ id: 2, name: 'b', prefix: 'iksi_bbbb', createdAt: new Date(2000).toISOString(), lastUsedAt: new Date(3000).toISOString() }
+			{ id: 2, name: 'b', prefix: 'iksi_bbbb', kind: 'extension', createdAt: new Date(2000).toISOString(), lastUsedAt: new Date(3000).toISOString() }
 		]);
 		const q = apiKey.findMany.mock.calls[0][0];
 		expect(q.where).toEqual({ userId: 42, revokedAt: null });
@@ -210,5 +214,59 @@ describe('revokeApiKey', () => {
 	it("reports a key that is not the user's, or already revoked", async () => {
 		apiKey.updateMany.mockResolvedValue({ count: 0 });
 		expect(await revokeApiKey(42, 7)).toBe(false);
+	});
+});
+
+describe('connectExtensionKey', () => {
+	const now = new Date('2026-11-01T10:00:00Z');
+	beforeEach(() => {
+		$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({ apiKey }));
+		apiKey.count.mockResolvedValue(0);
+		apiKey.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+			id: 9,
+			createdAt: now,
+			lastUsedAt: null,
+			...data
+		}));
+	});
+
+	it('makes a "Chrome extension" key of the extension kind, inside one transaction', async () => {
+		const { secret, key } = await connectExtensionKey(42, now);
+		expect(secret).toMatch(/^iksi_[A-Za-z0-9_-]{43}$/);
+		expect($transaction).toHaveBeenCalledTimes(1);
+		expect(apiKey.create.mock.calls[0][0].data).toEqual({
+			userId: 42,
+			name: 'Chrome extension',
+			hash: sha(secret),
+			prefix: secret.slice(0, 9),
+			kind: 'extension'
+		});
+		expect(key).toMatchObject({ id: 9, name: 'Chrome extension', kind: 'extension' });
+	});
+
+	it('revokes every earlier active extension key of the user, not the new one and not manual keys', async () => {
+		await connectExtensionKey(42, now);
+		expect(apiKey.updateMany).toHaveBeenCalledWith({
+			where: { userId: 42, revokedAt: null, kind: 'extension', id: { not: 9 } },
+			data: { revokedAt: now }
+		});
+	});
+
+	it('does not count the extension key it replaces toward the limit', async () => {
+		apiKey.count.mockResolvedValueOnce(MAX_API_KEYS - 1).mockResolvedValueOnce(MAX_API_KEYS);
+		await expect(connectExtensionKey(42, now)).resolves.toBeTruthy();
+		expect(apiKey.count.mock.calls[0][0]).toEqual({ where: { userId: 42, revokedAt: null, kind: { not: 'extension' } } });
+	});
+
+	it('refuses when the user already has the most manual keys', async () => {
+		apiKey.count.mockResolvedValue(MAX_API_KEYS);
+		await expect(connectExtensionKey(42, now)).rejects.toMatchObject({ code: 'limit' });
+		expect(apiKey.create).not.toHaveBeenCalled();
+		expect(apiKey.updateMany).not.toHaveBeenCalled();
+	});
+
+	it('throws (rolling the transaction back) when a concurrent create went over the limit', async () => {
+		apiKey.count.mockResolvedValueOnce(0).mockResolvedValueOnce(MAX_API_KEYS + 1);
+		await expect(connectExtensionKey(42, now)).rejects.toMatchObject({ code: 'limit' });
 	});
 });

@@ -8,6 +8,9 @@
   import BrandMark from '#lib/components/BrandMark.svelte';
 
   export let form: { error?: string } | null = null;
+  export let data: { next?: string | null } | null = null;
+
+  $: next = data?.next ?? '';
 
   let pending: 'twitter' | 'google' | null = null;
 
@@ -21,6 +24,7 @@
 
   <div class="providers">
     <form method="POST" action="?/twitter" on:submit={() => (pending = 'twitter')}>
+      {#if next}<input type="hidden" name="next" value={next} />{/if}
       <Button type="submit" variant="primary" size="lg" full disabled={pending === 'google'} loading={pending === 'twitter'}>
         <svg slot="icon" data-provider="x" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -30,6 +34,7 @@
     </form>
 
     <form method="POST" action="?/google" on:submit={() => (pending = 'google')}>
+      {#if next}<input type="hidden" name="next" value={next} />{/if}
       <Button type="submit" variant="secondary" size="lg" full disabled={pending === 'twitter'} loading={pending === 'google'}>
         <svg slot="icon" data-provider="google" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>

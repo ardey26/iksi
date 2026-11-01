@@ -1,5 +1,7 @@
-// Service worker: the right-click menu items, shortening, copying, feedback.
+// Service worker: the right-click menu items, shortening, copying, feedback,
+// and the "Connect to iksi" flow.
 import { MENU, shortenUrl, targetOf } from './shorten.js';
+import { connect } from './connect.js';
 
 const OFFSCREEN_PATH = 'src/offscreen.html';
 const BADGE_MS = 2500;
@@ -21,6 +23,28 @@ chrome.notifications?.onClicked.addListener((id) => {
   if (id.startsWith('iksi-key')) openOptions('bad_key');
   chrome.notifications.clear(id);
 });
+
+// The popup and the options page ask for a connect here. The auth window
+// takes focus, which closes the popup, so the flow cannot live there.
+let connecting = null;
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.target !== 'background' || message.type !== 'connect') return false;
+  connecting ??= connect({ identity: chrome.identity, storage: chrome.storage.sync }).finally(() => (connecting = null));
+  connecting.then((result) => {
+    // The popup is gone by now; say how it went where the user will see it.
+    if (message.from === 'popup') announce(result);
+    sendResponse(result);
+  });
+  return true;
+});
+
+function announce(result) {
+  if (result.ok) {
+    void badge('OK', COLORS.ok);
+    return notify('iksi-connected', 'Connected', 'Right-click any link or page to shorten it with iksi.');
+  }
+  if (result.code !== 'cancelled') notify('iksi-connect-error', 'Could not connect', result.message);
+}
 
 async function shortenAndCopy(url) {
   const { apiKey } = await chrome.storage.sync.get('apiKey');
