@@ -1,6 +1,6 @@
 # Images in R2 runbook
 
-Avatars and backgrounds are uploaded to the `iksi-media` bucket and served by the app at `https://www.iksi.app/media/<key>` (route `apps/web/src/routes/media/[...key]`), so no visitor request goes through Cloudflare, which Converge cannot reach reliably. Rows saved earlier hold `https://cdn.iksi.app/<key>` URLs; the app rewrites them onto `MEDIA_BASE_URL` when it reads them. The bucket, domain, token and env vars are set up once beforehand; this file covers only what is specific to images.
+Avatars and backgrounds are uploaded to the `iksi-media` bucket and served by the app at `https://www.iksi.app/media/<key>` (route `apps/web/src/routes/media/[uid]/[kind]/[file]`), so no visitor request goes through Cloudflare, which Converge cannot reach reliably. Rows saved earlier hold `https://cdn.iksi.app/<key>` URLs; the app rewrites them onto `MEDIA_BASE_URL` when it reads them. The bucket, domain, token and env vars are set up once beforehand; this file covers only what is specific to images.
 
 ## 1. Prerequisites
 

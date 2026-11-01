@@ -2,6 +2,8 @@
 // no visitor request depends on reaching Cloudflare. Keys are unique per
 // upload and never rewritten, so a found object is cached for a year by both
 // browsers and Vercel's CDN; the function runs once per key per region.
+// Fixed depth on purpose: a rest route would also match a bare /media and
+// take it from a short link named media.
 import type { RequestHandler } from './$types';
 import { r2MediaStore } from '#lib/server/media-store.js';
 import { isMediaKey } from '#lib/server/media-url.js';
@@ -15,7 +17,7 @@ function notFound(): Response {
 }
 
 export const GET: RequestHandler = async ({ params }) => {
-	const key = params.key;
+	const key = `${params.uid}/${params.kind}/${params.file}`;
 	if (!isMediaKey(key)) return notFound();
 
 	let obj;

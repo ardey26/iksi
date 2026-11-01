@@ -15,9 +15,14 @@ const RESERVED_DIRECTORIES = [
 	'/_app',
 	'/fonts',
 	'/internal',
-	'/_edge',
-	'/media'
+	'/_edge'
 ] as const;
+
+/**
+ * Paths that own only what is below them: `/media/...` is reserved, `/media`
+ * itself stays a slug so a short link named media keeps resolving.
+ */
+const RESERVED_SUBTREES = ['/media'] as const;
 
 /** Single files served by the app; matched on equality only. */
 const RESERVED_FILES = [
@@ -37,6 +42,7 @@ const PROFILE_PREFIX = '/@';
 export const RESERVED_PREFIXES: readonly string[] = [
 	PROFILE_PREFIX,
 	...RESERVED_DIRECTORIES,
+	...RESERVED_SUBTREES.map((dir) => dir + '/'),
 	...RESERVED_FILES
 ];
 
@@ -51,6 +57,7 @@ const SLUG = /^[A-Za-z0-9_-]{1,64}$/;
 function isReserved(pathname: string): boolean {
 	if (pathname.startsWith(PROFILE_PREFIX)) return true;
 	if ((RESERVED_FILES as readonly string[]).includes(pathname)) return true;
+	if (RESERVED_SUBTREES.some((dir) => pathname.startsWith(dir + '/'))) return true;
 	return RESERVED_DIRECTORIES.some((dir) => pathname === dir || pathname.startsWith(dir + '/'));
 }
 

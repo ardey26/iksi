@@ -93,6 +93,11 @@ describe('redirect', () => {
     expect(waitUntil).toHaveBeenCalledTimes(1);
   });
 
+  it('still redirects a link named media (images live under /media/<key>)', async () => {
+    const r = await run('/media');
+    expect(r.redirect).toEqual({ status: 302, location: 'https://example.com/' });
+  });
+
   it('301s a permanent link', async () => {
     findUnique.mockResolvedValue({ ...ROW, permanent: true });
     const r = await run('/AbC');
