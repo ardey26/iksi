@@ -24,7 +24,7 @@
 
 {#if logo}
   <span class="pay-mark pay-logo">
-    <Logo src={logo.logo} alt={name} {size} />
+    <Logo src={logo.logo} alt={name} {size} wordmark={!!logo.wordmark} />
   </span>
 {:else}
   <span class="pay-mark pay-monogram" role={name ? 'img' : undefined} aria-label={name || undefined}>

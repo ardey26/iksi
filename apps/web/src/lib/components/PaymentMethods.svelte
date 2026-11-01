@@ -19,7 +19,7 @@
     SortableList,
     Stack
   } from '#lib/ui/index.js';
-  import { defaultQrLabel, institutionById } from '#lib/pay-institutions.js';
+  import { defaultQrLabel, institutionById, logoSpellsName } from '#lib/pay-institutions.js';
   import {
     MAX_METHOD_LABEL_LENGTH,
     MAX_PAY_METHODS,
@@ -245,7 +245,7 @@
               <svelte:fragment slot="leading">
                 <DragHandle {handle} />
                 {#if logo}
-                  <Logo src={logo.logo} inset={logo.wordmark ? 0.1 : 0} />
+                  <Logo src={logo.logo} wordmark={!!logo.wordmark} />
                 {:else}
                   <Monogram name={methodTitle(m)} />
                 {/if}
@@ -267,7 +267,7 @@
                   />
                 </form>
               {:else}
-                <span class="clip">{methodTitle(m)}</span>
+                <span class="clip" class:sr-only={m.kind === 'qr' && logoSpellsName(m.institution, m.label)}>{methodTitle(m)}</span>
               {/if}
 
               <svelte:fragment slot="subtitle">

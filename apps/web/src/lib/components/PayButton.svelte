@@ -5,6 +5,7 @@
   import QRCode from 'qrcode';
   import { Button, Sheet } from '#lib/ui/index.js';
   import PayMark from './PayMark.svelte';
+  import { logoSpellsName } from '#lib/pay-institutions.js';
   import {
     PAY_LABEL_TEXT,
     PROVIDER_NAMES,
@@ -144,7 +145,7 @@
           <input type="radio" class="sr-only" name="pay-pick-{handle}" value={m.id} bind:group={selected} />
           <span class="key-face" title={methodTitle(m)}>
             <PayMark institution={institutionOf(m)} label={methodTitle(m)} size={32} alt="" />
-            <span class="pay-key-text">{methodTitle(m)}</span>
+            <span class="pay-key-text" class:sr-only={logoSpellsName(institutionOf(m), methodTitle(m))}>{methodTitle(m)}</span>
           </span>
         </label>
       {/each}
@@ -159,7 +160,7 @@
           {#if !picking}
             <div class="pay-who">
               <PayMark institution={m.institution} label={m.label} size={32} alt="" />
-              <p class="pay-method">{m.label}</p>
+              <p class="pay-method" class:sr-only={logoSpellsName(m.institution, m.label)}>{m.label}</p>
             </div>
           {/if}
 

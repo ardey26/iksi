@@ -14,7 +14,7 @@ export interface Institution {
 	logo?: string;
 	/** Natural aspect of the logo, as width / height. 1 when unset. */
 	aspect?: number;
-	/** The logo already spells the name, so it is set smaller to look the same weight as a round mark. */
+	/** The logo spells the name: it gets the kit Logo's wide box, and the name is not repeated beside it. */
 	wordmark?: boolean;
 }
 
@@ -88,6 +88,16 @@ export function institutionById(id: unknown): Institution | null {
 export function storedInstitution(id: unknown): Institution | null {
 	const i = institutionById(id);
 	return i && !BIC_KEYED.has(i.id) ? i : null;
+}
+
+/**
+ * The method's logo is a wordmark that already reads as its label ("Maya"
+ * beside the Maya wordmark), so the label is kept for screen readers only.
+ * A renamed QR ("Shop") still shows its name.
+ */
+export function logoSpellsName(id: unknown, label: string): boolean {
+	const i = institutionById(id);
+	return !!(i?.logo && i.wordmark && label.trim().toLowerCase() === i.name.toLowerCase());
 }
 
 export function defaultQrLabel(institution: Institution | null): string {

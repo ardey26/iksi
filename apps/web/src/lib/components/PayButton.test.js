@@ -175,6 +175,24 @@ describe('PayButton', () => {
       expect(within(picker).getByRole('radio', { name: 'PayPal' })).toBeInTheDocument();
     });
 
+    it('keys a wordmark by its logo alone, with the name kept for screen readers', async () => {
+      const maya = { ...qr, id: 'q3', institution: 'maya', label: 'Maya' };
+      render(PayButton, { props: props({ methods: [maya, gcash] }) });
+      await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+      const key = screen.getByRole('radio', { name: 'Maya' }).labels[0];
+      expect(key.querySelector('img')).toHaveAttribute('src', '/brands/maya.svg');
+      expect(key.querySelector('.logo.wordmark')).not.toBeNull();
+      expect(key.querySelector('.pay-key-text')).toHaveClass('sr-only');
+      // A round mark keeps its visible name.
+      expect(screen.getByRole('radio', { name: 'GCash' }).labels[0].querySelector('.pay-key-text')).not.toHaveClass('sr-only');
+    });
+
+    it('shows the name of a renamed wordmark QR', async () => {
+      render(PayButton, { props: props({ methods: [{ ...qr, id: 'q3', institution: 'maya', label: 'Shop' }, gcash] }) });
+      await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+      expect(screen.getByRole('radio', { name: 'Shop' }).labels[0].querySelector('.pay-key-text')).not.toHaveClass('sr-only');
+    });
+
     it('keys a renamed QR by its new name', async () => {
       render(PayButton, { props: props({ methods: [{ ...gcash, label: 'Shop' }, qr] }) });
       await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));

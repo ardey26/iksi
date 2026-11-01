@@ -4,6 +4,7 @@ import {
 	defaultQrLabel,
 	identifyInstitution,
 	institutionById,
+	logoSpellsName,
 	monogramOf,
 	normalizeBic,
 	storedInstitution
@@ -121,5 +122,19 @@ describe('monogramOf', () => {
 	it('is a neutral mark when the label has no letter', () => {
 		expect(monogramOf('')).toBe('?');
 		expect(monogramOf('---')).toBe('?');
+	});
+});
+
+describe('logoSpellsName', () => {
+	it('is true when a wordmark logo already spells the label', () => {
+		expect(institutionById('maya')?.wordmark).toBe(true);
+		expect(logoSpellsName('maya', 'Maya')).toBe(true);
+		expect(logoSpellsName('maya', ' maya ')).toBe(true);
+	});
+
+	it('is false for a renamed QR, a round mark, or no bank', () => {
+		expect(logoSpellsName('maya', 'Savings')).toBe(false);
+		expect(logoSpellsName('gcash', 'GCash')).toBe(false);
+		expect(logoSpellsName(null, 'Maya')).toBe(false);
 	});
 });

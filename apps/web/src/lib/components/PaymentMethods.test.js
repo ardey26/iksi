@@ -54,6 +54,16 @@ describe('PaymentMethods', () => {
       expect(screen.getByRole('button', { name: 'Remove GCash' })).toBeInTheDocument();
     });
 
+    it('shows a wordmark logo wide, without repeating its name as text', () => {
+      const maya = { ...qr, id: 'q3', institution: 'maya', label: 'Maya', name: 'MARIA SANTOS' };
+      const { container } = render(PaymentMethods, { props: { methods: [maya, gcash], label: 'pay' } });
+      const [first, second] = container.querySelectorAll('li');
+      expect(first.querySelector('.logo.wordmark img')).toHaveAttribute('src', '/brands/maya.svg');
+      expect(within(first).getByText('Maya')).toHaveClass('sr-only');
+      expect(second.querySelector('.logo.wordmark')).toBeNull();
+      expect(within(second).getByText('GCash')).not.toHaveClass('sr-only');
+    });
+
     it('lists no banks to choose from', () => {
       render(PaymentMethods, { props: { methods: [], label: 'pay' } });
       expect(screen.queryByRole('button', { name: /GCash|Maya|MariBank/ })).toBeNull();
