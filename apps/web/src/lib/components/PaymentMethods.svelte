@@ -296,7 +296,7 @@
                   <Button size="sm" variant="danger" loading={busy} on:click={() => remove(m)}>Remove</Button>
                 {:else}
                   {#if m.kind === 'qr'}
-                    <Button size="sm" variant="ghost" data-rename={m.id} disabled={busy} aria-label="Rename {m.label}" on:click={() => startRename(m)}>Rename</Button>
+                    <IconButton icon="edit" label="Rename {m.label}" data-rename={m.id} disabled={busy} on:click={() => startRename(m)} />
                   {/if}
                   <IconButton icon="trash" variant="danger" label="Remove {methodTitle(m)}" data-pay-remove={m.id} disabled={busy} on:click={() => ask(m)} />
                 {/if}

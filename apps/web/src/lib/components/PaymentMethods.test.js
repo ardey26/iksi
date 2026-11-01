@@ -194,6 +194,14 @@ describe('PaymentMethods', () => {
   describe('renaming', () => {
     const rename = (name) => fireEvent.click(screen.getByRole('button', { name: `Rename ${name}` }));
 
+    it('is an icon button with an accessible name, so the row text keeps its room', () => {
+      render(PaymentMethods, { props: { methods: [gcash], label: 'pay' } });
+      const btn = screen.getByRole('button', { name: 'Rename GCash' });
+      expect(btn).toHaveTextContent('');
+      expect(btn).toHaveAttribute('title', 'Rename GCash');
+      expect(btn.querySelector('svg.lucide-pencil')).not.toBeNull();
+    });
+
     it('renames a QR in place and saves it', async () => {
       fetchMock.mockResolvedValue(ok({ methods: [{ ...gcash, label: 'Shop' }], label: 'pay' }));
       render(PaymentMethods, { props: { methods: [gcash], label: 'pay' } });
