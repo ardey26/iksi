@@ -19,6 +19,7 @@ model User {
   handle        Handle?
   profile       Profile?
   links         LongURL[]
+  apiKeys       ApiKey[]
 }
 
 model Handle {
@@ -134,6 +135,23 @@ model Click {
   @@index([createdAt(sort: Desc)])
   @@index([profileId, createdAt(sort: Desc)])
   @@index([rowId, createdAt(sort: Desc)])
+}
+
+/// A key the browser extension (or a script) uses to shorten links as its owner.
+model ApiKey {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  name       String
+  /// SHA-256 (hex) of the whole key. The key itself is never stored.
+  hash       String    @unique
+  /// The key's first characters ("iksi_ab12"), so the owner can tell keys apart.
+  prefix     String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model RateLimit {
