@@ -1,10 +1,13 @@
-import { LINK_RECORD_VERSION, parseRules, type LinkRecord } from '@iksi/core';
+import { CANONICAL_HOST, LINK_RECORD_VERSION, parseRules, type LinkRecord } from '@iksi/core';
 
 export const FLAGGED_VERDICTS: readonly string[] = ['malware', 'phishing', 'unwanted'];
 
 export function isFlagged(verdict: string | null | undefined): boolean {
   return verdict != null && FLAGGED_VERDICTS.includes(verdict);
 }
+
+/** What a one-time link's record carries instead of its content. */
+const ONE_TIME_PLACEHOLDER = `https://${CANONICAL_HOST}/`;
 
 export function toLinkRecord(
   row: {
@@ -17,6 +20,7 @@ export function toLinkRecord(
     permanent: boolean;
     clickCount: number;
     maxClicks: number | null;
+    oneTime: boolean;
   },
   destination: string
 ): LinkRecord {
@@ -29,7 +33,9 @@ export function toLinkRecord(
   return {
     v: LINK_RECORD_VERSION,
     id: row.id,
-    destination,
+    // A one-time link's content never leaves the origin: the edge only learns
+    // that the link exists, and gets a placeholder that parses as a URL.
+    destination: row.oneTime ? ONE_TIME_PLACEHOLDER : destination,
     flagged: isFlagged(row.safeVerdict),
     permanent: row.permanent,
     rules,
@@ -37,7 +43,10 @@ export function toLinkRecord(
     // Origin clicks (every unlock) bump clickCount without going through ingest,
     // which is the only place that sets expiredAt, so the cap is checked here too.
     expired: row.expiredAt !== null || (row.maxClicks !== null && row.clickCount >= row.maxClicks),
-    protected: row.passwordHash !== null
+    // Protected makes every Worker hand the link to the origin, which is the
+    // only place a one-time link is revealed (and burned). It reuses a v2 field,
+    // so the record version does not change.
+    protected: row.passwordHash !== null || row.oneTime
   };
 }
 

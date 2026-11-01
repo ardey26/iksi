@@ -36,7 +36,9 @@ export const GET: RequestHandler = async ({ url, request }) => {
       passwordHash: true,
       permanent: true,
       clickCount: true,
-      maxClicks: true
+      maxClicks: true,
+      // Never the one-time `secret`: the edge only needs to know to pass it on.
+      oneTime: true
     }
   });
   if (!row) return json({ found: false }, 404);

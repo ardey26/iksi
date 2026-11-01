@@ -105,6 +105,14 @@ model LongURL {
   permanent       Boolean      @default(false)
   /// Bumped whenever the destination or rules change, so a verdict is only written for what was checked.
   settingsVersion Int          @default(0)
+  /// Burn after reading: opens once, then the content is erased. See src/lib/server/one-time.ts.
+  oneTime         Boolean      @default(false)
+  /// One-time content (a URL or a text), encrypted with encodeURL. Null once opened.
+  secret          String?
+  /// "url" or "text": what `secret` held.
+  secretKind      String?
+  /// When the one-time link was opened (claimed). Null while unopened.
+  openedAt        DateTime?
   user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   clicks          Click[]
   profileRows     ProfileRow[]

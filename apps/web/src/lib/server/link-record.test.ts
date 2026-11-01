@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { parseLinkRecord } from '@iksi/core';
+import { decideLink, parseLinkRecord } from '@iksi/core';
 import { destinationsOf, toLinkRecord } from './link-record';
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -12,6 +12,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   permanent: false,
   clickCount: 0,
   maxClicks: null,
+  oneTime: false,
   ...over
 });
 
@@ -89,6 +90,39 @@ describe('toLinkRecord', () => {
     const rec = toLinkRecord(row({ passwordHash: 'scrypt$secret' }), 'https://e.com');
     expect(rec.protected).toBe(true);
     expect(JSON.stringify(rec)).not.toContain('scrypt$secret');
+  });
+});
+
+describe('toLinkRecord for a one-time link', () => {
+  const now = 1_700_000_000_000;
+
+  it('is never a plain redirect, so the edge always passes it to the origin', () => {
+    const rec = toLinkRecord(row({ oneTime: true }), 'https://secret.example/');
+    const parsed = parseLinkRecord(JSON.parse(JSON.stringify(rec)));
+    expect(parsed).not.toBeNull();
+    expect(decideLink(parsed!, now)).not.toBe('redirect');
+    expect(rec.protected).toBe(true);
+  });
+
+  it('keeps the version, so no Worker needs a new record format', () => {
+    expect(toLinkRecord(row({ oneTime: true }), 'https://secret.example/').v).toBe(2);
+  });
+
+  it('never carries the secret destination to the edge store', () => {
+    const rec = toLinkRecord(row({ oneTime: true }), 'https://secret.example/token');
+    expect(JSON.stringify(rec)).not.toContain('secret.example');
+  });
+
+  it('still reports flagged and expired so the origin page is right', () => {
+    expect(decideLink(toLinkRecord(row({ oneTime: true, safeVerdict: 'malware' }), ''), now)).toBe('flagged');
+    expect(
+      decideLink(toLinkRecord(row({ oneTime: true, expiresAt: new Date(now - 1) }), ''), now)
+    ).toBe('expired');
+  });
+
+  it('an opened one-time link is never a redirect either', () => {
+    const rec = toLinkRecord(row({ oneTime: true, openedAt: new Date(now - 1) }), '');
+    expect(decideLink(parseLinkRecord(rec)!, now)).not.toBe('redirect');
   });
 });
 

@@ -22,7 +22,8 @@ const ROW = {
   passwordHash: null,
   permanent: false,
   clickCount: 0,
-  maxClicks: null
+  maxClicks: null,
+  oneTime: false
 };
 
 beforeEach(() => {
@@ -91,6 +92,17 @@ describe('GET /internal/resolve', () => {
     const res = await call('AbC', { 'x-iksi-internal': 'edge' });
     expect((await res.json()).record.expired).toBe(true);
     expect(findUnique.mock.calls[0][0].select).toMatchObject({ clickCount: true, maxClicks: true });
+  });
+
+  it('a one-time link is protected for the edge, with no secret and no content selected', async () => {
+    findUnique.mockResolvedValue({ ...ROW, oneTime: true, originalURL: '' });
+    const res = await call('AbC', { 'x-iksi-internal': 'edge' });
+    const { record } = await res.json();
+    expect(record.protected).toBe(true);
+    expect(record.v).toBe(2);
+    const select = findUnique.mock.calls[0][0].select;
+    expect(select).toMatchObject({ oneTime: true });
+    expect(select.secret).toBeUndefined();
   });
 
   it('400s for a 65-char slug', async () => {

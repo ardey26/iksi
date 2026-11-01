@@ -880,6 +880,37 @@ describe('routing and decisions at the edge', () => {
 		expect(events).toHaveLength(0);
 	});
 
+	describe('a one-time link (the record the origin builds for one)', () => {
+		// Mirrors toLinkRecord in apps/web: protected, placeholder destination, v2.
+		const oneTime: LinkRecord = {
+			...record,
+			destination: 'https://iksi.app/',
+			rules: [],
+			expiresAt: NOW + 7 * 24 * 3600 * 1000,
+			expired: false,
+			protected: true
+		};
+
+		test.each(['GET', 'HEAD'])('%s goes to the origin with no click and no redirect', async (method) => {
+			const { res, seen, events } = await run(oneTime, get('/QdM2whH', { method }));
+			expect(res.headers.get('location')).toBeNull();
+			expect(seen).toHaveLength(1);
+			expect(seen[0].method).toBe(method);
+			expect(events).toHaveLength(0);
+		});
+
+		test('the reveal POST goes to the origin untouched', async () => {
+			const { res, seen, events } = await run(
+				oneTime,
+				get('/QdM2whH?/reveal', { method: 'POST', body: 'password=x' })
+			);
+			expect(await res.text()).toBe('origin');
+			expect(seen[0].method).toBe('POST');
+			expect(seen[0].url).toBe('https://www.iksi.app/QdM2whH?/reveal');
+			expect(events).toHaveLength(0);
+		});
+	});
+
 	test('no UA, referer or cf resolves to the default, 302', async () => {
 		const { res } = await run(mobileRule, get('/QdM2whH'));
 		expect(res.status).toBe(302);
