@@ -21,6 +21,19 @@ const pick = (container) =>
     target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] }
   });
 
+describe('profile editor payments', () => {
+  it('shows the Payments section with the stored methods', () => {
+    const d = {
+      ...data(),
+      payments: { methods: [{ id: 'l1', kind: 'link', provider: 'kofi', url: 'https://ko-fi.com/me' }], label: 'tip' }
+    };
+    render(Page, { props: { data: d } });
+    expect(screen.getByRole('heading', { name: 'Payments' })).toBeInTheDocument();
+    expect(screen.getByText('https://ko-fi.com/me')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Send a tip' })).toBeChecked();
+  });
+});
+
 describe('profile editor upload sync', () => {
   let fetchMock;
   beforeEach(() => {

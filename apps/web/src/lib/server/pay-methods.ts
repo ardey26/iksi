@@ -1,7 +1,6 @@
 // Building and editing a profile's payment methods. Nothing here touches the
 // media store: an uploaded QR image is decoded in memory and discarded.
 import { MAX_PAY_METHODS, PROVIDER_NAMES, type LinkMethod, type PayMethod, type PayProvider } from '#lib/pay-methods.js';
-import { decodeQrImage } from './pay-qr-image';
 import { PAY_QR_ERROR_TEXT, validatePayQr, type PayQrErrorCode } from './pay-qr';
 import { PAY_LINK_ERROR_TEXT, parsePayLink, type PayLinkErrorCode } from './pay-links';
 
@@ -24,6 +23,8 @@ export class PayMethodError extends Error {
 
 /** An EMVCo payload becomes a QR method; an allow-listed https link (as Venmo or Cash App QR codes hold) a link method. */
 export async function methodFromImage(input: Uint8Array, newId: () => string): Promise<PayMethod> {
+	// Loaded here so pages that only read methods never load sharp and jsQR.
+	const { decodeQrImage } = await import('./pay-qr-image');
 	const text = (await decodeQrImage(input))?.trim();
 	if (!text) throw new PayMethodError('not_qr');
 	if (text.startsWith('000201')) {

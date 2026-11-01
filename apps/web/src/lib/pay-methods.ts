@@ -46,3 +46,17 @@ export const PAY_LABEL_TEXT: Record<PayLabel, string> = {
 export function payLabelOf(v: unknown): PayLabel {
 	return v === 'tip' ? 'tip' : 'pay';
 }
+
+/** "Philippines" for "PH"; the code itself where the name is unknown. */
+export function countryName(code: string): string {
+	try {
+		return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code;
+	} catch {
+		return code;
+	}
+}
+
+/** "MANDALUYONG, Philippines": where a QR's merchant is. */
+export function qrPlace(m: Pick<QrMethod, 'city' | 'country'>): string {
+	return [m.city, countryName(m.country)].filter(Boolean).join(', ');
+}

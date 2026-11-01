@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import ImageUpload from '#lib/components/ImageUpload.svelte';
+  import PaymentMethods from '#lib/components/PaymentMethods.svelte';
 
   export let data;
 
@@ -220,6 +221,15 @@
       </div>
     </div>
   </section>
+
+  <!-- Payments: saved as they change, outside the Save button below -->
+  {#if data.payments}
+    <section class="d-section" aria-labelledby="p-payments">
+      <h2 class="d-title" id="p-payments">Payments</h2>
+      <p class="d-desc">A button on your public page that shows how to pay you. Changes save right away. Payers see the name in your QR, so check that it is yours.</p>
+      <PaymentMethods methods={data.payments.methods} label={data.payments.label} />
+    </section>
+  {/if}
 
   <!-- Live preview — mirrors the /@handle card layout -->
   <section class="d-section" aria-labelledby="p-preview">
