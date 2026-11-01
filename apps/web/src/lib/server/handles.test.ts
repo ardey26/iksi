@@ -2,10 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { validateHandle, RESERVED } from './handles';
 
 describe('validateHandle', () => {
-  it('accepts 3-30 chars of [a-z0-9_-]', () => {
+  it('accepts 3-30 chars of [a-z0-9-]', () => {
     expect(validateHandle('abc').ok).toBe(true);
-    expect(validateHandle('a-b_c-9').ok).toBe(true);
     expect(validateHandle('a'.repeat(30)).ok).toBe(true);
+  });
+
+  // New handles must be valid subdomain labels, so every profile can have
+  // <handle>.iksi.app.
+  it('accepts a hyphenated handle', () => {
+    expect(validateHandle('ann-reyes-9')).toEqual({ ok: true, handle: 'ann-reyes-9' });
+  });
+
+  it('rejects an underscore', () => {
+    expect(validateHandle('ann_reyes')).toEqual({ ok: false, error: 'Use letters, numbers and hyphens. No underscores.' });
+    expect(validateHandle('a-b_c-9').ok).toBe(false);
+  });
+
+  it.each(['-ann', 'ann-', '-ann-'])('rejects %s, with a leading or trailing hyphen', (h) => {
+    expect(validateHandle(h)).toEqual({ ok: false, error: "A handle can't start or end with a hyphen." });
   });
 
   it('rejects too short / too long', () => {

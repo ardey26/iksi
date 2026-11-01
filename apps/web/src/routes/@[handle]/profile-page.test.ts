@@ -42,6 +42,22 @@ const run = () =>
 
 beforeEach(() => vi.clearAllMocks());
 
+describe('existing handles', () => {
+  // New claims cannot use an underscore, but handles claimed before that rule
+  // keep their profile.
+  it('still resolves a profile whose handle has an underscore', async () => {
+    findFirst.mockResolvedValue(profile([]));
+    const out = await load({
+      params: { handle: 'ann_reyes' },
+      request: new Request('https://www.iksi.app/@ann_reyes'),
+      url: new URL('https://www.iksi.app/@ann_reyes'),
+      setHeaders: () => {}
+    } as never);
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { user: { handle: { handle: 'ann_reyes' } } } }));
+    expect(out).toMatchObject({ handle: 'ann_reyes' });
+  });
+});
+
 describe('profile page cache tag', () => {
   it('tags the cached page with its owner so updates can clear it', async () => {
     findFirst.mockResolvedValue(profile([]));
