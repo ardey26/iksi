@@ -1,6 +1,7 @@
 <script>
   import '../app.css';
   import { ThemeToggle, SEO } from '../lib/components';
+  import { Button } from '#lib/ui/index.js';
   import UserMenu from '#lib/components/UserMenu.svelte';
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
@@ -78,9 +79,6 @@
   const home = $derived(appHref('/', page.url.host, import.meta.env.DEV));
   const signIn = $derived(appHref('/login', page.url.host, import.meta.env.DEV));
   const isDashboard = $derived(isDashboardPath(page.url.pathname));
-  // Public homepage + login use a full-height centered layout.
-  // Everything else (dashboard, /@handle, etc.) uses top-aligned flow.
-  const centerContent = $derived(page.url.pathname === '/' || onLoginPage);
 
   // Theme is resolved by the inline script in app.html before first paint and
   // kept in sync by $lib/stores/theme.js. Nothing to do on mount.
@@ -113,86 +111,101 @@
   <!-- Profile pages render their own themed background + no site chrome -->
   {@render children()}
 {:else}
-  <div class="min-h-screen flex flex-col relative" style="background: var(--bg);">
-    <!-- Brand mark: top-left -->
+  <div class="site">
+    <!-- In the page flow, so nothing scrolls under it at any width. -->
+    <header class="site-header">
+      <a href={home} class="brand" data-ui aria-label="iksi home">
+        <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="11" fill="currentColor"></circle>
+          <g transform="rotate(-45 12 12)" stroke="var(--bg)" stroke-width="1.5" fill="none">
+            <rect x="4" y="10" width="7" height="4" rx="2"></rect>
+            <rect x="13" y="10" width="7" height="4" rx="2"></rect>
+          </g>
+        </svg>
+        <span class="brand-name">iksi</span>
+      </a>
 
-    <a
-      href={home}
-      class="fixed top-6 left-6 z-50 flex items-center gap-2 hover:opacity-70 transition-opacity"
-    >
-      <svg
-        class="w-5 h-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        style="color: var(--text-muted);"
-      >
-        <circle cx="12" cy="12" r="11" fill="currentColor"></circle>
-
-        <g
-          transform="rotate(-45 12 12)"
-          stroke="var(--bg)"
-          stroke-width="1.5"
-          fill="none"
-        >
-          <rect x="4" y="10" width="7" height="4" rx="2"></rect>
-          <rect x="13" y="10" width="7" height="4" rx="2"></rect>
-        </g>
-      </svg>
-      <span class="text-sm font-medium tracking-tight" style="color: var(--text-muted);">iksi</span>
-    </a>
-
-    <!-- Right: UserMenu when signed in, Sign in link when not -->
-    {#if !onLoginPage}
-      <div class="fixed top-6 right-6 z-50">
-        {#if data?.user}
-          <UserMenu user={data.user} />
-        {:else}
-          <a href={signIn} class="text-sm hover:opacity-70 transition-opacity" style="color: var(--text-muted);">Sign in</a>
+      <div class="controls">
+        <ThemeToggle />
+        {#if !onLoginPage}
+          {#if data?.user}
+            <UserMenu user={data.user} />
+          {:else}
+            <Button size="sm" variant="secondary" href={signIn}>Sign in</Button>
+          {/if}
         {/if}
       </div>
-    {/if}
+    </header>
 
-    <!-- Theme toggle: bottom-right. Dashboard pages render it after their
-         content instead, so on narrow screens it can sit in the page flow. -->
-    {#if !isDashboard}{@render themeDock(false)}{/if}
-
-    {#if centerContent}
-      <main
-        class="flex-1 flex items-center justify-center px-4"
-      >{@render children()}</main>
+    {#if onLoginPage}
+      <main class="flex-1 flex items-center justify-center px-4 pb-16">{@render children()}</main>
+    {:else if isDashboard}
+      <main class="flex-1 flex flex-col pt-8 pb-24 px-4 dash-main">{@render children()}</main>
     {:else}
-      <main class="flex-1 flex flex-col pt-24 pb-24 px-4" class:dash-main={isDashboard}>{@render children()}</main>
+      <main class="site-main">{@render children()}</main>
     {/if}
-
-    {#if isDashboard}{@render themeDock(true)}{/if}
   </div>
 {/if}
 
-{#snippet themeDock(inFlow)}
-  <div class="theme-dock" class:in-flow={inFlow}>
-    <ThemeToggle />
-  </div>
-{/snippet}
-
 <style>
-  .theme-dock {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    z-index: 50;
+  .site {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--bg);
   }
-  /* A fixed corner button covers row actions (Revoke, delete) on a narrow
-     dashboard, however far the page scrolls; there it ends the page instead. */
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 64px;
+    padding: 0 var(--gutter);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin-left: -4px;
+    padding: 0 4px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: var(--radius-control);
+    transition: color var(--duration-normal) var(--ease-out);
+  }
+  .brand:hover { color: var(--text-primary); }
+  .brand:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 0;
+  }
+  .brand-mark {
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+  }
+  .brand-name {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  /* Phones: 44px targets need their 6px of air on either side. */
   @media (max-width: 639px) {
-    .theme-dock.in-flow {
-      position: static;
-      display: flex;
-      justify-content: flex-end;
-      padding: 0 16px max(24px, env(safe-area-inset-bottom));
-    }
-    .dash-main {
-      padding-bottom: 32px;
-    }
+    .controls { gap: 12px; }
+  }
+  .site-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
   }
   .nav-progress {
     position: fixed;
