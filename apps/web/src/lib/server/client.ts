@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { hashIp } from '#lib/server/ip-hash.js';
 
 /**
  * Behind Cloudflare, Vercel sees Cloudflare's IP and location, not the
@@ -52,4 +53,12 @@ export function clientOf(event: { request: Request; getClientAddress?: () => str
     if (!event.getClientAddress) throw new Error('no platform address');
     return event.getClientAddress();
   });
+}
+
+/**
+ * The visitor's IP as a keyed hash, for rate-limit keys: counts per visitor
+ * without the IP itself ever reaching the database.
+ */
+export function clientIpHash(event: { request: Request; getClientAddress?: () => string }): string {
+  return hashIp(clientOf(event).ip);
 }

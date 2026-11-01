@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { clientOf } from '#lib/server/client.js';
+import { clientIpHash } from '#lib/server/client.js';
 import { rateLimit } from '#lib/rateLimit.js';
 import { readPayMethods } from '#lib/server/pay-methods.js';
 
@@ -13,7 +13,7 @@ const LIMIT_PER_HOUR = 120;
 const HEADERS = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex' };
 
 export const GET: RequestHandler = async (event) => {
-	const rl = await rateLimit(`pay-qr:ip:${clientOf(event).ip}`, LIMIT_PER_HOUR, 3_600_000);
+	const rl = await rateLimit(`pay-qr:ip:${clientIpHash(event)}`, LIMIT_PER_HOUR, 3_600_000);
 	if (!rl.allowed) return json({ error: 'Rate limited' }, { status: 429, headers: HEADERS });
 
 	const raw = event.params.handle;

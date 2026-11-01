@@ -17,6 +17,11 @@ vi.mock('@vercel/functions', () => ({ waitUntil }));
 vi.mock('#lib/rateLimit.js', () => ({ rateLimit }));
 
 import { load, actions } from './+page.server';
+import { hashIp } from '#lib/server/ip-hash.js';
+
+// Rate-limit keys hold a keyed hash of the IP, so hashing needs a key.
+process.env.SECRET_KEY ||= 'k'.repeat(32);
+
 
 const HASH = bcrypt.hashSync('hunter2', 4);
 
@@ -386,9 +391,10 @@ describe('unlock', () => {
     expect(recordClick).toHaveBeenCalledTimes(1);
   });
 
-  it('keys the rate limit by slug and client ip: 10 per 10 minutes', async () => {
+  it('keys the rate limit by slug and a hash of the client ip: 10 per 10 minutes', async () => {
     await unlock('/AbC', 'nope');
-    expect(rateLimit).toHaveBeenCalledWith('unlock:AbC:1.2.3.4', 10, 10 * 60 * 1000);
+    expect(rateLimit).toHaveBeenCalledWith(`unlock:AbC:${hashIp('1.2.3.4')}`, 10, 10 * 60 * 1000);
+    expect(rateLimit.mock.calls[0][0]).not.toContain('1.2.3.4');
   });
 
   it('429s the 11th attempt in the window without checking the password', async () => {
@@ -676,8 +682,8 @@ describe('one-time links', () => {
       findUnique.mockResolvedValue({ ...ROW, passwordHash: HASH });
       await unlock('/AbC', 'nope');
       expect(rateLimit.mock.calls).toEqual([
-        ['unlock:AbC:1.2.3.4', 10, 10 * 60 * 1000],
-        ['unlock:AbC:1.2.3.4', 10, 10 * 60 * 1000]
+        [`unlock:AbC:${hashIp('1.2.3.4')}`, 10, 10 * 60 * 1000],
+        [`unlock:AbC:${hashIp('1.2.3.4')}`, 10, 10 * 60 * 1000]
       ]);
     });
 

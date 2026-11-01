@@ -7,7 +7,7 @@ import { encodeURL } from '#lib/server/crypto.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { randomBytes } from 'crypto';
 import { classifyPath, parseScopedSlug, scopedSlug } from '@iksi/core';
-import { clientOf } from '#lib/server/client.js';
+import { clientIpHash } from '#lib/server/client.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { FLAGGED_VERDICTS } from '#lib/server/link-record.js';
 import { BCRYPT_COST } from '#lib/server/link-settings.js';
@@ -239,9 +239,8 @@ export const POST = async (event) => withExtensionCors(event.request, await shor
 const shorten = async (event) => {
 	const { request, cookies } = event;
 	try {
-		// Rate limiting
-		const clientIP = clientOf(event).ip;
-		const rateLimitResult = await rateLimit(clientIP, RATE_LIMIT.requests, RATE_LIMIT.windowMs);
+		// Rate limiting, per visitor; the key holds a keyed hash, never the IP.
+		const rateLimitResult = await rateLimit(`shorten:ip:${clientIpHash(event)}`, RATE_LIMIT.requests, RATE_LIMIT.windowMs);
 		
 		if (!rateLimitResult.allowed) {
 			return new Response(JSON.stringify({ error: 'Too many requests. Please wait a minute.' }), {

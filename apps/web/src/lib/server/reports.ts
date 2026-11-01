@@ -12,11 +12,11 @@
  * The reporter is never told whether the link exists: a report for a link
  * that does not exist gets the same answer as one that was stored.
  */
-import { createHmac } from 'node:crypto';
 import { prisma } from '#lib/prisma.js';
 import { rateLimit } from '#lib/rateLimit.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { purgeEdge } from '#lib/server/edge-purge.js';
+import { hashIp } from '#lib/server/ip-hash.js';
 import { destinationsOf, isFlagged } from '#lib/server/link-record.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
 import { purgeProfile } from '#lib/server/profile-cache.js';
@@ -42,16 +42,7 @@ export const REVIEW_WINDOW_MS = DAY;
 export type Moderation = 'review' | 'disabled';
 export type ReportStatus = 'open' | 'actioned' | 'dismissed';
 
-/**
- * HMAC-SHA256 of an IP, keyed with SECRET_KEY: lets reports from one visitor
- * be told apart from reports by many without storing the IP, and without the
- * hash being reversible by trying every IPv4 address.
- */
-export function hashIp(ip: string): string {
-  const key = process.env.SECRET_KEY;
-  if (!key || key.length < 32) throw new Error('SECRET_KEY must be set and at least 32 characters');
-  return createHmac('sha256', key).update(ip).digest('hex');
-}
+export { hashIp };
 
 export interface ReportValues {
   link: string;

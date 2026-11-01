@@ -21,7 +21,7 @@ vi.mock('#lib/prisma.js', () => ({
 }));
 vi.mock('#lib/server/user-auth.js', () => ({ verifyUserSession: () => 7 }));
 vi.mock('#lib/server/user-cache.js', () => ({ getCachedUser: () => undefined, setCachedUser: () => {} }));
-vi.mock('#lib/server/client.js', () => ({ clientOf: () => ({ ip: '1.2.3.4' }) }));
+vi.mock('#lib/server/client.js', () => ({ clientOf: () => ({ ip: '1.2.3.4' }), clientIpHash: () => 'hash-of-1.2.3.4' }));
 
 import { load as layoutLoad } from './+layout.server';
 import { load as dashboardProfileLoad } from './(app)/dashboard/profile/+page.server';

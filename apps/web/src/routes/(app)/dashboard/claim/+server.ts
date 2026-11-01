@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { validateHandle } from '#lib/server/handles.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
-import { clientOf } from '#lib/server/client.js';
+import { clientIpHash } from '#lib/server/client.js';
 
 const CLAIM_LIMIT_PER_HOUR_IP = 3;
 const CLAIM_LIMIT_PER_HOUR_USER = 1;
@@ -38,7 +38,7 @@ export const POST: RequestHandler = async (event) => {
   const v = validateHandle(normalized);
   if (!v.ok) return json({ error: v.error }, { status: 400 });
 
-  const ipOk = await checkAndBump(`handle_claim:ip:${clientOf(event).ip}`, CLAIM_LIMIT_PER_HOUR_IP);
+  const ipOk = await checkAndBump(`handle_claim:ip:${clientIpHash(event)}`, CLAIM_LIMIT_PER_HOUR_IP);
   const userOk = await checkAndBump(`handle_claim:user:${uid}`, CLAIM_LIMIT_PER_HOUR_USER);
   if (!ipOk || !userOk) return json({ error: 'Too many attempts, wait an hour' }, { status: 429 });
 

@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 import { mediaUrl } from '#lib/server/media-url.js';
-import { clientOf } from '#lib/server/client.js';
+import { clientIpHash } from '#lib/server/client.js';
 
 const PUBLIC_LIMIT_PER_HOUR = 100;
 
@@ -25,7 +25,7 @@ async function checkAndBump(key: string, max: number): Promise<boolean> {
 
 export const GET: RequestHandler = async (event) => {
   const { params } = event;
-  const key = `public_api:ip:${clientOf(event).ip}`;
+  const key = `public_api:ip:${clientIpHash(event)}`;
   const ok = await checkAndBump(key, PUBLIC_LIMIT_PER_HOUR);
   if (!ok) return json({ error: 'Rate limited' }, { status: 429 });
 

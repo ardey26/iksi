@@ -11,6 +11,11 @@ vi.mock('#lib/prisma.js', () => ({ prisma: { profile: { findFirst: h.findFirst }
 vi.mock('#lib/rateLimit.js', () => ({ rateLimit: h.rateLimit }));
 
 import { GET } from './+server';
+import { hashIp } from '#lib/server/ip-hash.js';
+
+// Rate-limit keys hold a keyed hash of the IP, so hashing needs a key.
+process.env.SECRET_KEY ||= 'k'.repeat(32);
+
 
 const run = (handle = 'ann') =>
 	GET({
@@ -59,10 +64,11 @@ describe('GET /api/@handle/pay', () => {
 		expect(res.status).toBe(404);
 	});
 
-	it('rate limits by visitor', async () => {
+	it('rate limits by a keyed hash of the visitor, never the raw IP', async () => {
 		h.allowed = false;
 		h.profile = { payMethods: [] };
 		expect((await run()).status).toBe(429);
-		expect(h.rateLimit.mock.calls[0][0]).toContain('203.0.113.9');
+		expect(h.rateLimit).toHaveBeenCalledWith(`pay-qr:ip:${hashIp('203.0.113.9')}`, 120, 3_600_000);
+		expect(h.rateLimit.mock.calls[0][0]).not.toContain('203.0.113.9');
 	});
 });

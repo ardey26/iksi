@@ -12,7 +12,7 @@ import { PASSWORD_MAX } from '#lib/password-limits.js';
 import { prisma } from '#lib/prisma.js';
 import { rateLimit } from '#lib/rateLimit.js';
 import { decodeURL } from '#lib/server/crypto.js';
-import { clientOf } from '#lib/server/client.js';
+import { clientIpHash } from '#lib/server/client.js';
 import { blockedVerdict, toLinkRecord } from '#lib/server/link-record.js';
 import { claimOneTime, oneTimeState } from '#lib/server/one-time.js';
 import { requestContext } from '#lib/server/request-context.js';
@@ -118,7 +118,7 @@ async function toRecord(row: Row) {
 
 /** Unlock and reveal attempts share one budget per slug and visitor. */
 async function attemptsExhausted(event: RequestEvent, slug: string) {
-  const limit = await rateLimit(`unlock:${slug}:${clientOf(event).ip}`, UNLOCK_MAX, UNLOCK_WINDOW_MS);
+  const limit = await rateLimit(`unlock:${slug}:${clientIpHash(event)}`, UNLOCK_MAX, UNLOCK_WINDOW_MS);
   return limit.allowed ? null : fail(429, { error: 'Too many attempts. Try again in a few minutes.' });
 }
 

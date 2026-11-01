@@ -4,14 +4,21 @@ const findFirst = vi.hoisted(() => vi.fn());
 const create = vi.hoisted(() => vi.fn());
 const verifyUserSession = vi.hoisted(() => vi.fn());
 const settleVerdictInBackground = vi.hoisted(() => vi.fn());
+const rateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('#lib/prisma.js', () => ({ prisma: { longURL: { findFirst, create } } }));
-vi.mock('#lib/rateLimit.js', () => ({ rateLimit: vi.fn(async () => ({ allowed: true })) }));
+vi.mock('#lib/rateLimit.js', () => ({ rateLimit }));
 vi.mock('#lib/server/user-auth.js', () => ({ verifyUserSession }));
 vi.mock('#lib/server/crypto.js', () => ({ encodeURL: vi.fn((u: string) => `enc:${u}`) }));
 vi.mock('#lib/server/link-verdict.js', () => ({ settleVerdictInBackground }));
 
 import { POST } from './+server.js';
+import { hashIp } from '#lib/server/ip-hash.js';
+import { RATE_LIMIT } from '#lib/config.js';
+
+// Rate-limit keys hold a keyed hash of the IP, so hashing needs a key.
+process.env.SECRET_KEY ||= 'k'.repeat(32);
+
 
 const URL_IN = 'https://example.com/page';
 
@@ -47,6 +54,7 @@ function withHashRow(hashRow: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rateLimit.mockResolvedValue({ allowed: true });
   verifyUserSession.mockReturnValue(null);
   create.mockImplementation(async ({ data }: { data: { shortURL: string } }) => ({
     id: 1,
@@ -259,5 +267,23 @@ describe('one-time links', () => {
   it('still refuses an oversized body', async () => {
     const res = await oneTime({ kind: 'text', content: 'a'.repeat(20000) });
     expect(res.status).toBe(413);
+  });
+});
+
+describe('anonymous rate limit', () => {
+  it('counts per visitor under a keyed hash of the IP, never the raw IP', async () => {
+    withHashRow(null);
+    await shorten();
+    const [key, max, windowMs] = rateLimit.mock.calls[0];
+    expect(key).toBe(`shorten:ip:${hashIp('1.2.3.4')}`);
+    expect(key).not.toContain('1.2.3.4');
+    expect([max, windowMs]).toEqual([RATE_LIMIT.requests, RATE_LIMIT.windowMs]);
+  });
+
+  it('429s once the visitor is over the limit, before storing anything', async () => {
+    rateLimit.mockResolvedValue({ allowed: false, remaining: 0 });
+    const res = await shorten();
+    expect(res.status).toBe(429);
+    expect(create).not.toHaveBeenCalled();
   });
 });

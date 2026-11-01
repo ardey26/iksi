@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolveClient, EDGE_HEADERS } from './client';
+import { createHmac } from 'node:crypto';
+import { resolveClient, clientIpHash, EDGE_HEADERS } from './client';
 
 const SECRET = 'edge-secret-0123456789abcdef';
 const vercelIp = () => '203.0.113.9';
@@ -48,5 +49,20 @@ describe('resolveClient', () => {
       throw new Error('no address');
     };
     expect(resolveClient(headers({}), SECRET, throwing)).toEqual({ ip: 'unknown', country: null });
+  });
+});
+
+describe('clientIpHash', () => {
+  it('is the HMAC of the visitor IP keyed with SECRET_KEY, never the IP', () => {
+    const saved = process.env.SECRET_KEY;
+    process.env.SECRET_KEY = 's'.repeat(32);
+    try {
+      const event = { request: new Request('https://www.iksi.app/'), getClientAddress: vercelIp };
+      const h = clientIpHash(event);
+      expect(h).toBe(createHmac('sha256', 's'.repeat(32)).update('203.0.113.9').digest('hex'));
+      expect(h).not.toContain('203.0.113.9');
+    } finally {
+      process.env.SECRET_KEY = saved;
+    }
   });
 });

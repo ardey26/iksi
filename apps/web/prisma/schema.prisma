@@ -193,7 +193,7 @@ model ApiKey {
 }
 
 model RateLimit {
-  id      String   @id // IP address or identifier
+  id      String   @id // action and subject, e.g. shorten:ip:<HMAC of the IP>; never a raw IP
   count   Int      @default(1)
   resetAt DateTime
 

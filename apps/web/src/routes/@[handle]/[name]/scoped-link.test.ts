@@ -19,6 +19,11 @@ vi.mock('@vercel/functions', () => ({ waitUntil, addCacheTag, dangerouslyDeleteB
 vi.mock('#lib/rateLimit.js', () => ({ rateLimit }));
 
 import { load, actions } from './+page.server';
+import { hashIp } from '#lib/server/ip-hash.js';
+
+// Rate-limit keys hold a keyed hash of the IP, so hashing needs a key.
+process.env.SECRET_KEY ||= 'k'.repeat(32);
+
 
 const HASH = bcrypt.hashSync('hunter2', 4);
 
@@ -127,7 +132,7 @@ describe('/@handle/name', () => {
     const right = await act('unlock', '/@andre/sale', 'hunter2');
     expect(right.redirect).toEqual({ status: 303, location: 'https://example.com/sale' });
     expect(recordClick).toHaveBeenCalledTimes(1);
-    expect(rateLimit).toHaveBeenCalledWith('unlock:@andre/sale:1.2.3.4', 10, 10 * 60 * 1000);
+    expect(rateLimit).toHaveBeenCalledWith(`unlock:@andre/sale:${hashIp('1.2.3.4')}`, 10, 10 * 60 * 1000);
   });
 
   it('sends an unprotected link back to its own scoped path', async () => {
@@ -233,6 +238,6 @@ describe('on andre.iksi.app (rerouted from /<name>)', () => {
     const event = onSubdomain('/sale', { method: 'POST', body });
     const r = await settle(event, () => (actions as any).unlock(event as never));
     expect(r.redirect).toEqual({ status: 303, location: 'https://example.com/sale' });
-    expect(rateLimit).toHaveBeenCalledWith('unlock:@andre/sale:1.2.3.4', 10, 10 * 60 * 1000);
+    expect(rateLimit).toHaveBeenCalledWith(`unlock:@andre/sale:${hashIp('1.2.3.4')}`, 10, 10 * 60 * 1000);
   });
 });
