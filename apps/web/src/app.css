@@ -97,10 +97,24 @@
   unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 
+/* Until Geist arrives (font-display: swap), text renders in Arial scaled
+   to Geist's width and vertical metrics, so the swap does not reflow text or
+   resize buttons. Width: Geist / Arial over UI copy at 400-500, measured in
+   Chrome (1.026 at 400, 1.048 at 500). Vertical: Geist's hhea ascender 1005
+   and descender 295 per 1000 units, divided by the size adjust. */
+@font-face {
+  font-family: 'Geist Fallback';
+  src: local('Arial'), local('ArialMT');
+  size-adjust: 103.5%;
+  ascent-override: 97.1%;
+  descent-override: 28.5%;
+  line-gap-override: 0%;
+}
+
 html {
   background: var(--bg);
   min-height: 100vh;
-  font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Geist', 'Geist Fallback', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -283,7 +297,7 @@ select[size]:not([size="1"]) {
   --duration-sheet: 220ms;
 
   /* Type */
-  --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Geist', 'Geist Fallback', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (min-width: 768px) {
