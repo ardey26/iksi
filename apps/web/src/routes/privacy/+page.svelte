@@ -6,7 +6,7 @@
   import { Container, PageHeader, Paper, Section } from '#lib/ui/index.js';
 
   const UPDATED = 'November 1, 2026';
-  const CONTACT = 'andre@iksi.app';
+  const CONTACT = 'dejesusandre0226@gmail.com';
 
   const SECTIONS = [
     { id: 'summary', title: 'The short version' },

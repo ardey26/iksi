@@ -35,10 +35,10 @@ describe('privacy page', () => {
 
   it('gives the contact address as a mail link', () => {
     const { container } = render(Privacy);
-    expect(container.textContent).toContain('andre@iksi.app');
+    expect(container.textContent).toContain('dejesusandre0226@gmail.com');
     const mail = [...container.querySelectorAll('a[href^="mailto:"]')];
     expect(mail.length).toBeGreaterThan(0);
-    for (const a of mail) expect(a).toHaveAttribute('href', 'mailto:andre@iksi.app');
+    for (const a of mail) expect(a).toHaveAttribute('href', 'mailto:dejesusandre0226@gmail.com');
   });
 
   it('links every contents entry to a section with that id, in order', () => {
