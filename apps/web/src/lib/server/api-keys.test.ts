@@ -105,8 +105,8 @@ describe('authenticateApiKey', () => {
 	});
 
 	it('records use when the last one was over a minute ago, guarded against races', async () => {
-		apiKey.findUnique.mockResolvedValue(row());
 		const now = new Date('2026-11-01T10:00:00Z');
+		apiKey.findUnique.mockResolvedValue(row({ lastUsedAt: new Date(now.getTime() - 120_000) }));
 		await authenticateApiKey(KEY, now);
 		expect(apiKey.updateMany).toHaveBeenCalledWith({
 			where: { id: 7, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: new Date(now.getTime() - 60_000) } }] },
