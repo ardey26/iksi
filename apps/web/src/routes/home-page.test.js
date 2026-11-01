@@ -153,3 +153,16 @@ describe('home page layout', () => {
     expect(container.querySelector('section.hero')).toHaveTextContent('AbCdEf');
   });
 });
+
+describe('home page footer', () => {
+  it('links the report form and the privacy policy, below the fold', () => {
+    const { container } = render(Home);
+    const foot = container.querySelector('footer.site-foot');
+    expect([...foot.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Report a link', '/report'],
+      ['Privacy', '/privacy']
+    ]);
+    // The first screen stays the tool alone: the footer is outside the hero.
+    expect(container.querySelector('section.hero').contains(foot)).toBe(false);
+  });
+});

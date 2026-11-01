@@ -216,6 +216,7 @@
     <Container width="wide">
       <div class="foot-inner">
         <a href="/report">Report a link</a>
+        <a href="/privacy">Privacy</a>
       </div>
     </Container>
   </footer>
