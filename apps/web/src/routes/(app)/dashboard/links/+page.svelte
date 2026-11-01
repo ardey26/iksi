@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { invalidateAll } from '$app/navigation';
   import LinkSettings from '#lib/components/links/LinkSettings.svelte';
   import type { LinkSettingsData } from '#lib/rules-form.js';
@@ -32,11 +33,61 @@
 
   let copiedId: number | null = null;
 
-  // --- Per-link settings panel (one open at a time) ---
-  let settingsOpenId: number | null = null;
+  // --- Per-link settings sheet (one open at a time) ---
+  // The sheet is a modal dialog: focus moves into it on open, Tab stays
+  // inside it, Escape or a backdrop click closes it, and focus returns to
+  // the gear that opened it.
+  let sheetId: number | null = null;
+  let sheetEl: HTMLElement | undefined;
+  let sheetTrigger: HTMLElement | null = null;
+  $: sheetLink = sheetId === null ? null : links.find((l) => l.id === sheetId && l.settings) ?? null;
+
+  async function openSheet(l: Link, e: MouseEvent) {
+    sheetTrigger = e.currentTarget as HTMLElement;
+    sheetId = l.id;
+    await tick();
+    sheetEl?.focus();
+  }
+  async function closeSheet() {
+    if (sheetId === null) return;
+    sheetId = null;
+    await tick();
+    sheetTrigger?.focus();
+    sheetTrigger = null;
+  }
+  function onWindowKeydown(e: KeyboardEvent) {
+    if (sheetId === null || e.key !== 'Escape') return;
+    e.preventDefault();
+    closeSheet();
+  }
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function trapFocus(e: KeyboardEvent) {
+    if (e.key !== 'Tab' || !sheetEl) return;
+    const items = [...sheetEl.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest('[hidden]'));
+    if (items.length === 0) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || active === sheetEl)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   function onSettingsSaved(id: number, s: LinkSettingsData) {
     links = links.map((l) => (l.id === id ? { ...l, originalURL: s.destination, settings: s } : l));
     toast('Settings saved');
+  }
+
+  function states(s: LinkSettingsData) {
+    return [
+      { label: 'Password', on: s.hasPassword },
+      { label: 'Expiry', on: s.expiresAt !== null || s.maxClicks !== null },
+      { label: 'Rules', on: s.rules.length > 0 }
+    ];
   }
 
   // --- Lightweight toast (single message, auto-dismiss) ---
@@ -341,47 +392,28 @@
   }
 </script>
 
+
 <svelte:head><title>Links — iksi</title></svelte:head>
+<svelte:window on:keydown={onWindowKeydown} />
 
 {#if toastMessage}
-  <div
-    role="status"
-    aria-live="polite"
-    class="toast-anim"
-    style="
-      position: fixed;
-      top: 1.25rem;
-      right: 1.25rem;
-      z-index: 100;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.625rem;
-      padding: 0.5rem 0.9rem;
-      border-radius: 9999px;
-      font-size: 0.8125rem;
-      color: var(--text-primary);
-      background: var(--surface);
-      border: 1px solid {toastKind === 'error' ? 'var(--error)' : 'var(--border)'};
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-      width: auto;
-      max-width: min(90vw, 26rem);
-      pointer-events: none;
-    "
-  >
-    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: {toastKind === 'error' ? 'var(--error)' : 'var(--accent)'};"></span>
-    <span>{toastMessage}</span>
+  <div class="toast-wrap">
+    <div role="status" aria-live="polite" class="toast toast-anim" class:error={toastKind === 'error'}>
+      <span class="d-dot on" class:err-dot={toastKind === 'error'}></span>
+      <span>{toastMessage}</span>
+    </div>
   </div>
 {/if}
 
-<section class="w-full max-w-2xl mx-auto space-y-8">
-  <header>
+<section class="w-full max-w-2xl mx-auto d-scope" inert={sheetId !== null}>
+  <header class="mb-10">
     <p class="text-sm mb-8" style="color: var(--text-muted);">
       <a href="/dashboard" class="hover:opacity-70 transition-opacity">← Dashboard</a>
     </p>
     <div class="flex items-baseline justify-between gap-4">
       <div>
         <h1 class="text-3xl font-semibold tracking-tight" style="color: var(--text-primary);">Links</h1>
-        <p class="text-sm mt-2" style="color: var(--text-muted);">Everything you've shortened. Toggle to show on your public page.</p>
+        <p class="d-desc mt-2">Everything you've shortened. Switch one on to show it on your public page.</p>
       </div>
       {#if data.user.handle}
         <a href={`/@${data.user.handle}`} target="_blank" rel="noopener"
@@ -396,228 +428,433 @@
     </div>
   </header>
 
-  <div class="rounded-xl overflow-hidden" style="background: var(--surface); border: 1px solid var(--border);">
-    <table class="w-full text-sm">
-      <thead>
-        <tr style="background: color-mix(in srgb, var(--text-primary) 2%, transparent);">
-          <th class="w-6"></th>
-          <th class="text-left py-2.5 pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Link</th>
-          <th class="w-20 text-center whitespace-nowrap font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">On page</th>
-          <th class="w-16 text-right pr-3 font-medium text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">Clicks</th>
-          <th class="w-9"></th>
-          <th class="w-10 pr-2"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each links as l (l.id)}
-          <tr
-            draggable={isPublic(l) && !l.pending}
-            on:dragstart={(e) => onDragStart(e, l)}
-            on:dragover={(e) => onDragOver(e, l)}
-            on:dragend={onDragEnd}
-            on:drop={(e) => onDrop(e, l)}
-            class="group"
-            style="border-top: 1px solid var(--border); opacity: {dragId === l.id ? '0.35' : l.pending ? '0.5' : '1'}; background: {dragOverId === l.id && dragId !== l.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent'}; transition: opacity 180ms ease;"
-          >
-            <!-- Drag handle (public only) -->
-            <td class="w-6 pl-2 align-middle" style="cursor: {isPublic(l) ? 'grab' : 'default'};">
-              {#if isPublic(l)}
-                <svg class="w-3 h-3 opacity-25 group-hover:opacity-60 transition-opacity"
-                     viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
-                  <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
-                  <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-                  <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-                </svg>
-              {/if}
-            </td>
+  <table class="links w-full">
+    <thead>
+      <tr>
+        <th class="handle-col"><span class="sr-only">Reorder</span></th>
+        <th class="text-left">Link</th>
+        <th class="toggle-col">On page</th>
+        <th class="clicks-col">Clicks</th>
+        <th class="icon-col"><span class="sr-only">Settings</span></th>
+        <th class="icon-col"><span class="sr-only">Delete</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each links as l (l.id)}
+        <tr
+          draggable={isPublic(l) && !l.pending}
+          on:dragstart={(e) => onDragStart(e, l)}
+          on:dragover={(e) => onDragOver(e, l)}
+          on:dragend={onDragEnd}
+          on:drop={(e) => onDrop(e, l)}
+          class="row group"
+          class:drop-target={dragOverId === l.id && dragId !== l.id}
+          style="opacity: {dragId === l.id ? '0.35' : l.pending ? '0.5' : '1'};"
+        >
+          <!-- Drag handle (public only) -->
+          <td class="handle-col" style="cursor: {isPublic(l) ? 'grab' : 'default'};">
+            {#if isPublic(l)}
+              <svg class="w-3 h-3 opacity-25 group-hover:opacity-60 transition-opacity"
+                   viewBox="0 0 24 24" fill="currentColor" style="color: var(--text-muted);" aria-hidden="true">
+                <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+              </svg>
+            {/if}
+          </td>
 
-            <!-- Favicon + title + meta -->
-            <td class="py-3 pr-3 align-middle min-w-0">
-              <div class="flex items-center gap-3 min-w-0">
-                {#if faviconOf(l.originalURL)}
-                  <img src={faviconOf(l.originalURL)} alt="" width="16" height="16"
-                       class="shrink-0 rounded-sm" loading="lazy" decoding="async"
-                       on:error={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
-                {:else}
-                  <div class="w-4 h-4 shrink-0"></div>
-                {/if}
-                <div class="min-w-0 flex-1">
-                  <input
-                    type="text"
-                    value={l.profileRow?.title ?? ''}
-                    placeholder={isPublic(l) ? 'Untitled' : 'Add a title…'}
-                    maxlength="80"
-                    on:blur={(e) => saveTitle(l, e.currentTarget.value)}
-                    on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                    class="block w-full text-sm font-medium bg-transparent outline-none py-1.5 px-2 -mx-2 rounded-md truncate title-input"
-                    style="color: {l.profileRow?.title ? 'var(--text-primary)' : 'var(--text-muted)'}; border: none;"
-                  />
-                  <div class="flex items-center gap-1.5 mt-0.5 text-xs truncate" style="color: var(--text-muted);">
-                    <button on:click={() => copy(l.id, l.shortURL)}
-                            class="font-mono hover:opacity-70 transition-opacity shrink-0"
-                            style="background: transparent; border: none; cursor: pointer; padding: 0; color: inherit;"
-                            title="Copy short link"
-                    >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
-                    {#if l.originalURL}
-                      <span style="opacity: 0.4;">·</span>
-                      <span class="truncate" title={l.originalURL}>{hostOf(l.originalURL)}</span>
-                    {/if}
-                    {#if verdictLabel(l.safeVerdict)}
-                      <span style="opacity: 0.4;">·</span>
-                      <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
-                    {/if}
-                  </div>
+          <!-- Favicon + title + meta -->
+          <td class="link-col">
+            <div class="flex items-center gap-3 min-w-0">
+              {#if faviconOf(l.originalURL)}
+                <img src={faviconOf(l.originalURL)} alt="" width="16" height="16"
+                     class="shrink-0 rounded-sm" loading="lazy" decoding="async"
+                     on:error={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+              {:else}
+                <div class="w-4 h-4 shrink-0"></div>
+              {/if}
+              <div class="min-w-0 flex-1">
+                <input
+                  type="text"
+                  value={l.profileRow?.title ?? ''}
+                  placeholder={isPublic(l) ? 'Untitled' : 'Add a title…'}
+                  maxlength="80"
+                  aria-label="Title"
+                  on:blur={(e) => saveTitle(l, e.currentTarget.value)}
+                  on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                  class="title-input"
+                  class:untitled={!l.profileRow?.title}
+                />
+                <div class="meta">
+                  <button on:click={() => copy(l.id, l.shortURL)} class="short" title="Copy short link"
+                  >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
+                  {#if l.originalURL}
+                    <span class="sep" aria-hidden="true">·</span>
+                    <span class="truncate" title={l.originalURL}>{hostOf(l.originalURL)}</span>
+                  {/if}
+                  {#if verdictLabel(l.safeVerdict)}
+                    <span class="sep" aria-hidden="true">·</span>
+                    <span style="color: var(--error);">{verdictLabel(l.safeVerdict)}</span>
+                  {/if}
+                  {#if l.settings}
+                    <span class="dots" role="list" aria-label="Link state">
+                      {#each states(l.settings) as st}
+                        <span role="listitem" class="d-dot" class:on={st.on} title={`${st.label}: ${st.on ? 'on' : 'off'}`}>
+                          <span class="sr-only">{st.label} {st.on ? 'on' : 'off'}</span>
+                        </span>
+                      {/each}
+                    </span>
+                  {/if}
                 </div>
               </div>
-            </td>
+            </div>
+          </td>
 
-            <!-- Toggle -->
-            <td class="w-20 text-center align-middle">
+          <!-- On page -->
+          <td class="toggle-col">
+            <button
+              type="button"
+              role="switch"
+              class="d-switch"
+              aria-checked={l.profileRow?.enabled ?? false}
+              aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
+              on:click={() => togglePublish(l)}
+            ></button>
+          </td>
+
+          <!-- Clicks -->
+          <td class="clicks-col">
+            <span class="d-readout" title={relDate(l.createdAt)}>{fmtClicks(l.clickCount)}</span>
+          </td>
+
+          <!-- Settings -->
+          <td class="icon-col">
+            {#if l.settings}
               <button
-                role="switch"
-                aria-checked={l.profileRow?.enabled ?? false}
-                aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
-                on:click={() => togglePublish(l)}
-                class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors align-middle"
-                style="background: {l.profileRow?.enabled ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
-              >
-                <span class="inline-block w-4 h-4 rounded-full transition-transform"
-                      style="background: white; transform: translateX({l.profileRow?.enabled ? '18px' : '2px'});"></span>
-              </button>
-            </td>
-
-            <!-- Clicks -->
-            <td class="w-16 text-right align-middle tabular-nums pr-3">
-              <div class="text-sm" style="color: var(--text-primary);" title={relDate(l.createdAt)}>{fmtClicks(l.clickCount)}</div>
-            </td>
-
-            <!-- Settings -->
-            <td class="w-9 text-center align-middle">
-              {#if l.settings}
-              <button
-                on:click={() => (settingsOpenId = settingsOpenId === l.id ? null : l.id)}
+                type="button"
+                class="d-icon"
+                on:click={(e) => openSheet(l, e)}
                 aria-label="Link settings"
-                aria-expanded={settingsOpenId === l.id}
+                aria-haspopup="dialog"
+                aria-expanded={sheetId === l.id}
                 title="Link settings"
-                class="settings-btn p-1 align-middle"
-                style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
               >
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                   <circle cx="12" cy="12" r="3"/>
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
-              {/if}
-            </td>
-
-            <!-- Delete -->
-            <td class="w-10 pr-2 text-center align-middle">
-              <button
-                on:click={() => del(l)}
-                aria-label="Delete link"
-                title="Delete link"
-                class="p-1 opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity align-middle"
-                style="color: var(--text-muted); background: transparent; border: none; cursor: pointer;"
-              >
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
-                </svg>
-              </button>
-            </td>
-          </tr>
-          {#if settingsOpenId === l.id && l.settings}
-            <tr style="border-top: 1px solid var(--border);">
-              <td colspan="6" class="p-0">
-                <LinkSettings id={l.id} settings={l.settings} on:saved={(e) => onSettingsSaved(l.id, e.detail)} />
-              </td>
-            </tr>
-          {/if}
-        {/each}
-
-        <!-- Add-row -->
-        <tr style="border-top: 1px solid var(--border); background: color-mix(in srgb, var(--text-primary) 2%, transparent);">
-          <td class="w-6 pl-2 align-middle text-center">
-            <span class="text-sm" style="color: var(--text-muted); opacity: 0.5;">+</span>
+            {/if}
           </td>
-          <td class="py-3 pr-3 align-middle">
-            <div class="flex items-center gap-3">
-              <!-- Spacer to align inputs with body-row favicons -->
-              <div class="w-4 h-4 shrink-0" aria-hidden="true"></div>
-              <div class="min-w-0 flex-1 space-y-1">
-                <input
-                  type="url"
-                  bind:value={newURL}
-                  placeholder="Paste a URL…"
-                  maxlength="2048"
-                  on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                  class="block w-full text-sm font-medium bg-transparent outline-none py-1.5 px-2 -mx-2 rounded-md truncate title-input"
-                  style="color: var(--text-primary); border: none;"
-                />
-                <input
-                  type="text"
-                  bind:value={newTitle}
-                  placeholder="Title (optional)"
-                  maxlength="80"
-                  on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-                  class="block w-full text-xs bg-transparent outline-none py-1.5 px-2 -mx-2 rounded-md truncate title-input"
-                  style="color: var(--text-muted); border: none;"
-                />
-              </div>
-            </div>
-          </td>
-          <td class="w-20 text-center align-middle">
-            <button
-              role="switch"
-              aria-checked={newPublish}
-              aria-label={newPublish ? 'Will publish' : 'Will not publish'}
-              on:click={() => (newPublish = !newPublish)}
-              class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors align-middle"
-              style="background: {newPublish ? 'var(--accent)' : 'var(--border)'}; border: none; cursor: pointer; padding: 0;"
-            >
-              <span class="inline-block w-4 h-4 rounded-full transition-transform"
-                    style="background: white; transform: translateX({newPublish ? '18px' : '2px'});"></span>
+
+          <!-- Delete -->
+          <td class="icon-col">
+            <button type="button" on:click={() => del(l)} aria-label="Delete link" title="Delete link" class="d-icon delete">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+              </svg>
             </button>
           </td>
-          <td class="align-middle text-right pr-2" colspan="3">
-            <button
-              on:click={add}
-              disabled={!canAdd}
-              class="px-3 py-1.5 text-xs font-medium rounded-md transition-opacity hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-              style="background: var(--text-primary); color: var(--bg); border: none; cursor: pointer;"
-            >Add</button>
-          </td>
         </tr>
-      </tbody>
-    </table>
-  </div>
+      {/each}
 
-  {#if addError}
-    <p class="text-xs" style="color: var(--error);">{addError}</p>
-  {/if}
+      <!-- Add row -->
+      <tr class="row add-row">
+        <td class="handle-col">
+          <span class="text-sm" style="color: var(--text-muted); opacity: 0.5;" aria-hidden="true">+</span>
+        </td>
+        <td class="link-col">
+          <div class="flex items-center gap-3">
+            <!-- Spacer to align inputs with body-row favicons -->
+            <div class="w-4 h-4 shrink-0" aria-hidden="true"></div>
+            <div class="min-w-0 flex-1">
+              <input
+                type="url"
+                bind:value={newURL}
+                placeholder="Paste a URL…"
+                maxlength="2048"
+                aria-label="New link URL"
+                on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+                class="title-input"
+              />
+              <input
+                type="text"
+                bind:value={newTitle}
+                placeholder="Title (optional)"
+                maxlength="80"
+                aria-label="New link title"
+                on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+                class="title-input sub"
+              />
+            </div>
+          </div>
+        </td>
+        <td class="toggle-col">
+          <button
+            type="button"
+            role="switch"
+            class="d-switch"
+            aria-checked={newPublish}
+            aria-label={newPublish ? 'Will publish' : 'Will not publish'}
+            on:click={() => (newPublish = !newPublish)}
+          ></button>
+        </td>
+        <td class="add-col" colspan="3">
+          <button type="button" on:click={add} disabled={!canAdd} class="d-btn d-btn-primary">Add link</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="add-error" role={addError ? 'alert' : undefined}>{addError}</p>
 </section>
 
+{#if sheetLink && sheetLink.settings}
+  <div class="sheet-root d-scope">
+    <!-- Pointer-only shortcut; Escape and the close button cover keyboards. -->
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="backdrop" data-testid="sheet-backdrop" on:click={closeSheet}></div>
+    <div
+      class="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sheet-title"
+      aria-describedby="sheet-sub"
+      tabindex="-1"
+      bind:this={sheetEl}
+      on:keydown={trapFocus}
+    >
+      <header class="sheet-head">
+        <div class="min-w-0">
+          <h2 id="sheet-title" class="d-title">Link settings</h2>
+          <p id="sheet-sub" class="sheet-sub">iksi.app/{sheetLink.shortURL}</p>
+        </div>
+        <button type="button" class="d-icon" aria-label="Close settings" on:click={closeSheet}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        {#key sheetLink.id}
+          <LinkSettings id={sheetLink.id} settings={sheetLink.settings} on:saved={(e) => onSettingsSaved(sheetLink.id, e.detail)} />
+        {/key}
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
-  .settings-btn:disabled { opacity: 0.3; cursor: default; }
-  .settings-btn:not(:disabled):hover { opacity: 0.8; }
-  .settings-btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
-  .title-input::placeholder {
+  /* Links table: flat, hairline rows, no outer box. */
+  .links {
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 14px;
+  }
+  .links th {
+    height: 36px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 400;
+    text-align: center;
     color: var(--text-muted);
-    opacity: 0.6;
+    border-bottom: 1px solid var(--border);
   }
-  .title-input:hover:not(:focus) {
-    background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  .links th.text-left { text-align: left; padding-left: 0; }
+  .links td {
+    padding: 12px 8px;
+    vertical-align: middle;
   }
-  .title-input:focus {
-    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  .row { border-bottom: 1px solid var(--border); }
+  .row.drop-target { background-color: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .handle-col { width: 24px; padding-left: 0 !important; padding-right: 0 !important; }
+  .link-col { padding-left: 0 !important; }
+  .toggle-col { width: 76px; text-align: center; }
+  .toggle-col .d-switch { vertical-align: middle; }
+  .clicks-col { width: 64px; text-align: right !important; }
+  .links td.clicks-col { padding-right: 12px; }
+  .icon-col { width: 40px; padding-left: 0 !important; padding-right: 0 !important; text-align: center; }
+  .add-col { text-align: right; padding-right: 0 !important; }
+
+  .title-input {
+    display: block;
+    width: calc(100% + 16px);
+    margin: 0 -8px;
+    padding: 4px 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    outline: none;
+    text-overflow: ellipsis;
+  }
+  .title-input.untitled,
+  .title-input.sub { color: var(--text-muted); }
+  .title-input.sub { font-size: 13px; font-weight: 400; }
+  .title-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+  .title-input:hover:not(:focus) { background-color: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .title-input:focus { background-color: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+  .title-input:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 0; }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-top: 2px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--text-muted);
+  }
+  .short {
+    flex: none;
+    padding: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .short:hover { color: var(--text-primary); }
+  .sep { opacity: 0.4; }
+  .dots {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
   }
 
-  /* Toast entry animation (positioning is inlined on the element itself
-     to sidestep any scoped-CSS or flex-parent quirks). */
-  .toast-anim {
-    animation: toast-in 180ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  .d-icon.delete { opacity: 0; }
+  .row:hover .d-icon.delete,
+  .d-icon.delete:focus-visible { opacity: 1; }
+  .d-icon.delete:hover { color: var(--error) !important; }
+  @media (hover: none) {
+    .d-icon.delete { opacity: 1; }
   }
+
+  .add-row { border-bottom: none; }
+  .add-error {
+    min-height: 18px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--error);
+  }
+
+  @media (max-width: 639px) {
+    .handle-col { display: none; }
+    .toggle-col { width: 52px; }
+    .clicks-col { width: 48px; }
+    .links td.clicks-col { padding-right: 4px; }
+    .icon-col { width: 44px; }
+    .add-col .d-btn { padding: 0 12px; }
+  }
+
+  /* Settings sheet */
+  .sheet-root {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+  }
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    background-color: rgb(0 0 0 / 0.55);
+    animation: backdrop-in 200ms var(--ease-out);
+  }
+  :global([data-theme="light"]) .backdrop { background-color: rgb(0 0 0 / 0.2); }
+  .sheet {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    width: 480px;
+    max-width: 100%;
+    background-color: var(--bg);
+    border-left: 1px solid var(--border);
+    outline: none;
+    animation: sheet-in 200ms var(--ease-out);
+  }
+  .sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 20px 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet-head .d-icon { margin-top: -6px; }
+  .sheet-sub {
+    margin-top: 2px;
+    overflow: hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--text-muted);
+  }
+  .sheet-body {
+    --ls-pad: 24px;
+    --d-label: 136px;
+    flex: 1;
+    min-height: 0;
+    padding: 4px 24px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  @keyframes sheet-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @media (max-width: 639px) {
+    .sheet { width: 100%; border-left: none; }
+    .sheet-head { padding: 12px 8px 12px 16px; }
+    .sheet-head .d-icon { margin-top: -10px; }
+    .sheet-body { --ls-pad: 16px; padding: 0 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet,
+    .backdrop { animation: none; }
+  }
+
+  /* Toast: bottom centre so it never sits on the sheet's header. */
+  .toast-wrap {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 24px;
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px;
+    pointer-events: none;
+  }
+  .toast {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(90vw, 26rem);
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text-primary);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .toast.error { border-color: var(--error); }
+  .err-dot { background-color: var(--error) !important; }
+  .toast-anim { animation: toast-in 180ms var(--ease-out); }
   @keyframes toast-in {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast-anim { animation: none; }
   }
 </style>
