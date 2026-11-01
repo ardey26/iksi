@@ -19,6 +19,8 @@
       </svg>
       <span class="text-sm font-medium tracking-tight">iksi</span>
     </a>
+    <div class="flex items-center gap-6">
+    <a href="/admin/reports" class="text-sm transition-colors hover:opacity-70" style="color: var(--text-muted);">Reports</a>
     <form method="POST" action="/admin/logout">
       <button
         type="submit"
@@ -28,6 +30,7 @@
         Sign out
       </button>
     </form>
+    </div>
   </div>
 
   <main class="px-6 py-8">
