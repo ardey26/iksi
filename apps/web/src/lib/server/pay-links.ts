@@ -29,6 +29,7 @@ const HOSTS = new Map<string, PayProvider>(Object.entries({
 	'wise.com': 'wise',
 	'revolut.me': 'revolut',
 	'ko-fi.com': 'kofi',
+	'www.ko-fi.com': 'kofi',
 	'buymeacoffee.com': 'bmc',
 	'www.buymeacoffee.com': 'bmc',
 	'buy.stripe.com': 'stripe'
