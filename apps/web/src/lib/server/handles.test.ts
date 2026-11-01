@@ -26,6 +26,14 @@ describe('validateHandle', () => {
     }
   });
 
+  it.each([
+    'www', 'admin', 'api', 'cdn', 'app', 'mail', 'email', 'smtp', 'imap', 'pop', 'ftp', 'ns1', 'ns2',
+    'status', 'blog', 'docs', 'help', 'support', 'static', 'assets', 'media', 'dev', 'staging', 'test',
+    'beta', 'auth', 'login', 'dashboard'
+  ])('rejects %s, which would shadow a hostname, as reserved', (h) => {
+    expect(validateHandle(h)).toEqual({ ok: false, error: 'That handle is reserved' });
+  });
+
   it('rejects empty / null-ish', () => {
     expect(validateHandle('').ok).toBe(false);
     expect(validateHandle(undefined as any).ok).toBe(false);

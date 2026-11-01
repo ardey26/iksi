@@ -2,6 +2,7 @@ import type { Handle } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
 import { prisma } from '#lib/prisma.js';
 import { decodeURL } from '#lib/server/crypto.js';
+import { subdomainDecision, subdomainsEnabled } from '#lib/server/subdomains.js';
 
 const ADMIN_HOSTS = ['admin.iksi.app', 'admin.localhost'];
 
@@ -34,6 +35,28 @@ export const handle: Handle = async ({ event, resolve }) => {
     // 1. Host gating: admin routes only reachable on admin hosts.
     if (inAdminGroup && !isAdminHost) {
         return new Response('Not Found', { status: 404 });
+    }
+
+    // 1b. Profile subdomains (<handle>.iksi.app, rerouted in hooks.ts) and the
+    //     www/@handle -> subdomain redirect. Inert unless SUBDOMAINS_ENABLED=true.
+    const sub = subdomainDecision({
+        host,
+        pathname: event.url.pathname,
+        search: event.url.search,
+        method: event.request.method,
+        routeId,
+        handle: event.params.handle,
+        enabled: subdomainsEnabled(),
+        dev: import.meta.env.DEV
+    });
+    if (sub.kind === 'not-found') return new Response('Not Found', { status: 404 });
+    if (sub.kind === 'redirect') {
+        // A client-side navigation fetches __data.json and needs SvelteKit's JSON redirect.
+        if (sub.status === 302 || event.isDataRequest) redirect(sub.status, sub.location, { external: true });
+        return new Response(null, {
+            status: 301,
+            headers: { Location: sub.location, 'Cache-Control': sub.cacheControl }
+        });
     }
 
     // 2. On admin subdomain, redirect root to /admin (dashboard). Any other

@@ -204,3 +204,35 @@ describe('/@handle/name', () => {
     });
   });
 });
+
+describe('on andre.iksi.app (rerouted from /<name>)', () => {
+  const onSubdomain = (path: string, init: { method?: string; body?: FormData } = {}) => {
+    const event = makeEvent('/@andre/x', init);
+    const url = new URL(`https://andre.iksi.app${path}`);
+    return { ...event, url, request: new Request(url, { method: init.method ?? 'GET', body: init.body }) };
+  };
+
+  it('resolves /sale as @andre/sale, not the global sale', async () => {
+    const event = onSubdomain('/sale');
+    const r = await settle(event, () => load(event as never));
+    expect(r.redirect).toEqual({ status: 302, location: 'https://example.com/sale' });
+    expect(lookedUp()).toEqual(['@andre/sale']);
+  });
+
+  it('previews /sale+ as @andre/sale', async () => {
+    const event = onSubdomain('/sale+');
+    const r = await settle(event, () => load(event as never));
+    expect(r.redirect).toBeUndefined();
+    expect(lookedUp()).toEqual(['@andre/sale']);
+  });
+
+  it('unlocks /sale as @andre/sale', async () => {
+    findUnique.mockResolvedValue({ ...ROW, passwordHash: HASH });
+    const body = new FormData();
+    body.set('password', 'hunter2');
+    const event = onSubdomain('/sale', { method: 'POST', body });
+    const r = await settle(event, () => (actions as any).unlock(event as never));
+    expect(r.redirect).toEqual({ status: 303, location: 'https://example.com/sale' });
+    expect(rateLimit).toHaveBeenCalledWith('unlock:@andre/sale:1.2.3.4', 10, 10 * 60 * 1000);
+  });
+});

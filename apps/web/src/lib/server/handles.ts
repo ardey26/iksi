@@ -1,8 +1,7 @@
-export const RESERVED = new Set([
-  'admin', 'api', 'app', 'www', 'root', 'help', 'support',
-  'about', 'terms', 'privacy', 'login', 'signup', 'logout',
-  'dashboard', 'settings', 'links', 'static', 'auth'
-]);
+import { RESERVED_HANDLES } from '#lib/subdomains.js';
+
+/** Defined with the subdomain rules, so a reserved handle is never a profile host. */
+export const RESERVED: ReadonlySet<string> = new Set(RESERVED_HANDLES);
 
 const HANDLE_RE = /^[a-z0-9_-]{3,30}$/;
 

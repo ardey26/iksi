@@ -17,6 +17,7 @@ import { toLinkRecord } from '#lib/server/link-record.js';
 import { claimOneTime, oneTimeState } from '#lib/server/one-time.js';
 import { requestContext } from '#lib/server/request-context.js';
 import { recordClick } from '#lib/server/tracking.js';
+import { routedPathname } from '#lib/subdomains.js';
 
 /**
  * A browser must never keep a slug response: a redirect it cached would skip a
@@ -61,9 +62,12 @@ type Row = NonNullable<Awaited<ReturnType<typeof findRow>>>;
 
 const OPENED = { message: 'This link was already opened.', view: 'opened' } as const;
 
-/** The link this path names (a slug, or `@handle/name`), or a 404. */
+/**
+ * The link this path names (a slug, or `@handle/name`), or a 404. Read from the
+ * routed path: on andre.iksi.app, `/sale` is `@andre/sale`, never the global `sale`.
+ */
 function linkPathOf(event: RequestEvent): { slug: string; mode: 'redirect' | 'preview' } {
-  const path = classifyPath(event.url.pathname);
+  const path = classifyPath(routedPathname(event.url, import.meta.env.DEV));
   if ((path.kind !== 'slug' && path.kind !== 'scoped') || path.mode === 'stats') error(404, 'not found');
   return { slug: path.slug, mode: path.mode };
 }
