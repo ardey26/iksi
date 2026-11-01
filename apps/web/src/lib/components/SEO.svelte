@@ -1,7 +1,6 @@
 <script>
 	export let title = 'iksi - URL Shortener | Make Long Links Short & Sweet';
 	export let description = 'Transform long URLs into clean, shareable links with iksi. Free URL shortener with custom links, analytics, and lightning-fast redirects. No registration required.';
-	export let keywords = 'URL shortener, link shortener, custom links, short links, free URL shortener, link management, iksi';
 	export let canonical = '';
 	export let ogImage = '/og-image.png';
 	export let ogType = 'website';
@@ -13,13 +12,10 @@
 <svelte:head>
 	<!-- Primary Meta Tags -->
 	<title>{title}</title>
-	<meta name="title" content={title} />
 	<meta name="description" content={description} />
-	<meta name="keywords" content={keywords} />
 	<meta name="author" content="Andre de Jesus" />
 	<meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
-	<meta name="language" content="English" />
-	
+
 	<!-- Canonical URL -->
 	{#if canonical}
 		<link rel="canonical" href={canonical} />
@@ -38,12 +34,11 @@
 	<meta property="og:locale" content="en_US" />
 	
 	<!-- Twitter -->
-	<meta property="twitter:card" content={twitterCard} />
-	<meta property="twitter:url" content={canonical || 'https://www.iksi.app'} />
-	<meta property="twitter:title" content={title} />
-	<meta property="twitter:description" content={description} />
-	<meta property="twitter:image" content={ogImage} />
-	<meta property="twitter:creator" content="@iksi_app" />
+	<meta name="twitter:card" content={twitterCard} />
+	<meta name="twitter:title" content={title} />
+	<meta name="twitter:description" content={description} />
+	<meta name="twitter:image" content={ogImage} />
+	<meta name="twitter:creator" content="@iksi_app" />
 	
 	<!-- Additional SEO Meta Tags -->
 	<meta name="theme-color" content="#007AFF" />
