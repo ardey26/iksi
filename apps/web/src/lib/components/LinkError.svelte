@@ -1,5 +1,8 @@
 <script>
   import { page } from '$app/state';
+  import { Button } from '#lib/ui/index.js';
+  import { appHref } from '#lib/subdomains.js';
+  import Interstitial from '#lib/components/Interstitial.svelte';
   import LinkNotice from '#lib/components/LinkNotice.svelte';
 
   let view = $derived(page.error?.view);
@@ -12,6 +15,8 @@
           ? 'Link disabled'
           : 'Not found'
   );
+  // On a profile subdomain `/` is the profile; the shortener is on www.
+  const home = $derived(appHref('/', page.url?.host ?? '', import.meta.env.DEV));
 </script>
 
 <svelte:head>
@@ -19,18 +24,14 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<div class="flex-1 flex items-center justify-center">
-  <div class="w-full max-w-[500px] text-center">
-    {#if view === 'expired' || view === 'opened' || view === 'flagged'}
-      <LinkNotice {view} verdict={page.error?.verdict} />
-    {:else}
-      <h1 class="text-2xl font-semibold tracking-tight" style="color: var(--text-primary);">Nothing here</h1>
-      <p class="mt-2 text-sm" style="color: var(--text-muted);">
-        This short link isn't pointing anywhere yet. Claim it if you want.
-      </p>
-      <a href="/" class="inline-block mt-6 text-sm hover:opacity-70 transition-opacity" style="color: var(--accent);">
-        Back to iksi
-      </a>
-    {/if}
-  </div>
-</div>
+{#if view === 'expired' || view === 'opened' || view === 'flagged'}
+  <LinkNotice {view} verdict={page.error?.verdict} />
+{:else}
+  <Interstitial
+    icon="search"
+    title="Nothing here"
+    description="This short link isn't pointing anywhere yet. Claim it if you want."
+  >
+    <Button variant="primary" size="lg" full href={home}>Shorten a link</Button>
+  </Interstitial>
+{/if}

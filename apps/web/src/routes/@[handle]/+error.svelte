@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { Button } from '#lib/ui/index.js';
   import { appHref } from '#lib/subdomains.js';
+  import Interstitial from '#lib/components/Interstitial.svelte';
 
   const missing = $derived(page.status === 404);
 </script>
@@ -11,11 +13,21 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center px-4"
-     style="background: var(--bg); color: var(--text-primary);">
-  <div class="text-center space-y-2">
-    <h1 class="text-lg font-medium">{page.status}</h1>
-    <p class="text-sm" style="color: var(--text-muted);">{missing ? 'This handle does not exist.' : 'Try again in a moment.'}</p>
-    <a href={appHref('/', page.url.host, import.meta.env.DEV)} class="text-sm underline" style="color: var(--accent);">Back to iksi</a>
-  </div>
+<div class="profile-error">
+  <Interstitial
+    icon={missing ? 'search' : 'alert'}
+    title={missing ? 'Handle not found' : 'Something went wrong'}
+    description={missing ? 'This handle does not exist.' : 'Try again in a moment.'}
+  >
+    <Button variant="primary" size="lg" full href={appHref('/', page.url.host, import.meta.env.DEV)}>Go to iksi</Button>
+  </Interstitial>
 </div>
+
+<style>
+  .profile-error {
+    min-height: 100vh;
+    min-height: 100dvh;
+    color: var(--text-primary);
+    background-color: var(--bg);
+  }
+</style>
