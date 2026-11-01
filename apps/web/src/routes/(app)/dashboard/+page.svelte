@@ -118,7 +118,7 @@
     </Paper>
   </Section>
 
-  <Section title="API keys" description="Keys let the iksi browser extension shorten links as you.">
+  <Section title="Connected apps" description="Apps that shorten links as you, like the iksi browser extension.">
     <ApiKeys keys={data.apiKeys ?? []} />
   </Section>
 </Container>
