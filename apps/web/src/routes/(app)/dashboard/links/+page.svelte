@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import { invalidateAll } from '$app/navigation';
   import LinkSettings from '#lib/components/links/LinkSettings.svelte';
+  import OneTimeLinkForm from '#lib/components/links/OneTimeLinkForm.svelte';
   import type { LinkSettingsData } from '#lib/rules-form.js';
 
   export let data;
@@ -15,6 +16,8 @@
     safeVerdict: string | null;
     profileRow: { id: number; title: string; enabled: boolean; position: number } | null;
     settings?: LinkSettingsData;
+    // Set for burn-after-reading links: no settings, never on the page, content never sent here.
+    oneTime?: { kind: 'url' | 'text'; state: 'unopened' | 'opened' | 'expired' } | null;
     // Set true on optimistic rows while the server call is in flight; used to
     // dim the row visually. Never persisted by the loader.
     pending?: boolean;
@@ -75,6 +78,13 @@
       e.preventDefault();
       first.focus();
     }
+  }
+
+  const ONE_TIME_STATE = { unopened: 'Unopened', opened: 'Opened', expired: 'Expired' } as const;
+
+  function onOneTimeCreated(e: CustomEvent<Record<string, unknown>>) {
+    links = [{ ...(e.detail as unknown as Link), profileRow: null }, ...links];
+    toast('One-time link created');
   }
 
   function onSettingsSaved(id: number, s: LinkSettingsData) {
@@ -474,6 +484,9 @@
                 <div class="w-4 h-4 shrink-0"></div>
               {/if}
               <div class="min-w-0 flex-1">
+                {#if l.oneTime}
+                  <p class="one-time-title">One-time {l.oneTime.kind === 'url' ? 'URL' : 'text'}</p>
+                {:else}
                 <input
                   type="text"
                   value={l.profileRow?.title ?? ''}
@@ -485,9 +498,15 @@
                   class="title-input"
                   class:untitled={!l.profileRow?.title}
                 />
+                {/if}
                 <div class="meta">
                   <button on:click={() => copy(l.id, l.shortURL)} class="short" title="Copy short link"
                   >{copiedId === l.id ? 'copied' : `iksi.app/${l.shortURL}`}</button>
+                  {#if l.oneTime}
+                    <span class="sep" aria-hidden="true">·</span>
+                    <span class="d-dot" class:on={l.oneTime.state === 'unopened'} aria-hidden="true"></span>
+                    <span>{ONE_TIME_STATE[l.oneTime.state]}</span>
+                  {/if}
                   {#if l.originalURL}
                     <span class="sep" aria-hidden="true">·</span>
                     <span class="truncate" title={l.originalURL}>{hostOf(l.originalURL)}</span>
@@ -512,6 +531,7 @@
 
           <!-- On page -->
           <td class="toggle-col">
+            {#if !l.oneTime}
             <button
               type="button"
               role="switch"
@@ -520,6 +540,7 @@
               aria-label={l.profileRow?.enabled ? 'Remove from public page' : 'Show on public page'}
               on:click={() => togglePublish(l)}
             ></button>
+            {/if}
           </td>
 
           <!-- Clicks -->
@@ -607,6 +628,8 @@
   </table>
 
   <p class="add-error" role={addError ? 'alert' : undefined}>{addError}</p>
+
+  <OneTimeLinkForm on:created={onOneTimeCreated} />
 </section>
 
 {#if sheetLink && sheetLink.settings}
@@ -695,6 +718,13 @@
   .title-input:hover:not(:focus) { background-color: color-mix(in srgb, var(--text-primary) 4%, transparent); }
   .title-input:focus { background-color: color-mix(in srgb, var(--text-primary) 6%, transparent); }
   .title-input:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 0; }
+
+  .one-time-title {
+    padding: 4px 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
 
   .meta {
     display: flex;

@@ -41,6 +41,10 @@ export const load: PageServerLoad = async ({ parent, url }) => {
         expiredAt: true,
         passwordHash: true,
         permanent: true,
+        // Never `secret`: the owner sees a one-time link's state, not its content.
+        oneTime: true,
+        secretKind: true,
+        openedAt: true,
         profileRows: profileId
           ? {
               where: { profileId },
@@ -53,8 +57,25 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     prisma.longURL.count({ where: { userId: user.id } })
   ]);
 
+  const now = Date.now();
   const decoded = await Promise.all(
     links.map(async (l) => {
+      if (l.oneTime) {
+        const { profileRows: _rows, rules: _rules, passwordHash: _hash, oneTime: _one, secretKind, openedAt, ...rest } = l as any;
+        const state =
+          openedAt !== null
+            ? 'opened'
+            : l.expiredAt !== null || (l.expiresAt !== null && l.expiresAt.getTime() <= now)
+              ? 'expired'
+              : 'unopened';
+        // No settings: a one-time link cannot be edited or put on the page.
+        return {
+          ...rest,
+          originalURL: '',
+          profileRow: null,
+          oneTime: { kind: secretKind === 'url' ? 'url' : 'text', state }
+        };
+      }
       let plain: string;
       try {
         plain = await decodeURL(l.originalURL);
@@ -67,9 +88,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
         plain = '';
       }
       const row = (l as any).profileRows?.[0] ?? null;
-      const { profileRows: _drop, rules, passwordHash, ...rest } = l as any;
+      const { profileRows: _drop, rules, passwordHash, oneTime: _one, secretKind: _kind, openedAt: _opened, ...rest } = l as any;
       const settings = toLinkSettings({ ...l, rules, passwordHash }, plain);
-      return { ...rest, originalURL: plain, profileRow: row, settings };
+      return { ...rest, originalURL: plain, profileRow: row, settings, oneTime: null };
     })
   );
 

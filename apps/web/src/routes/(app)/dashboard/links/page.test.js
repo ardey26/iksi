@@ -99,3 +99,44 @@ describe('links page settings sheet', () => {
     await waitFor(() => expect(screen.getByTitle('https://changed.example.org/b')).toBeInTheDocument());
   });
 });
+
+describe('links page one-time links', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const oneTime = (id, kind, state) =>
+    link(id, { shortURL: `OneTime${id}`, originalURL: '', oneTime: { kind, state } });
+
+  it('shows a one-time row by kind and state, without settings or an on-page switch', () => {
+    renderPage([link(1, { settings }), oneTime(2, 'text', 'unopened')]);
+    const row = screen.getByText('iksi.app/OneTime2').closest('tr');
+    expect(within(row).getByText('One-time text')).toBeInTheDocument();
+    expect(within(row).getByText('Unopened')).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Link settings' })).toBeNull();
+    expect(within(row).queryByRole('switch')).toBeNull();
+    expect(within(row).queryByLabelText('Title')).toBeNull();
+    expect(within(row).getByRole('button', { name: 'Delete link' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['url', 'opened', 'One-time URL', 'Opened'],
+    ['text', 'expired', 'One-time text', 'Expired']
+  ])('a %s link that is %s says so', (kind, state, title, label) => {
+    renderPage([oneTime(3, kind, state)]);
+    const row = screen.getByText('iksi.app/OneTime3').closest('tr');
+    expect(within(row).getByText(title)).toBeInTheDocument();
+    expect(within(row).getByText(label)).toBeInTheDocument();
+  });
+
+  it('offers the one-time create form and adds the new row to the top', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      shortURL: 'NewOne1234',
+      link: { id: 50, shortURL: 'NewOne1234', originalURL: '', clickCount: 0, createdAt: new Date().toISOString(), safeVerdict: null, oneTime: { kind: 'url', state: 'unopened' } }
+    }))));
+    renderPage([link(1, { settings })]);
+    await fireEvent.input(screen.getByLabelText('Link to share'), { target: { value: 'example.com/doc' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Create one-time link' }));
+    await waitFor(() => expect(screen.getByText('iksi.app/NewOne1234')).toBeInTheDocument());
+    const rows = screen.getAllByRole('row');
+    expect(within(rows[1]).getByText('iksi.app/NewOne1234')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('One-time link created');
+  });
+});
