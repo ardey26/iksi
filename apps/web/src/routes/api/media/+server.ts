@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { purgeProfileOnSuccess } from '#lib/server/profile-cache.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
 import { rateLimit } from '#lib/rateLimit.js';
@@ -18,7 +19,7 @@ function parseKind(v: unknown): MediaKind | null {
 	return v === 'avatar' || v === 'background' ? v : null;
 }
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+const handlePost: RequestHandler = async ({ request, cookies }) => {
 	const uid = verifyUserSession(cookies.get('user_session'));
 	if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
 
@@ -53,7 +54,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	}
 };
 
-export const DELETE: RequestHandler = async ({ url, cookies }) => {
+const handleDelete: RequestHandler = async ({ url, cookies }) => {
 	const uid = verifyUserSession(cookies.get('user_session'));
 	if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
 	const kind = parseKind(url.searchParams.get('kind'));
@@ -67,3 +68,7 @@ export const DELETE: RequestHandler = async ({ url, cookies }) => {
 	if (kind === 'avatar') invalidateUserCache(uid);
 	return new Response(null, { status: 204 });
 };
+
+// A successful update can change the owner's public profile page; clear its cached copy.
+export const POST: RequestHandler = purgeProfileOnSuccess(handlePost);
+export const DELETE: RequestHandler = purgeProfileOnSuccess(handleDelete);

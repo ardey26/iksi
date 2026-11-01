@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { decodeURL } from '#lib/server/crypto.js';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
+import { tagProfile } from '#lib/server/profile-cache.js';
 
 // Popular social domains we recognize on row destinations — used to build
 // Schema.org `sameAs` entries so Google can associate the profile with the
@@ -36,6 +37,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
     where: { user: { handle: { handle } } },
     select: {
       id: true,
+      userId: true,
       displayName: true,
       bio: true,
       avatarUrl: true,
@@ -96,6 +98,7 @@ export const load: PageServerLoad = async ({ params, request, setHeaders }) => {
   await recordProfileView(p.id, { request } as any);
 
   setHeaders({ 'cache-control': CACHE_CONTROL });
+  await tagProfile(p.userId);
 
   return {
     handle,

@@ -4,6 +4,8 @@ const findFirst = vi.hoisted(() => vi.fn());
 vi.mock('#lib/prisma.js', () => ({ prisma: { profile: { findFirst } } }));
 vi.mock('#lib/server/crypto.js', () => ({ decodeURL: vi.fn(async (u: string) => u) }));
 vi.mock('#lib/server/tracking.js', () => ({ recordProfileView: vi.fn(async () => {}) }));
+const tagProfile = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('#lib/server/profile-cache.js', () => ({ tagProfile }));
 
 import { load } from './+page.server';
 
@@ -18,6 +20,7 @@ const link = (id: number, originalURL: string, passwordHash: string | null = nul
 function profile(rows: { id: number; title: string; link: ReturnType<typeof link> }[]) {
   return {
     id: 1,
+    userId: 42,
     displayName: 'A',
     bio: null,
     avatarUrl: null,
@@ -36,6 +39,14 @@ const run = () =>
   } as never) as Promise<{ sameAs: string[]; rows: unknown[] }>;
 
 beforeEach(() => vi.clearAllMocks());
+
+describe('profile page cache tag', () => {
+  it('tags the cached page with its owner so updates can clear it', async () => {
+    findFirst.mockResolvedValue(profile([]));
+    await run();
+    expect(tagProfile).toHaveBeenCalledWith(42);
+  });
+});
 
 describe('profile JSON-LD sameAs', () => {
   it('lists a public social destination', async () => {

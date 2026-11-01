@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { purgeProfileOnSuccess } from '#lib/server/profile-cache.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { decodeURL } from '#lib/server/crypto.js';
 import { settleVerdictInBackground } from '#lib/server/link-verdict.js';
@@ -7,7 +8,7 @@ import { validateSettings, toLinkSettings, type SettingsInput } from '#lib/serve
 import { purgeEdge } from '#lib/server/edge-purge.js';
 import { destinationsOf } from '#lib/server/link-record.js';
 
-export const PATCH: RequestHandler = async ({ request, cookies }) => {
+const handlePatch: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
   if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
   const body = await request.json();
@@ -60,7 +61,7 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
   return json({ ok: true, settings: toLinkSettings(row, destination) });
 };
 
-export const DELETE: RequestHandler = async ({ request, cookies }) => {
+const handleDelete: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
   if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
   const { id } = await request.json();
@@ -80,3 +81,7 @@ export const DELETE: RequestHandler = async ({ request, cookies }) => {
   await purgeEdge([link.shortURL]);
   return json({ ok: true });
 };
+
+// A successful update can change the owner's public profile page; clear its cached copy.
+export const PATCH: RequestHandler = purgeProfileOnSuccess(handlePatch);
+export const DELETE: RequestHandler = purgeProfileOnSuccess(handleDelete);

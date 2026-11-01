@@ -9,12 +9,15 @@ const rowFindFirst = vi.hoisted(() => vi.fn());
 const rowUpdate = vi.hoisted(() => vi.fn());
 const checkURLs = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
+const rowFindUnique = vi.hoisted(() => vi.fn());
+const cacheDelete = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('@vercel/functions', () => ({ dangerouslyDeleteByTag: cacheDelete, addCacheTag: vi.fn(), waitUntil: vi.fn() }));
 
 vi.mock('#lib/prisma.js', () => ({
   prisma: {
     profile: { findUnique: profileFindUnique },
     longURL: { findUnique: linkFindUnique, updateMany: linkUpdate },
-    profileRow: { aggregate: rowAggregate, create: rowCreate, findFirst: rowFindFirst, update: rowUpdate }
+    profileRow: { aggregate: rowAggregate, create: rowCreate, findFirst: rowFindFirst, findUnique: rowFindUnique, update: rowUpdate }
   }
 }));
 vi.mock('#lib/server/user-auth.js', () => ({ verifyUserSession: vi.fn(() => 7) }));
@@ -134,5 +137,25 @@ describe('dashboard profile verdict changes purge the edge', () => {
       expect(checkURLs).not.toHaveBeenCalled();
       expect(purgeEdge).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('profile page cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    profileFindUnique.mockResolvedValue({ id: 1, userId: 7 });
+  });
+
+  it('clears the cached profile page after a successful update', async () => {
+    rowFindUnique.mockResolvedValue({ id: 9, profileId: 1 });
+    const r = await call({ action: 'toggleRow', rowId: 9, enabled: false });
+    expect(r.status).toBe(200);
+    expect(cacheDelete).toHaveBeenCalledWith('profile-7');
+  });
+
+  it('leaves the cache alone when the update fails', async () => {
+    const r = await call({ action: 'nope' });
+    expect(r.status).toBe(400);
+    expect(cacheDelete).not.toHaveBeenCalled();
   });
 });

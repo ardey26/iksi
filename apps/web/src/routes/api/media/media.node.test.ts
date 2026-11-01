@@ -11,6 +11,8 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/server/user-auth.js', () => ({ verifyUserSession: () => h.uid }));
+const cacheDelete = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('@vercel/functions', () => ({ dangerouslyDeleteByTag: cacheDelete, addCacheTag: vi.fn(), waitUntil: vi.fn() }));
 vi.mock('#lib/rateLimit.js', () => ({ rateLimit: vi.fn(async () => ({ allowed: h.allowed })) }));
 vi.mock('#lib/server/user-cache.js', () => ({ invalidateUserCache: vi.fn() }));
 vi.mock('#lib/prisma.js', () => ({
@@ -92,5 +94,28 @@ describe('/api/media', () => {
 		h.profile = { id: 3, avatarKey: '7/avatar/u1', backgroundKey: null };
 		expect((await del('avatar')).status).toBe(204);
 		expect(h.deletePrefix).toHaveBeenCalledWith('7/avatar/u1.');
+	});
+});
+
+describe('profile page cache', () => {
+	beforeEach(() => cacheDelete.mockClear());
+
+	it('clears the cached profile page after an avatar upload', async () => {
+		const r = await post(new Blob([await png()], { type: 'image/png' }), 'avatar');
+		expect(r.status).toBe(200);
+		expect(cacheDelete).toHaveBeenCalledWith('profile-7');
+	});
+
+	it('clears the cached profile page after removing the avatar', async () => {
+		h.profile = { id: 3, avatarKey: '7/avatar/old', backgroundKey: null };
+		const r = await del('avatar');
+		expect(r.status).toBe(204);
+		expect(cacheDelete).toHaveBeenCalledWith('profile-7');
+	});
+
+	it('leaves the cache alone when the upload is rejected', async () => {
+		const r = await post(new Blob(['hello'], { type: 'text/plain' }), 'avatar');
+		expect(r.status).toBe(400);
+		expect(cacheDelete).not.toHaveBeenCalled();
 	});
 });

@@ -7,6 +7,8 @@ const deleteMany = vi.hoisted(() => vi.fn());
 const $transaction = vi.hoisted(() => vi.fn());
 const purgeEdge = vi.hoisted(() => vi.fn());
 const settleVerdictInBackground = vi.hoisted(() => vi.fn());
+const cacheDelete = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('@vercel/functions', () => ({ dangerouslyDeleteByTag: cacheDelete, addCacheTag: vi.fn(), waitUntil: vi.fn() }));
 
 vi.mock('#lib/prisma.js', () => ({
   prisma: { longURL: { findUnique, update, delete: del }, profileRow: { deleteMany }, $transaction }
@@ -233,5 +235,34 @@ describe('dashboard links PATCH settings', () => {
     expect((await r.json()).error).toBe('Nothing to change');
     expect(update).not.toHaveBeenCalled();
     expect(purgeEdge).not.toHaveBeenCalled();
+  });
+});
+
+describe('profile page cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    purgeEdge.mockResolvedValue(true);
+    $transaction.mockResolvedValue([]);
+  });
+
+  it('PATCH clears the owner profile page, which shows the link', async () => {
+    findUnique.mockResolvedValue({ id: 5, userId: 7, shortURL: 'Xy' });
+    const r = await call(PATCH, { id: 5, originalURL: 'https://e.com' });
+    expect(r.status).toBe(200);
+    expect(cacheDelete).toHaveBeenCalledWith('profile-7');
+  });
+
+  it('DELETE clears the owner profile page', async () => {
+    findUnique.mockResolvedValue({ id: 5, userId: 7, shortURL: 'Xy' });
+    const r = await call(DELETE, { id: 5 });
+    expect(r.status).toBe(200);
+    expect(cacheDelete).toHaveBeenCalledWith('profile-7');
+  });
+
+  it("a request for another user's link clears nothing", async () => {
+    findUnique.mockResolvedValue({ id: 5, userId: 99, shortURL: 'Xy' });
+    const r = await call(PATCH, { id: 5, originalURL: 'https://e.com' });
+    expect(r.status).toBe(404);
+    expect(cacheDelete).not.toHaveBeenCalled();
   });
 });

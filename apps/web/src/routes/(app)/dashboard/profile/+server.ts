@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { purgeProfileOnSuccess } from '#lib/server/profile-cache.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { checkURLs } from '#lib/server/safe-browsing.js';
 import { decodeURL } from '#lib/server/crypto.js';
@@ -62,7 +63,7 @@ async function requireProfile(uid: number) {
   return { prisma, p };
 }
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+const handlePost: RequestHandler = async ({ request, cookies }) => {
   const uid = verifyUserSession(cookies.get('user_session'));
   if (uid === null) return json({ error: 'Not signed in' }, { status: 401 });
 
@@ -220,3 +221,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
       return json({ error: 'Unknown action' }, { status: 400 });
   }
 };
+
+// A successful update can change the owner's public profile page; clear its cached copy.
+export const POST: RequestHandler = purgeProfileOnSuccess(handlePost);
