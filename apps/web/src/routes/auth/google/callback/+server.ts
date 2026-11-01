@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { dev } from '$app/env';
 import { verifyState, exchangeCode, fetchMe } from '#lib/server/google-oauth.js';
 import { createUserSession } from '#lib/server/user-auth.js';
+import { takeNext } from '#lib/server/login-return.js';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
   const code = url.searchParams.get('code');
@@ -12,6 +13,8 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 
   cookies.delete('oauth_state', { path: '/' });
   cookies.delete('oauth_pkce', { path: '/' });
+  // Read (and cleared) up front, so a failed sign-in does not leave it behind.
+  const next = takeNext(cookies);
 
   if (!code || !state || !verifier || !verifyState(cookieState, state)) {
     return new Response('OAuth state mismatch', { status: 400 });
@@ -60,5 +63,5 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     maxAge: 60 * 60 * 24 * 30
   });
 
-  redirect(302, user.handle ? '/dashboard' : '/dashboard/claim');
+  redirect(302, next ?? (user.handle ? '/dashboard' : '/dashboard/claim'));
 };
