@@ -58,6 +58,16 @@
         noindex: false
       };
     }
+    if (pathname === '/privacy') {
+      return {
+        title: 'Privacy | iksi',
+        description: 'What iksi collects when you shorten links or build a profile, who handles it, how long it is kept, and how to get it deleted.',
+        canonical: 'https://www.iksi.app/privacy',
+        ogImage: 'https://www.iksi.app/og-image.png',
+        structuredData: null,
+        noindex: false
+      };
+    }
     // Always www: andre.iksi.app/sale is a vanity alias of www/@andre/sale.
     return {
       title: 'iksi — free URL shortener',

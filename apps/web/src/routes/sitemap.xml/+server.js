@@ -61,6 +61,9 @@ export async function GET() {
   <url>
     <loc>https://www.iksi.app/</loc>
   </url>
+  <url>
+    <loc>https://www.iksi.app/privacy</loc>
+  </url>
 ${profileUrls}
 </urlset>`;
 

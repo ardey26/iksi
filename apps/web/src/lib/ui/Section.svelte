@@ -6,12 +6,13 @@
   export let description = '';
   /** Heading level for the title. */
   export let level = 2;
+  /** Names the section, so `#id` links land on it; the title is `id-title`. */
   export let id = uid('section');
   let className = '';
   export { className as class };
 </script>
 
-<section class="section ui-section {className}" aria-labelledby={title ? `${id}-title` : undefined} {...$$restProps}>
+<section {id} class="section ui-section {className}" aria-labelledby={title ? `${id}-title` : undefined} {...$$restProps}>
   {#if title}
     <header class="head">
       <div class="text">

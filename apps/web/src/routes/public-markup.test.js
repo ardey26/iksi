@@ -32,6 +32,7 @@ import LinkErrorPage from './[slug]/+error.svelte';
 import Profile from './@[handle]/+page.svelte';
 import ProfileError from './@[handle]/+error.svelte';
 import ReportPage from './report/+page.svelte';
+import PrivacyPage from './privacy/+page.svelte';
 
 const DOT = /·|&middot;|&#183;|&#xb7;/i;
 
@@ -54,7 +55,8 @@ describe('public markup has no middle dots', () => {
   it.each([
     ['/', '/'],
     ['/AbC', '/[slug]'],
-    ['/login', '/login']
+    ['/login', '/login'],
+    ['/privacy', '/privacy']
   ])('site chrome on %s, signed out and in', async (path, id) => {
     page.url = new URL(`https://www.iksi.app${path}`);
     page.route = { id };
@@ -126,6 +128,12 @@ describe('public markup has no middle dots', () => {
   ])('report page %j %j', (data, form) => {
     page.url = new URL('https://www.iksi.app/report');
     render(ReportPage, { data, form });
+    noDots();
+  });
+
+  it('privacy page', () => {
+    page.url = new URL('https://www.iksi.app/privacy');
+    render(PrivacyPage);
     noDots();
   });
 

@@ -12,6 +12,7 @@ import Switch from './Switch.svelte';
 import Segmented from './Segmented.svelte';
 import ChipGroup from './ChipGroup.svelte';
 import Logo from './Logo.svelte';
+import Section from './Section.svelte';
 import RowHarness from './tests/RowHarness.svelte';
 import SheetHarness from './tests/SheetHarness.svelte';
 import ToastHarness from './tests/ToastHarness.svelte';
@@ -274,6 +275,16 @@ describe('Toast', () => {
     await tick();
     await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.getByRole('status')).not.toHaveTextContent('Payment method removed');
+  });
+});
+
+describe('Section', () => {
+  it('carries its id, so #id links land on it, and names itself by its title', () => {
+    const { container } = render(Section, { props: { id: 'cookies', title: 'Cookies' } });
+    const section = container.querySelector('section');
+    expect(section).toHaveAttribute('id', 'cookies');
+    expect(section).toHaveAttribute('aria-labelledby', 'cookies-title');
+    expect(screen.getByRole('heading', { level: 2, name: 'Cookies' })).toHaveAttribute('id', 'cookies-title');
   });
 });
 

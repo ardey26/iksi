@@ -30,3 +30,13 @@ describe('sitemap profile URLs', () => {
     expect(xml).not.toContain('ann.iksi.app');
   });
 });
+
+describe('sitemap static pages', () => {
+  it('lists the home page and the privacy policy, even when profiles fail to load', async () => {
+    findMany.mockRejectedValue(new Error('db down'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const xml = await sitemap();
+    expect(xml).toContain('<loc>https://www.iksi.app/</loc>');
+    expect(xml).toContain('<loc>https://www.iksi.app/privacy</loc>');
+  });
+});

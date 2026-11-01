@@ -37,6 +37,10 @@ describe('route ownership', () => {
 		expect(routesMatching('/report')).toEqual(['/[slug]', '/report']);
 	});
 
+	it('gives /privacy to the privacy policy over [slug]', () => {
+		expect(routesMatching('/privacy')).toEqual(['/[slug]', '/privacy']);
+	});
+
 	it('gives /connect/extension to the connect page and leaves /connect a short link', () => {
 		expect(routesMatching('/connect/extension')).toEqual(['/connect/extension']);
 		expect(routesMatching('/connect')).toEqual(['/[slug]']);
