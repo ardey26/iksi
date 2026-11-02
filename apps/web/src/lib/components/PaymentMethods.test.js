@@ -54,6 +54,13 @@ describe('PaymentMethods', () => {
       expect(screen.getByRole('button', { name: 'Remove GCash' })).toBeInTheDocument();
     });
 
+    it("marks a payment link with its provider's logo", () => {
+      const { container } = render(PaymentMethods, { props: { methods: [paypal], label: 'pay' } });
+      const row = container.querySelector('li');
+      expect(row.querySelector('img')).toHaveAttribute('src', '/brands/paypal.svg');
+      expect(within(row).getByText('PayPal')).not.toHaveClass('sr-only');
+    });
+
     it('shows a wordmark logo wide, without repeating its name as text', () => {
       const maya = { ...qr, id: 'q3', institution: 'maya', label: 'Maya', name: 'MARIA SANTOS' };
       const { container } = render(PaymentMethods, { props: { methods: [maya, gcash], label: 'pay' } });

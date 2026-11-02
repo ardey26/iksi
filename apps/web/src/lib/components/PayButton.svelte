@@ -144,7 +144,7 @@
         <label class="key">
           <input type="radio" class="sr-only" name="pay-pick-{handle}" value={m.id} bind:group={selected} />
           <span class="key-face" title={methodTitle(m)}>
-            <PayMark institution={institutionOf(m)} label={methodTitle(m)} size={32} alt="" />
+            <PayMark institution={institutionOf(m)} provider={m.kind === 'link' ? m.provider : null} label={methodTitle(m)} size={32} alt="" />
             <span class="pay-key-text" class:sr-only={logoSpellsName(institutionOf(m), methodTitle(m))}>{methodTitle(m)}</span>
           </span>
         </label>
@@ -184,7 +184,7 @@
         {:else}
           {#if !picking}
             <div class="pay-who">
-              <PayMark label={methodTitle(m)} size={32} alt="" />
+              <PayMark provider={m.provider} label={methodTitle(m)} size={32} alt="" />
               <p class="pay-method">{methodTitle(m)}</p>
             </div>
           {/if}

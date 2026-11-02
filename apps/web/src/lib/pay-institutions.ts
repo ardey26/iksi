@@ -53,6 +53,20 @@ const BY_ID = new Map<string, Institution>(
  */
 const BIC_KEYED = new Set(Object.values(BY_BIC).map((i) => i.id).filter((id) => id !== MAYA.id));
 
+/**
+ * Logos for payment link providers (#lib/pay-methods PayProvider), kept apart
+ * from the banks so a QR can never be saved as one. Providers without an entry
+ * get a monogram. PayPal's is its official mark, from paypalobjects.com.
+ */
+const PROVIDER_BRANDS: Record<string, Institution> = {
+	paypal: { id: 'paypal', name: 'PayPal', logo: '/brands/paypal.svg', aspect: 1 }
+};
+
+/** The logo entry for a payment link provider, or null when it has none. */
+export function providerBrand(provider: unknown): Institution | null {
+	return typeof provider === 'string' && Object.hasOwn(PROVIDER_BRANDS, provider) ? PROVIDER_BRANDS[provider] : null;
+}
+
 /** What an unknown bank's QR is called until its owner renames it. */
 export const FALLBACK_QR_LABEL = 'Bank QR';
 

@@ -122,6 +122,12 @@ describe('PayButton', () => {
     expect(link.getAttribute('rel')).toContain('noopener');
   });
 
+  it("heads a lone link method with its provider's logo", async () => {
+    render(PayButton, { props: props({ methods: [paypal] }) });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    expect(document.querySelector('.pay-who img')).toHaveAttribute('src', '/brands/paypal.svg');
+  });
+
   it("shows the bank's logo and name above who it pays", async () => {
     render(PayButton, { props: props({ methods: [{ ...qr, institution: 'gcash', label: 'GCash' }] }) });
     await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
@@ -173,6 +179,14 @@ describe('PayButton', () => {
       );
       expect(within(picker).getByRole('radio', { name: 'Bank QR' }).labels[0].querySelector('.pay-monogram')).toHaveTextContent('B');
       expect(within(picker).getByRole('radio', { name: 'PayPal' })).toBeInTheDocument();
+    });
+
+    it("keys a payment link by its provider's logo, keeping the name beside it", async () => {
+      render(PayButton, { props: many() });
+      await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+      const key = screen.getByRole('radio', { name: 'PayPal' }).labels[0];
+      expect(key.querySelector('img')).toHaveAttribute('src', '/brands/paypal.svg');
+      expect(key.querySelector('.pay-key-text')).not.toHaveClass('sr-only');
     });
 
     it('keys a wordmark by its logo alone, with the name kept for screen readers', async () => {

@@ -19,7 +19,7 @@
     SortableList,
     Stack
   } from '#lib/ui/index.js';
-  import { defaultQrLabel, institutionById, logoSpellsName } from '#lib/pay-institutions.js';
+  import { defaultQrLabel, institutionById, logoSpellsName, providerBrand } from '#lib/pay-institutions.js';
   import {
     MAX_METHOD_LABEL_LENGTH,
     MAX_PAY_METHODS,
@@ -89,7 +89,7 @@
   }
 
   function logoOf(m: PayMethod) {
-    const info = m.kind === 'qr' ? institutionById(m.institution) : null;
+    const info = m.kind === 'qr' ? institutionById(m.institution) : providerBrand(m.provider);
     return info?.logo ? info : null;
   }
 
