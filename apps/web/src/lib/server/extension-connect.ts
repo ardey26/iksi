@@ -61,7 +61,13 @@ export function connectRedirect(
 }
 
 /** No cache may keep the page, and nothing may carry it on as a referrer. */
-export const CONNECT_HEADERS = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } as const;
+/**
+ * same-origin, not no-referrer: the page URL (with its state) still never goes
+ * to another site, but the Allow form's POST keeps its Origin. Under
+ * no-referrer Chrome sends "Origin: null", SvelteKit's cross-site check answers
+ * 403, and launchWebAuthFlow fails with "Authorization page could not be loaded".
+ */
+export const CONNECT_HEADERS = { 'cache-control': 'no-store', 'referrer-policy': 'same-origin' } as const;
 
 /** Connects allowed per user per hour. */
 export const CONNECT_RATE = { requests: 10, windowMs: 3_600_000 };

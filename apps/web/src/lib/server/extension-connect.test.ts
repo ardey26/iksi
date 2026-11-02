@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+	CONNECT_HEADERS,
 	OFFICIAL_EXTENSION_ID,
 	allowedExtensionIds,
 	connectRedirect,
@@ -133,5 +134,14 @@ describe('connectRedirect', () => {
 
 	it('carries an error and the state', () => {
 		expect(connectRedirect(GOOD, { error: 'access_denied', state: STATE })).toBe(`${GOOD}#error=access_denied&state=${STATE}`);
+	});
+});
+
+describe('CONNECT_HEADERS', () => {
+	// Under no-referrer, Chrome sends "Origin: null" on the Allow form's POST,
+	// SvelteKit's cross-site check answers 403, and launchWebAuthFlow reports
+	// any 4xx as "Authorization page could not be loaded".
+	it('keeps the Origin on same-site posts while sending no referrer to other sites', () => {
+		expect(CONNECT_HEADERS['referrer-policy']).toBe('same-origin');
 	});
 });

@@ -77,10 +77,10 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('/connect/extension load', () => {
-	it('asks a signed-in user, uncached and without a referrer', async () => {
+	it('asks a signed-in user, uncached, sending no referrer to other sites', async () => {
 		const { setHeaders, call } = runLoad(connectUrl());
 		expect(await call()).toEqual({ redirectUri: REDIRECT, state: STATE, account: '@ana' });
-		expect(setHeaders).toHaveBeenCalledWith({ 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
+		expect(setHeaders).toHaveBeenCalledWith({ 'cache-control': 'no-store', 'referrer-policy': 'same-origin' });
 	});
 
 	it('names the account when there is no handle yet', async () => {
@@ -164,7 +164,7 @@ describe('Allow', () => {
 		expect(isRedirect(err) && err.status).toBe(303);
 		expect((err as { location: string }).location).toBe(`${REDIRECT}#key=${SECRET}&state=${STATE}`);
 		expect(connectExtensionKey).toHaveBeenCalledWith(42);
-		expect(setHeaders).toHaveBeenCalledWith({ 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
+		expect(setHeaders).toHaveBeenCalledWith({ 'cache-control': 'no-store', 'referrer-policy': 'same-origin' });
 	});
 
 	it('validates the posted request again', async () => {
@@ -211,7 +211,7 @@ describe('Cancel', () => {
 		expect(isRedirect(err) && err.status).toBe(303);
 		expect((err as { location: string }).location).toBe(`${REDIRECT}#error=access_denied&state=${STATE}`);
 		expect(connectExtensionKey).not.toHaveBeenCalled();
-		expect(setHeaders).toHaveBeenCalledWith({ 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' });
+		expect(setHeaders).toHaveBeenCalledWith({ 'cache-control': 'no-store', 'referrer-policy': 'same-origin' });
 	});
 
 	it('never redirects outside the allowlist', async () => {
