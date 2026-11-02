@@ -86,7 +86,10 @@ export function titleCase(raw: string): string {
 	return s
 		.toLocaleLowerCase('en')
 		.replace(/(^|[^\p{L}\p{M}\p{N}*])(\p{L})/gu, (_, before: string, ch: string) => before + ch.toLocaleUpperCase('en'))
-		.replace(ROMAN, (_, before: string, numeral: string) => before + numeral.toUpperCase());
+		.replace(ROMAN, (_, before: string, numeral: string) => before + numeral.toUpperCase())
+		// "Lily's", not "Lily'S": a short ending after an apostrophe is a
+		// possessive or contraction. A longer one is a name ("O'Neil").
+		.replace(/(\p{L}['’])(\p{L}{1,2})(?![\p{L}\p{M}\p{N}])/gu, (_, head: string, tail: string) => head + tail.toLocaleLowerCase('en'));
 }
 
 export type PayLabel = 'pay' | 'tip';

@@ -12,7 +12,10 @@ describe('titleCase', () => {
 		['JOSE RIZAL III', 'Jose Rizal III'],
 		['PEÑA', 'Peña'],
 		['MA.CRISTINA', 'Ma.Cristina'],
-		['JU*N D*LA CR*Z', 'Ju*n D*la Cr*z']
+		['JU*N D*LA CR*Z', 'Ju*n D*la Cr*z'],
+		["LILY'S BAKERY", "Lily's Bakery"],
+		["ALING NENA’S CAFE", "Aling Nena’s Cafe"],
+		["JUAN'LL", "Juan'll"]
 	])('sets %j as %j', (raw, out) => {
 		expect(titleCase(raw)).toBe(out);
 	});
