@@ -12,7 +12,7 @@ import {
 } from '../src/connect.js';
 
 const KEY = 'iksi_' + 'Ab3-_'.repeat(8) + 'xyz';
-const REDIRECT = 'https://nabbcbgomkkojhmhnglhicbeapheadem.chromiumapp.org/';
+const REDIRECT = 'https://fjlijiannnmnggbaknnkcloofcoeejnf.chromiumapp.org/';
 const STATE = 'c3RhdGUtdGhhdC1pcy1sb25nLWVub3VnaC1mb3ItdXM';
 
 function fakeChrome({ launch = async () => `${REDIRECT}#key=${KEY}&state=${STATE}` } = {}) {

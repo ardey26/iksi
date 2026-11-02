@@ -8,7 +8,7 @@
 // redirect: this must not become an open redirect or a key leak.
 
 /** The iksi extension in the Chrome Web Store. Permanent. */
-export const OFFICIAL_EXTENSION_ID = 'nabbcbgomkkojhmhnglhicbeapheadem';
+export const OFFICIAL_EXTENSION_ID = 'fjlijiannnmnggbaknnkcloofcoeejnf';
 
 /** Chrome extension ids: 32 letters a to p. */
 const EXTENSION_ID_RE = /^[a-p]{32}$/;

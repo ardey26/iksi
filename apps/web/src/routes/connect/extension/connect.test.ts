@@ -23,7 +23,7 @@ import ConnectError from './+error.svelte';
 import { ApiKeyError } from '#lib/server/api-keys.js';
 import { LOGIN_NEXT_COOKIE, takeNext } from '#lib/server/login-return.js';
 
-const ID = 'nabbcbgomkkojhmhnglhicbeapheadem';
+const ID = 'fjlijiannnmnggbaknnkcloofcoeejnf';
 const DEV = 'abcdefghijklmnopabcdefghijklmnop';
 const REDIRECT = `https://${ID}.chromiumapp.org/`;
 const STATE = 'c3RhdGUtdGhhdC1pcy1sb25nLWVub3VnaA';

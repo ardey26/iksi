@@ -9,7 +9,7 @@ import {
 	readConnectRequest
 } from './extension-connect.js';
 
-const ID = 'nabbcbgomkkojhmhnglhicbeapheadem';
+const ID = 'fjlijiannnmnggbaknnkcloofcoeejnf';
 const DEV = 'abcdefghijklmnopabcdefghijklmnop';
 const GOOD = `https://${ID}.chromiumapp.org/`;
 const STATE = 'Q2hlY2tpbmcgdGhlIHN0YXRlIGlzIGhlcmU';

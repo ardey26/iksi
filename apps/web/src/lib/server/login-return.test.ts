@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { LOGIN_NEXT_COOKIE, loginUrlFor, rememberNext, safeNext, takeNext } from './login-return.js';
 
-const PATH = '/connect/extension?state=' + 'a'.repeat(43) + '&redirect_uri=https%3A%2F%2Fnabbcbgomkkojhmhnglhicbeapheadem.chromiumapp.org%2F';
+const PATH = '/connect/extension?state=' + 'a'.repeat(43) + '&redirect_uri=https%3A%2F%2Ffjlijiannnmnggbaknnkcloofcoeejnf.chromiumapp.org%2F';
 
 function jar(initial: Record<string, string> = {}) {
 	const store = new Map(Object.entries(initial));
