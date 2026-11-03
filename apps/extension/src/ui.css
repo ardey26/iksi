@@ -13,6 +13,7 @@
   color-scheme: dark;
   --bg: #0A0A0B;
   --surface: #141416;
+  --surface-2: #1A1A1D;
   --border: #27272A;
   --border-focus: #3B82F6;
   --text-primary: #FAFAFA;
@@ -30,6 +31,7 @@
     color-scheme: light;
     --bg: #FAFAFA;
     --surface: #FFFFFF;
+    --surface-2: #F8F8F9;
     --border: #E4E4E7;
     --border-focus: #2563EB;
     --text-primary: #09090B;
@@ -51,6 +53,15 @@ body {
 }
 
 [hidden] { display: none !important; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 .brand {
   display: flex;

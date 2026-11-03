@@ -1,54 +1,124 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="loading">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>iksi</title>
     <link rel="stylesheet" href="ui.css" />
     <style>
-      body { width: 340px; }
-      main { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
-      header { display: flex; align-items: center; justify-content: space-between; }
-      .page { display: flex; flex-direction: column; gap: 2px; min-height: 38px; }
-      .row { display: flex; gap: 8px; }
-      .row .field { flex: 1 1 auto; min-width: 0; }
-      .result { display: flex; align-items: center; height: var(--ctl); padding: 0 12px;
-                font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums;
-                background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-      #copy { min-width: 84px; }
-      #shorten { width: 100%; }
+      /* Hidden until the cached palette is on, so the popup never flashes. */
+      html.loading body { visibility: hidden; }
+      body { width: 360px; }
+      main { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+      .stack { display: flex; flex-direction: column; gap: 12px; }
+
+      .bar { display: flex; align-items: center; justify-content: space-between; height: 36px; margin: -4px 0 4px; }
+      .brand img { width: 22px; height: 22px; }
+      .icon-btn { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; color: var(--text-muted);
+                  background: none; border: 0; border-radius: 999px; cursor: pointer;
+                  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out); }
+      .icon-btn:hover { color: var(--text-primary); background-color: var(--surface-2); }
+      .icon-btn:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 0; }
+
+      .identity { display: flex; align-items: center; gap: 12px; height: 56px; padding: 4px 2px 8px; }
+      .avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background-color: var(--surface-2); }
+      .avatar-letter { display: grid; place-items: center; font-size: 17px; font-weight: 600; color: var(--text-muted); }
+      .who { flex: 1 1 auto; min-width: 0; }
+      .name { min-height: 22px; font-size: 16px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em; }
+      .profile-link { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 18px; margin-top: 1px; padding: 0;
+                      font: inherit; font-size: 13px; line-height: 18px; color: var(--text-muted);
+                      background: none; border: 0; border-radius: 4px; cursor: pointer;
+                      transition: color var(--duration-fast) var(--ease-out); }
+      .profile-link:hover { color: var(--text-primary); }
+      .profile-link:focus-visible, .lrow:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 0; }
+      .profile-link .ico { display: inline-grid; flex: none; width: 13px; height: 13px; }
+      .profile-link .ico svg { width: 13px; height: 13px; }
+      .empty-handle { color: var(--text-primary); }
+
+      .paper { background-color: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+      .cur { padding: 14px 14px 8px; }
+      .cur .t { font-size: 14px; line-height: 20px; font-weight: 500; }
+      /* Kept even when empty, so a message never moves the list below. */
+      .cur .status { margin-top: 6px; }
+      .pill { display: flex; width: 100%; height: 40px; margin-top: 12px; padding: 0 16px; align-items: center; justify-content: center;
+              font: inherit; font-weight: 500; color: var(--bg); background-color: var(--text-primary);
+              border: 0; border-radius: 999px; cursor: pointer; transition: opacity var(--duration-fast) var(--ease-out); }
+      .pill:hover:not(:disabled) { opacity: 0.9; }
+      .pill:disabled { opacity: 0.4; cursor: not-allowed; }
+      .pill:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 2px; }
+      .done { display: flex; gap: 8px; margin-top: 12px; }
+      .result { flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 16px; font-size: 14px; line-height: 38px; font-weight: 500;
+                font-variant-numeric: tabular-nums; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; }
+      #copy { min-width: 84px; border-radius: 999px; }
+
+      .h { padding: 8px 2px 0; font-size: 13px; line-height: 18px; color: var(--text-muted); }
+      /* Six rows, then the list scrolls inside its paper. */
+      .list ul { list-style: none; max-height: 272px; padding: 4px; overflow-y: auto; scrollbar-width: thin; }
+      .lrow { display: flex; align-items: center; gap: 10px; width: 100%; height: 44px; padding: 0 10px 0 12px;
+              font: inherit; color: inherit; text-align: left; background: none; border: 0; border-radius: 10px; cursor: pointer;
+              transition: background-color var(--duration-fast) var(--ease-out); }
+      .lrow:hover { background-color: var(--surface-2); }
+      .lt { flex: 1 1 auto; min-width: 0; font-weight: 500; }
+      .ls { flex: 0 1 auto; max-width: 40%; font-size: 13px; color: var(--text-muted); }
+      .lc { display: grid; flex: none; width: 16px; height: 16px; color: var(--text-muted); }
+      .lc.on { color: var(--text-primary); }
+
+      .connect { padding: 14px; }
+      .connect .status { margin-top: 8px; }
     </style>
   </head>
   <body>
     <main>
-      <header>
-        <span class="brand"><img src="../icons/icon-32.png" alt="" />iksi</span>
-        <button type="button" class="btn btn-text" id="options">Options</button>
+      <header class="bar">
+        <span class="brand"><img src="../icons/mark.svg" alt="" />iksi</span>
+        <button type="button" class="icon-btn" id="options" aria-label="Settings" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
       </header>
 
-      <section id="no-key" hidden>
+      <section id="no-key" class="paper connect" hidden>
         <p class="title">Connect iksi to start</p>
         <p class="muted" style="margin-top: 4px">Sign in to iksi once, and the extension shortens links as you.</p>
-        <button type="button" class="btn btn-primary" id="connect" style="margin-top: 16px; width: 100%">Connect to iksi</button>
-        <p class="status" id="connect-status" role="status" style="margin-top: 8px"></p>
+        <button type="button" class="pill" id="connect" style="margin-top: 16px">Connect to iksi</button>
+        <p class="status" id="connect-status" role="status"></p>
         <button type="button" class="btn btn-text" id="use-key">Use an API key instead</button>
       </section>
 
-      <section id="ready" hidden>
-        <div class="page">
-          <p class="title clip" id="page-title"></p>
+      <section id="ready" class="stack" hidden>
+        <div class="identity" id="identity" hidden>
+          <img class="avatar" id="avatar" alt="" hidden />
+          <span class="avatar avatar-letter" id="avatar-letter" aria-hidden="true"></span>
+          <div class="who">
+            <p class="name clip" id="name"></p>
+            <button type="button" class="profile-link" id="profile-link" hidden>
+              <span class="clip" id="profile-label"></span><span class="ico" id="profile-icon"></span>
+            </button>
+            <p class="muted" id="no-handle" hidden>
+              No profile yet. <a class="empty-handle" href="https://www.iksi.app/dashboard" target="_blank" rel="noopener">Choose a handle</a>
+            </p>
+          </div>
+        </div>
+
+        <div class="paper cur">
+          <p class="t clip" id="page-title"></p>
           <p class="muted clip" id="page-url"></p>
+          <div id="action">
+            <button type="button" class="pill" id="shorten">Shorten this page</button>
+          </div>
+          <div id="done" class="done" hidden>
+            <output class="result mono clip" id="short" aria-label="Short link"></output>
+            <button type="button" class="btn btn-secondary" id="copy">Copy</button>
+          </div>
+          <p class="status" id="status" role="status"></p>
         </div>
-        <div id="action" style="margin-top: 16px">
-          <button type="button" class="btn btn-primary" id="shorten">Shorten this page</button>
+
+        <p class="h" id="links-label" hidden>Profile links</p>
+        <div class="paper list" id="links-paper" hidden>
+          <ul id="links" aria-labelledby="links-label"></ul>
         </div>
-        <div id="done" class="row" style="margin-top: 16px" hidden>
-          <output class="result field mono clip" id="short" aria-label="Short link"></output>
-          <button type="button" class="btn btn-secondary" id="copy">Copy</button>
-        </div>
-        <p class="status" id="status" role="status" style="margin-top: 8px"></p>
       </section>
     </main>
+    <p class="sr-only" id="announce" role="status"></p>
     <script src="popup.js" type="module"></script>
   </body>
 </html>
