@@ -13,6 +13,7 @@ export const CONNECT_ERRORS = {
   cancelled: 'Connecting was cancelled. Nothing was changed.',
   state_mismatch: 'iksi answered a request this extension did not make, so the answer was ignored. Try again.',
   network: 'Could not reach iksi. Check your connection and try again.',
+  page_failed: 'iksi could not open the connect page. Try again, or use an API key instead.',
   rate_limited: 'Too many connects in the last hour. Try again later.',
   key_limit: 'Your account has the most API keys it can hold. Revoke one in your dashboard, then try again.',
   failed: 'Could not connect. Try again.'
@@ -60,7 +61,10 @@ export function readConnectResult(responseUrl, expectedState, redirectUri) {
 export function errorOfLaunch(err) {
   const message = String(err?.message ?? err ?? '');
   if (/did not approve|cancel|closed|denied/i.test(message)) return 'cancelled';
-  if (/could not be loaded|net::|network|offline|internet/i.test(message)) return 'network';
+  // Chrome says "Authorization page could not be loaded" for any HTTP error
+  // page in the window, so it is not proof of a network failure.
+  if (/could not be loaded/i.test(message)) return 'page_failed';
+  if (/net::|network|offline|internet/i.test(message)) return 'network';
   return 'failed';
 }
 
