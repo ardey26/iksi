@@ -5,20 +5,11 @@
   import { Button, Container, Field, Input, PageHeader, Paper, Section, Stack, Switch, Textarea, toast } from '#lib/ui/index.js';
   import { uid } from '#lib/ui/uid.js';
   import { profileLabel } from '#lib/subdomains.js';
+  import { brightnessOf, profilePalette } from '#lib/profile-palette.js';
 
   export let data;
 
   const ids = { scope: uid('scope'), scopeDesc: uid('scope-desc') };
-
-  // Reuse `theme` column: numeric-in-string 0..100 (brightness). Legacy values map:
-  //   'light' → 100, everything else ('dark' | 'default' | 'mono' | undefined) → 20.
-  function themeToBrightness(t: string | null | undefined): number {
-    if (!t) return 20;
-    const n = parseInt(t, 10);
-    if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
-    if (t === 'light') return 100;
-    return 20;
-  }
 
   let displayName = data.profile?.displayName ?? '';
   let bio = data.profile?.bio ?? '';
@@ -29,7 +20,7 @@
   let backgroundUrl: string | null = data.profile?.backgroundUrl ?? null;
   let showUrlInput = false;
   let accent = data.profile?.accent ?? '#3B82F6';
-  let brightness: number = themeToBrightness(data.profile?.theme);
+  let brightness: number = brightnessOf(data.profile?.theme);
 
   let saving = false;
   let dirty = false;
@@ -40,7 +31,7 @@
       bio: data.profile?.bio ?? '',
       avatarUrl: savedAvatarUrl,
       accent: data.profile?.accent ?? '#3B82F6',
-      brightness: themeToBrightness(data.profile?.theme)
+      brightness: brightnessOf(data.profile?.theme)
     };
     dirty = displayName !== orig.displayName || bio !== orig.bio || avatarUrl !== orig.avatarUrl
       // The color input reports lowercase hex; case is not a change.
@@ -119,23 +110,16 @@
     }
   }
 
-  // Palette derivation (must mirror /@handle logic exactly).
-  // OKLCH-based: perceptually uniform lightness across all hues.
+  // The public profile's palette (lib/profile-palette.ts), under the preview's names.
   $: paletteStyle = (() => {
-    const bL = Math.max(0.04, Math.min(0.99, brightness / 100));
-    const isLight = bL > 0.5;
-    const sL = Math.min(1, bL + (isLight ? 0.025 : 0.03));
-    const tL = isLight ? Math.max(0.14, 0.94 - bL) : Math.min(0.94, bL + 0.75);
-    const mL = isLight ? Math.max(0.38, bL - 0.30) : Math.min(0.72, bL + 0.38);
-    const brL = isLight ? Math.max(0.80, bL - 0.10) : Math.min(0.32, bL + 0.14);
-    const accentReadableL = isLight ? 0.48 : 0.72;
-    return `--accent: ${accent};
-            --p-accent-text: oklch(from ${accent} ${accentReadableL} max(c, 0.09) h);
-            --p-bg: oklch(from ${accent} ${bL} 0.020 h);
-            --p-surface: oklch(from ${accent} ${sL} 0.014 h);
-            --p-border: oklch(from ${accent} ${brL} 0.050 h);
-            --p-text: oklch(from ${accent} ${tL} 0.008 h);
-            --p-muted: oklch(from ${accent} ${mL} 0.018 h);`;
+    const t = profilePalette(accent, String(Math.round(brightness))).tokens;
+    return `--accent: ${t['--accent']};
+            --p-accent-text: ${t['--accent-text']};
+            --p-bg: ${t['--bg']};
+            --p-surface: ${t['--surface']};
+            --p-border: ${t['--border']};
+            --p-text: ${t['--text-primary']};
+            --p-muted: ${t['--text-muted']};`;
   })();
 
   $: placeholderName = data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name';

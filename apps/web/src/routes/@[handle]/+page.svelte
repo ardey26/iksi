@@ -3,6 +3,7 @@
   import PayButton from '#lib/components/PayButton.svelte';
   import { Button, IconButton, List, Paper, Row } from '#lib/ui/index.js';
   import { canonicalProfileUrl, profileLabel, profileShareUrl } from '#lib/subdomains.js';
+  import { paletteCss, profilePalette } from '#lib/profile-palette.js';
 
   export let data;
 
@@ -69,44 +70,7 @@
     };
   });
 
-  // `theme` column stores brightness as string "0".."100".
-  function brightnessOf(t) {
-    if (!t) return 20;
-    const n = parseInt(t, 10);
-    if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
-    if (t === 'light') return 100;
-    return 20;
-  }
-  $: b = brightnessOf(data.theme);
-  $: bL = Math.max(0.04, Math.min(0.99, b / 100));
-  $: isLight = bL > 0.5;
-  $: sL = Math.min(1, bL + (isLight ? 0.025 : 0.03));
-  $: tL = isLight ? Math.max(0.14, 0.94 - bL) : Math.min(0.94, bL + 0.75);
-  $: mL = isLight ? Math.max(0.38, bL - 0.30) : Math.min(0.72, bL + 0.38);
-  $: brL = isLight ? Math.max(0.80, bL - 0.10) : Math.min(0.32, bL + 0.14);
-  $: accentReadableL = isLight ? 0.48 : 0.72;
-  $: paletteStyle =
-    `--accent: ${data.accent};
-     --accent-text: oklch(from ${data.accent} ${accentReadableL} max(c, 0.09) h);
-     --bg: oklch(from ${data.accent} ${bL} 0.020 h);
-     --surface: oklch(from ${data.accent} ${sL} 0.014 h);
-     --border: oklch(from ${data.accent} ${brL} 0.050 h);
-     --text-primary: oklch(from ${data.accent} ${tL} 0.008 h);
-     --text-muted: oklch(from ${data.accent} ${mL} 0.018 h);` + kitTokens;
-
-  // The UI kit's remaining tokens, derived from the same palette so kit
-  // components (rows, buttons, the pay sheet) match the owner's colours.
-  $: kitTokens = `
-     --surface-2: oklch(from ${data.accent} ${isLight ? Math.max(0, sL - 0.02) : Math.min(1, sL + 0.03)} 0.014 h);
-     --skeleton: oklch(from ${data.accent} ${isLight ? Math.max(0, sL - 0.05) : Math.min(1, sL + 0.06)} 0.014 h);
-     --border-strong: oklch(from ${data.accent} ${isLight ? Math.max(0, brL - 0.08) : Math.min(1, brL + 0.08)} 0.050 h);
-     --text-faint: oklch(from ${data.accent} ${isLight ? Math.min(0.62, mL + 0.1) : Math.max(0.5, mL - 0.1)} 0.018 h);
-     --track: oklch(from ${data.accent} ${isLight ? Math.max(0, sL - 0.03) : Math.min(1, sL + 0.03)} 0.014 h);
-     --thumb: var(--surface);
-     --paper-shadow: ${isLight ? '0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.04)' : 'inset 0 1px 0 rgb(255 255 255 / 0.04)'};
-     --overlay-shadow: ${isLight ? '0 24px 64px rgb(0 0 0 / 0.16)' : '0 24px 64px rgb(0 0 0 / 0.6)'};
-     --scrim: ${isLight ? 'rgb(9 9 11 / 0.32)' : 'rgb(0 0 0 / 0.64)'};
-     color-scheme: ${isLight ? 'light' : 'dark'};`;
+  $: paletteStyle = paletteCss(profilePalette(data.accent, data.theme));
 
   // backgroundUrl lands in an inline style: accept only https URLs with none
   // of the characters that could end the quoted url() string or the declaration.
