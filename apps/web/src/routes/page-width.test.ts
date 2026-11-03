@@ -37,6 +37,14 @@ describe('dashboard width', () => {
     expect(containerWidths(source)).toEqual(['wide']);
   });
 
+  // A screen that pads its own column would put its header lower than the rest.
+  it.each(Object.entries(dashboard))('%s adds no top space of its own above the header', (_path, source) => {
+    const classes = [...source.matchAll(/<Container\b[^>]*\bclass="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/));
+    for (const c of classes) {
+      expect(source).not.toMatch(new RegExp(`\\.${c}\\)?\\s*\\{[^}]*padding`));
+    }
+  });
+
   it('keeps the claim form narrow inside the wide column', () => {
     const claim = dashboard['/src/routes/(app)/dashboard/claim/+page.svelte'];
     expect(claim).toMatch(/max-width:\s*var\(--width-narrow\)/);

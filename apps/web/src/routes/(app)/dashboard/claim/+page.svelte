@@ -58,7 +58,7 @@
 
 <svelte:head><title>Claim your handle — iksi</title></svelte:head>
 
-<Container width="wide" class="claim">
+<Container width="wide">
   <PageHeader title="Claim your handle" description="It's the address of your public page." />
 
   <!-- The dashboard's wide column, so the header sits where it does on every
@@ -106,8 +106,6 @@
 </Container>
 
 <style>
-  /* Onboarding sits a little lower than app pages. */
-  :global(.claim) { padding-top: 24px; }
   .claim-form { max-width: var(--width-narrow); }
   /* The prefix reads as one address with the typed handle. */
   .ui-box > .ui-affix { color: var(--text-muted); margin-right: -8px; }
