@@ -25,13 +25,16 @@ export function withExtensionCors(request: Request, response: Response): Respons
 	return response;
 }
 
-/** The answer to a CORS preflight: a grant for extension origins, nothing for anyone else. */
-export function extensionPreflight(request: Request): Response {
-	const headers = new Headers({ allow: 'POST, OPTIONS' });
+/**
+ * The answer to a CORS preflight: a grant for extension origins, nothing for
+ * anyone else. `method` is the one the endpoint serves.
+ */
+export function extensionPreflight(request: Request, method: 'GET' | 'POST' = 'POST'): Response {
+	const headers = new Headers({ allow: `${method}, OPTIONS` });
 	const origin = request.headers.get('origin');
 	if (isExtensionOrigin(origin)) {
 		headers.set('access-control-allow-origin', origin);
-		headers.set('access-control-allow-methods', 'POST');
+		headers.set('access-control-allow-methods', method);
 		headers.set('access-control-allow-headers', 'Authorization, Content-Type');
 		headers.set('access-control-max-age', '86400');
 	}

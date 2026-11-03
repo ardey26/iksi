@@ -76,12 +76,12 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // 4. Block direct GETs to /api on the public host, EXCEPT for public
-    //    read-only endpoints under /api/@ (JSON API + OG image) and cron
-    //    endpoints. Everything else (like /api/shorten) is POST-only and
-    //    a GET is just probing.
+    //    read-only endpoints under /api/@ (JSON API + OG image), cron
+    //    endpoints and the extension's keyed /api/me/profile. Everything else
+    //    (like /api/shorten) is POST-only and a GET is just probing.
     if (event.request.method === 'GET' && event.url.pathname.startsWith('/api')) {
         const p = event.url.pathname;
-        const allowed = p.startsWith('/api/@') || p.startsWith('/api/cron/');
+        const allowed = p.startsWith('/api/@') || p.startsWith('/api/cron/') || p === '/api/me/profile';
         if (!allowed) {
             return new Response(null, { status: 302, headers: { Location: '/' } });
         }

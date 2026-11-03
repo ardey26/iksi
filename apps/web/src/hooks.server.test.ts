@@ -107,3 +107,17 @@ describe('no ads', () => {
     expect(csp).toContain("connect-src 'self'");
   });
 });
+
+describe('GET to /api', () => {
+  it('turns a probing GET away', async () => {
+    const res = await run(event('https://www.iksi.app/api/shorten', '/api/shorten'));
+    expect(res.status).toBe(302);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("lets the extension read the key owner's profile", async () => {
+    const res = await run(event('https://www.iksi.app/api/me/profile', '/api/me/profile'));
+    expect(res.status).toBe(200);
+    expect(resolve).toHaveBeenCalledTimes(1);
+  });
+});
