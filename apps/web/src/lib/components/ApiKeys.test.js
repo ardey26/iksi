@@ -183,6 +183,14 @@ describe('ApiKeys', () => {
       expect(screen.getByText('No apps connected')).toBeInTheDocument();
     });
 
+    it('links the extension in the store when nothing is connected', () => {
+      render(ApiKeys, { props: { keys: [] } });
+      const get = screen.getByRole('link', { name: 'Get the Chrome extension' });
+      expect(get).toHaveAttribute('href', 'https://chromewebstore.google.com/detail/iksi/fjlijiannnmnggbaknnkcloofcoeejnf');
+      expect(get).toHaveAttribute('target', '_blank');
+      expect(get.getAttribute('rel')).toContain('noopener');
+    });
+
     it('disconnects after a confirm step', async () => {
       fetchMock.mockResolvedValue(ok({ keys: [laptop] }));
       render(ApiKeys, { props: { keys: [chrome, laptop] } });

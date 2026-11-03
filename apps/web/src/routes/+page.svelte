@@ -1,4 +1,5 @@
 <script>
+  import { CHROME_EXTENSION_URL } from '#lib/extension-store.js';
   import { Input, ShortenedURL } from '#lib/components/index.js';
   import OneTimeForm from '#lib/components/OneTimeForm.svelte';
   import { Button, Container, Paper, Segmented } from '#lib/ui/index.js';
@@ -215,6 +216,7 @@
   <footer class="band site-foot">
     <Container width="wide">
       <div class="foot-inner">
+        <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">Chrome extension</a>
         <a href="/report">Report a link</a>
         <a href="/privacy">Privacy</a>
       </div>

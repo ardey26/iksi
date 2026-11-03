@@ -155,10 +155,11 @@ describe('home page layout', () => {
 });
 
 describe('home page footer', () => {
-  it('links the report form and the privacy policy, below the fold', () => {
+  it('links the extension, the report form and the privacy policy, below the fold', () => {
     const { container } = render(Home);
     const foot = container.querySelector('footer.site-foot');
     expect([...foot.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['Chrome extension', 'https://chromewebstore.google.com/detail/iksi/fjlijiannnmnggbaknnkcloofcoeejnf'],
       ['Report a link', '/report'],
       ['Privacy', '/privacy']
     ]);

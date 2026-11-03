@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHROME_EXTENSION_URL } from '#lib/extension-store.js';
   // Dashboard "Connected apps" section body. Keys the extension made through
   // "Connect to iksi" show as connected apps, with a Disconnect action. Keys
   // made by hand sit below, behind a quieter "API keys" disclosure. A new key
@@ -116,7 +117,9 @@
   <Stack gap={16}>
     <Paper padding="none">
       {#if apps.length === 0}
-        <EmptyState icon="link" title="No apps connected" description="Install the iksi extension and choose Connect to iksi." />
+        <EmptyState icon="link" title="No apps connected" description="Install the iksi extension and choose Connect to iksi.">
+          <Button href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">Get the Chrome extension</Button>
+        </EmptyState>
       {:else}
         <List label="Connected apps">
           {#each apps as k (k.id)}
