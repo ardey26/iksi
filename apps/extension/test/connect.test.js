@@ -101,8 +101,10 @@ describe('errorOfLaunch', () => {
   it.each([
     ['The user did not approve access.', 'cancelled'],
     ['User cancelled or denied access.', 'cancelled'],
-    ['Authorization page could not be loaded.', 'network'],
+    ['Authorization page could not be loaded.', 'page_failed'],
     ['net::ERR_INTERNET_DISCONNECTED', 'network'],
+    ['net::ERR_NAME_NOT_RESOLVED', 'network'],
+    ['You are offline.', 'network'],
     ['Something odd', 'failed']
   ])('%s → %s', (message, code) => expect(errorOfLaunch(new Error(message))).toBe(code));
 });
@@ -148,8 +150,17 @@ describe('connect', () => {
     expect(await connect({ identity: c.identity, storage: c.storage, state: STATE })).toMatchObject({ ok: false, code: 'cancelled' });
   });
 
-  it('reports a page that would not load as a network error', async () => {
+  it('reports an error page in the window as page_failed, not a network error', async () => {
     const c = fakeChrome({ launch: async () => Promise.reject(new Error('Authorization page could not be loaded.')) });
+    expect(await connect({ identity: c.identity, storage: c.storage, state: STATE })).toEqual({
+      ok: false,
+      code: 'page_failed',
+      message: 'iksi could not open the connect page. Try again, or use an API key instead.'
+    });
+  });
+
+  it('still reports a real network failure as network', async () => {
+    const c = fakeChrome({ launch: async () => Promise.reject(new Error('net::ERR_INTERNET_DISCONNECTED')) });
     expect(await connect({ identity: c.identity, storage: c.storage, state: STATE })).toMatchObject({ ok: false, code: 'network' });
   });
 
@@ -160,7 +171,7 @@ describe('connect', () => {
   });
 
   it('every error has a plain message without the key', () => {
-    for (const code of ['cancelled', 'state_mismatch', 'network', 'rate_limited', 'key_limit', 'failed']) {
+    for (const code of ['cancelled', 'state_mismatch', 'network', 'page_failed', 'rate_limited', 'key_limit', 'failed']) {
       expect(CONNECT_ERRORS[code]).toMatch(/^([A-Z]|iksi ).*\.$/);
       expect(CONNECT_ERRORS[code]).not.toContain('·');
     }
