@@ -58,7 +58,7 @@ describe('stored media urls are served from MEDIA_BASE_URL', () => {
 	});
 
 	it('dashboard profile avatar and background', async () => {
-		h.profileFindUnique.mockResolvedValue({ avatarUrl: OLD_AVATAR, backgroundUrl: OLD_BG });
+		h.profileFindUnique.mockResolvedValue({ avatarUrl: OLD_AVATAR, backgroundUrl: OLD_BG, rows: [] });
 		const out = (await dashboardProfileLoad({ parent: async () => ({ user: { id: 7 } }) } as never)) as {
 			profile: { avatarUrl: string; backgroundUrl: string };
 		};
@@ -76,7 +76,7 @@ describe('stored media urls are served from MEDIA_BASE_URL', () => {
 
 	it('leaves external avatars alone', async () => {
 		const google = 'https://lh3.googleusercontent.com/a/abc=s400-c';
-		h.profileFindUnique.mockResolvedValue({ avatarUrl: google, backgroundUrl: null });
+		h.profileFindUnique.mockResolvedValue({ avatarUrl: google, backgroundUrl: null, rows: [] });
 		const out = (await dashboardProfileLoad({ parent: async () => ({ user: { id: 7 } }) } as never)) as {
 			profile: { avatarUrl: string; backgroundUrl: string | null };
 		};

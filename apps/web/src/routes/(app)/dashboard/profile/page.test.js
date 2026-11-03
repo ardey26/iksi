@@ -184,3 +184,18 @@ describe('profile editor preview avatar', () => {
     expect(card().firstElementChild).toHaveClass('who');
   });
 });
+
+describe('profile editor preview rows', () => {
+  const samples = () => [...document.querySelectorAll('.preview .preview-row')].map((r) => r.textContent.trim());
+
+  it('lists the real rows of the public page, in order', () => {
+    render(Page, { props: { data: { ...data(), rows: [{ id: 3, title: 'Pre-order' }, { id: 5, title: 'Menu' }] } } });
+    expect(samples()).toEqual(['Pre-order', 'Menu']);
+  });
+
+  it('lists no rows, and nothing in their place, when there are none', () => {
+    render(Page, { props: { data: { ...data(), rows: [] } } });
+    expect(samples()).toEqual([]);
+    expect(document.querySelector('.preview').textContent).not.toMatch(/Website|Latest post|Newsletter/);
+  });
+});

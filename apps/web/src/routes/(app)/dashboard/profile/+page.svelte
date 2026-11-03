@@ -125,7 +125,8 @@
   $: placeholderName = data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name';
   $: previewName = displayName || data.user.twitterHandle || data.user.googleEmail?.split('@')[0] || 'You';
   $: previewHandle = data.user.handle || data.user.twitterHandle || 'you';
-  const sampleRows = ['Website', 'Latest post', 'Newsletter'];
+  // The public page's own rows, in order. None means none: no stand-ins.
+  $: rows = (data.rows ?? []) as { id: number; title: string }[];
 </script>
 
 <svelte:head><title>Profile — iksi</title></svelte:head>
@@ -221,8 +222,8 @@
             <span class="pill">Copy</span>
           </div>
           {#if bio}<p class="bio">{bio}</p>{/if}
-          {#each sampleRows as row}
-            <div class="sample">{row}</div>
+          {#each rows as row (row.id)}
+            <div class="preview-row">{row.title}</div>
           {/each}
           <p class="foot">{previewHandle} shortens links with <span>iksi</span></p>
         </div>
@@ -462,7 +463,7 @@
     line-height: 18px;
     font-weight: 500;
   }
-  .sample {
+  .preview-row {
     padding: 12px 16px;
     font-size: 14px;
     font-weight: 600;
