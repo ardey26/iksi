@@ -169,3 +169,18 @@ describe('profile editor accent', () => {
     expect(save()).not.toBeDisabled();
   });
 });
+
+describe('profile editor preview avatar', () => {
+  const card = () => document.querySelector('.preview .card-head');
+
+  it('shows the photo in the preview', () => {
+    render(Page, { props: { data: data(OLD) } });
+    expect(card().querySelector('img.avatar')).toHaveAttribute('src', OLD);
+  });
+
+  it('shows no avatar and no letters without a photo, like the public page', () => {
+    render(Page, { props: { data: data(null) } });
+    expect(card().querySelector('.avatar')).toBeNull();
+    expect(card().firstElementChild).toHaveClass('who');
+  });
+});

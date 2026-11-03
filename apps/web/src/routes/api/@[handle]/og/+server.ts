@@ -51,16 +51,8 @@ function derivePalette(accentHex: string, brightness: number) {
     bg: hslToHex(h, 8, bL),
     text: hslToHex(h, 3, tL),
     muted: hslToHex(h, 8, mL),
-    accentTint: hslToHex(h, Math.max(s, 40), 90),
     accentText: hslToHex(h, Math.max(s, 40), isLight ? 48 : 72)
   };
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toLowerCase();
-  return (parts[0][0] + parts[1][0]).toLowerCase();
 }
 
 // Satori requires `display: flex` on ANY div with children (even a text child).
@@ -145,9 +137,10 @@ export const GET: RequestHandler = async ({ params }) => {
       const src = mediaUrl(p.avatarUrl);
       avatarSrc = (await cdnAvatarDataUrl(src)) ?? normalizeAvatarUrl(src);
     } catch (err) {
-      console.error('og: could not prepare CDN avatar, using initials', err);
+      console.error('og: could not prepare CDN avatar, drawing the card without it', err);
     }
   }
+  // No photo: the card starts with the name. Nothing stands in for it.
   const avatar = avatarSrc
     ? {
         type: 'img',
@@ -162,25 +155,11 @@ export const GET: RequestHandler = async ({ params }) => {
           }
         }
       }
-    : box(
-        {
-          width: 160,
-          height: 160,
-          borderRadius: 80,
-          flexShrink: 0,
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: palette.accentTint,
-          color: palette.accentText,
-          fontSize: 68,
-          fontWeight: 700
-        },
-        initials(displayName)
-      );
+    : null;
 
   // --- Identity block: name + full iksi.app/@handle URL under it ---
   const nameEl = box(
-    { fontSize: 76, fontWeight: 700, color: palette.text, lineHeight: 1.05, marginTop: 40, textAlign: 'center' },
+    { fontSize: 76, fontWeight: 700, color: palette.text, lineHeight: 1.05, marginTop: avatar ? 40 : 0, textAlign: 'center' },
     displayName
   );
 
@@ -218,7 +197,7 @@ export const GET: RequestHandler = async ({ params }) => {
   );
 
   // --- Root frame: everything centered vertically and horizontally ---
-  const contentChildren: any[] = [avatar, nameEl, urlEl];
+  const contentChildren: any[] = avatar ? [avatar, nameEl, urlEl] : [nameEl, urlEl];
   if (bioBlock) contentChildren.push(bioBlock);
   contentChildren.push(footer);
 

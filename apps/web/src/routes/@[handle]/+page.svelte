@@ -17,12 +17,6 @@
     } catch {}
   }
 
-  // Up to two initials, letters or digits only; never punctuation like "@".
-  function initials(name: string) {
-    const words = name.match(/[\p{L}\p{N}]+/gu) ?? [];
-    if (words.length === 0) return '?';
-    return (words.length === 1 ? words[0].slice(0, 1) : words[0][0] + words[1][0]).toUpperCase();
-  }
 
   // --- Share popup state ---
   let openShareId: number | null = null;
@@ -163,11 +157,10 @@
   <main class="profile">
     <header class="head">
       {#if data.avatarUrl && !avatarBroken}
-        <!-- Hot-linked avatars (LinkedIn, Twitter CDNs) expire; fall back to initials instead of a broken image. -->
+        <!-- Hot-linked avatars (LinkedIn, Twitter CDNs) expire; drop one that fails rather than show a broken image.
+             Without a photo the page starts with the name: nothing stands in for it. -->
         <img src={data.avatarUrl} alt="" class="avatar" width="72" height="72"
              on:error={() => (avatarBroken = true)} />
-      {:else}
-        <div class="avatar avatar-initials" aria-hidden="true">{initials(data.displayName)}</div>
       {/if}
 
       <h1 class="name">{data.displayName}</h1>
@@ -276,16 +269,6 @@
     border-radius: 50%;
     object-fit: cover;
     box-shadow: 0 0 0 1px var(--border);
-  }
-  .avatar-initials {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 26px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: oklch(from var(--accent) 0.36 max(c, 0.09) h);
-    background-color: oklch(from var(--accent) 0.90 max(c, 0.08) h);
   }
   .name {
     max-width: 100%;

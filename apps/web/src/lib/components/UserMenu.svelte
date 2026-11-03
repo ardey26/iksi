@@ -1,8 +1,10 @@
 <script lang="ts">
-  // Header account control: an avatar that opens a small menu on paper.
+  // Header account control: the owner's photo, or a bare account icon when
+  // there is none (never a letter on a disc), opening a small menu on paper.
   // A disclosure, not an ARIA menu: Tab moves through the items, Escape
   // closes and returns focus to the avatar, a click outside closes.
   import { onMount, tick } from 'svelte';
+  import { Icon } from '#lib/ui/index.js';
 
   export let user: {
     twitterHandle: string | null;
@@ -45,10 +47,7 @@
 
   $: identityLabel = user.twitterHandle ? `@${user.twitterHandle}` : (user.googleEmail ?? '');
   $: name = user.displayName?.trim() || (user.handle ? `@${user.handle}` : identityLabel);
-  $: initial = (user.displayName || user.handle || user.twitterHandle || user.googleEmail || '?')
-    .trim()
-    .charAt(0)
-    .toUpperCase();
+  $: photo = !!user.avatarUrl && !avatarBroken;
 </script>
 
 <div bind:this={menuRoot} class="user-menu">
@@ -57,16 +56,17 @@
     data-ui
     type="button"
     class="avatar"
+    class:photo
     on:click|stopPropagation={toggle}
     aria-haspopup="true"
     aria-expanded={menuOpen}
     aria-controls={id}
     aria-label="Account menu"
   >
-    {#if user.avatarUrl && !avatarBroken}
+    {#if photo}
       <img src={user.avatarUrl} alt="" width="32" height="32" on:error={() => (avatarBroken = true)} />
     {:else}
-      <span aria-hidden="true">{initial}</span>
+      <Icon name="user" size={20} />
     {/if}
   </button>
 
@@ -103,18 +103,18 @@
     padding: 0;
     overflow: hidden;
     font: inherit;
-    font-size: 13px;
-    font-weight: 600;
     color: var(--text-muted);
-    background-color: var(--surface-2);
+    background-color: transparent;
     border: 0;
     border-radius: 50%;
-    box-shadow: inset 0 0 0 1px var(--border);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: box-shadow var(--duration-normal) var(--ease-out);
+    transition: box-shadow var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out);
   }
-  .avatar:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
+  /* The bare icon brightens on hover; a photo gets a hairline ring. */
+  .avatar:hover { color: var(--text-primary); }
+  .avatar.photo { box-shadow: inset 0 0 0 1px var(--border); }
+  .avatar.photo:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
   .avatar:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;

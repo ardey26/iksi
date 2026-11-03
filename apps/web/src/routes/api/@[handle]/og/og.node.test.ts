@@ -83,7 +83,9 @@ describe('og avatar', () => {
 		}
 	}, 30000);
 
-	it('falls back to initials and logs when the fetch fails', async () => {
+	it('draws no avatar and logs when the fetch fails: the same card as a profile without a photo', async () => {
+		h.avatarUrl = '';
+		const bare = await render();
 		h.avatarUrl = 'https://cdn.iksi.app/1/avatar/x.400.webp';
 		const err = vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('boom'); }));
@@ -92,5 +94,16 @@ describe('og avatar', () => {
 		const [r, g, b] = pixel(data, info, 600, 200);
 		// not the avatar red
 		expect(r > 200 && g < 60 && b < 60).toBe(false);
+		expect(Buffer.compare(data, bare.data)).toBe(0);
+	}, 30000);
+
+	it('starts a card without a photo with the name: no disc where the avatar would be', async () => {
+		h.avatarUrl = '';
+		const { data, info } = await render();
+		// A disc would fill x 520..680, y 72..232; its lower part, below the name and address
+		// once they move up, is plain background.
+		const bg = pixel(data, info, 20, 20);
+		expect(pixel(data, info, 600, 225)).toEqual(bg);
+		expect(pixel(data, info, 560, 215)).toEqual(bg);
 	}, 30000);
 });

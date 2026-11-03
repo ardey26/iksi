@@ -125,12 +125,6 @@
   $: placeholderName = data.user.twitterHandle ?? data.user.googleEmail?.split('@')[0] ?? 'Your name';
   $: previewName = displayName || data.user.twitterHandle || data.user.googleEmail?.split('@')[0] || 'You';
   $: previewHandle = data.user.handle || data.user.twitterHandle || 'you';
-  function initials(name: string) {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0].slice(0, 2).toLowerCase();
-    return (parts[0][0] + parts[1][0]).toLowerCase();
-  }
   const sampleRows = ['Website', 'Latest post', 'Newsletter'];
 </script>
 
@@ -216,10 +210,9 @@
       <div class="stage" style="{paletteStyle} background-color: var(--p-bg);{backgroundUrl ? ` background-image: url('${backgroundUrl}'); background-size: cover; background-position: center;` : ''}">
         <div class="card">
           <div class="card-head">
+            <!-- Like the public page: the photo, or nothing in its place. -->
             {#if avatarUrl}
               <img src={avatarUrl} alt="" class="avatar" />
-            {:else}
-              <div class="avatar initials" style="background: oklch(from {accent} 0.90 max(c, 0.08) h); color: var(--p-accent-text);">{initials(previewName)}</div>
             {/if}
             <div class="who">
               <div class="name">{previewName}</div>
@@ -434,14 +427,6 @@
     border: 1px solid var(--p-border);
     border-radius: 50%;
     object-fit: cover;
-  }
-  .initials {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 600;
-    border: 0;
   }
   .who { flex: 1; min-width: 0; }
   .name,

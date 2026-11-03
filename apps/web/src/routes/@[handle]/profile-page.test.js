@@ -125,3 +125,23 @@ describe('profile canonical after a way back from a subdomain', () => {
     expect(og).toBe(canonical);
   });
 });
+
+// No stand-in letters: a profile without a photo starts with the name.
+describe('public profile avatar', () => {
+  it('shows the photo when there is one', () => {
+    const { container } = render(Page, { data: { ...base, backgroundUrl: null } });
+    expect(container.querySelector('.head img.avatar')).toHaveAttribute('src', base.avatarUrl);
+  });
+
+  it('shows no avatar at all without a photo, and nothing in its place', () => {
+    const { container } = render(Page, { data: { ...base, avatarUrl: null, backgroundUrl: null } });
+    expect(container.querySelector('.avatar')).toBeNull();
+    expect(container.querySelector('.head').firstElementChild).toHaveClass('name');
+  });
+
+  it('drops a photo that fails to load', async () => {
+    const { container } = render(Page, { data: { ...base, backgroundUrl: null } });
+    await fireEvent.error(container.querySelector('.head img.avatar'));
+    expect(container.querySelector('.avatar')).toBeNull();
+  });
+});
