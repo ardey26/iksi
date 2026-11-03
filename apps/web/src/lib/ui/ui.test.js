@@ -13,6 +13,8 @@ import Segmented from './Segmented.svelte';
 import ChipGroup from './ChipGroup.svelte';
 import Logo from './Logo.svelte';
 import MediaIcon from './MediaIcon.svelte';
+import EmptyState from './EmptyState.svelte';
+import emptyStateSource from './EmptyState.svelte?raw';
 import Section from './Section.svelte';
 import RowHarness from './tests/RowHarness.svelte';
 import SheetHarness from './tests/SheetHarness.svelte';
@@ -325,6 +327,22 @@ describe('MediaIcon', () => {
     render(MediaIcon, { props: { name: 'qr', label: 'Bank QR' } });
     const img = screen.getByRole('img', { name: 'Bank QR' });
     expect(img.closest('.media-icon').style.getPropertyValue('--size')).toBe('40px');
+  });
+});
+
+// The icon stands on its own, like MediaIcon: no tile, fill or border.
+describe('EmptyState', () => {
+  it.each(['section', 'page'])('shows a bare 24px icon in the %s variant', (variant) => {
+    const { container } = render(EmptyState, { props: { icon: 'lock', title: 'Locked', variant } });
+    const svg = container.querySelector('.icon svg.lucide-lock');
+    expect(svg).toHaveAttribute('width', '24');
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('puts no tile behind the icon', () => {
+    const rules = [...emptyStateSource.matchAll(/\.icon\s*\{([^}]*)\}/g)].map((m) => m[1]);
+    expect(rules.length).toBeGreaterThan(0);
+    for (const r of rules) expect(r).not.toMatch(/background|border|box-shadow/);
   });
 });
 

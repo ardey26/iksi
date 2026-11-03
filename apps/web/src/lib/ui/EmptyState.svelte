@@ -15,10 +15,11 @@
 
 <div class="empty {variant}">
   {#if $$slots.media}
-    <!-- Artwork that brings its own shape (the brand mark): no tile. -->
+    <!-- Artwork that brings its own shape (the brand mark). -->
     <span class="media"><slot name="media" /></span>
   {:else}
-    <span class="icon"><Icon name={icon} size={20} /></span>
+    <!-- A bare icon, like MediaIcon: no tile, fill or border. -->
+    <span class="icon"><Icon name={icon} size={24} /></span>
   {/if}
   {#if variant === 'page'}
     <svelte:element this={`h${level}`} class="title t-title">{title}</svelte:element>
@@ -39,15 +40,8 @@
   }
   .icon {
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
     margin-bottom: 16px;
     color: var(--text-muted);
-    background-color: var(--surface-2);
-    border-radius: var(--radius-control);
-    box-shadow: inset 0 0 0 1px var(--border);
   }
   .title {
     margin: 0;
@@ -73,12 +67,7 @@
   .action { margin-top: 20px; }
 
   .page { padding: 16px 0 0; }
-  .page .icon {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 20px;
-    border-radius: 14px;
-  }
+  .page .icon { margin-bottom: 20px; }
   .page .media { margin-bottom: 20px; }
   .page .title {
     font-size: 20px;
