@@ -73,3 +73,40 @@ describe('dashboard connected apps', () => {
     expect(view.getByRole('list', { name: 'API keys' })).toHaveTextContent('Laptop');
   });
 });
+
+describe('dashboard your page row', () => {
+  const page = (user) =>
+    render(Page, { props: { data: { user: { id: 1, handle: 'ana', profileId: 3, ...user }, apiKeys: [], streamed: null, subdomains: false } } });
+  const row = (view) => view.getByRole('list', { name: 'Your page' }).querySelector('li');
+
+  it("leads with the owner's avatar, as a round image", () => {
+    const view = page({ avatarUrl: 'https://cdn.example.com/a.webp' });
+    const img = row(view).querySelector('.leading img');
+    expect(img).toHaveAttribute('src', 'https://cdn.example.com/a.webp');
+    expect(img).toHaveClass('avatar');
+  });
+
+  it('has no leading media without an avatar, and no letter in its place', () => {
+    const view = page({ avatarUrl: null });
+    expect(row(view).querySelector('.leading')).toBeNull();
+    expect(row(view).querySelector('.title')).toHaveTextContent('iksi.app/@ana');
+  });
+
+  it('drops the avatar when it fails to load', async () => {
+    const view = page({ avatarUrl: 'https://cdn.example.com/gone.webp' });
+    await fireEvent.error(row(view).querySelector('.leading img'));
+    expect(row(view).querySelector('.leading')).toBeNull();
+  });
+});
+
+describe('dashboard manage rows', () => {
+  it('lead with a bare icon, not an icon on a tile', () => {
+    const view = render(Page, { props: { data: { user: { id: 1, handle: 'ana', profileId: 3 }, apiKeys: [], streamed: null, subdomains: false } } });
+    const rows = view.getByRole('navigation', { name: 'Manage' }).querySelectorAll('li');
+    expect(rows).toHaveLength(2);
+    for (const r of rows) {
+      expect(r.querySelector('.leading svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(r.querySelector('.tile')).toBeNull();
+    }
+  });
+});

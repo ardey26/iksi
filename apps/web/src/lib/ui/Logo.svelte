@@ -1,6 +1,6 @@
 <script>
   // Brand logos sit directly on the surface: transparent artwork, no chip.
-  // A round mark gets a square box, so it aligns with monograms; a wordmark
+  // A round mark gets a square box, the same as a MediaIcon's; a wordmark
   // (a logo that spells the name) gets a wide box of the same height class,
   // and the name beside it is visually hidden rather than repeated.
   export let src;
@@ -18,7 +18,8 @@
 </script>
 
 <span class="logo" class:wordmark style="--w: {w}px; --h: {h}px; --inset: {inset};">
-  <img {src} {alt} width={w} height={h} loading="lazy" decoding="async" />
+  <!-- load and error are forwarded, so a screen can swap out artwork that fails. -->
+  <img {src} {alt} width={w} height={h} loading="lazy" decoding="async" on:load on:error />
 </span>
 
 <style>

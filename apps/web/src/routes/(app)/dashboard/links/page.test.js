@@ -320,3 +320,54 @@ describe('links page groups and order', () => {
     expect(screen.getByText('Nothing on your page yet')).toBeInTheDocument();
   });
 });
+
+// Leading marks show something real (the destination's favicon) or a bare
+// icon that says what the row is; never a letter on a tile.
+describe('links page marks', () => {
+  const mark = (row) => row.querySelector('.mark');
+
+  it('marks a one-time link with a flame, a decorative icon the row text already names', () => {
+    renderPage([link(4, { shortURL: 'OneTime4', originalURL: '', oneTime: { kind: 'url', state: 'unopened' } })]);
+    const m = mark(rowOf('iksi.app/OneTime4'));
+    expect(m.querySelector('svg.lucide-flame')).toHaveAttribute('aria-hidden', 'true');
+    expect(m.querySelector('img')).toBeNull();
+    expect(m).toHaveTextContent(/^$/);
+  });
+
+  it("marks a link with its destination's favicon", () => {
+    renderPage([link(6)]);
+    const m = mark(rowOf('iksi.app/s6'));
+    expect(m.querySelector('img').getAttribute('src')).toContain('example.com');
+    expect(m.querySelector('svg')).toBeNull();
+  });
+
+  it('marks a link without a favicon with a bare link icon', async () => {
+    renderPage([link(7, { originalURL: 'http://localhost/a' })]);
+    const m = mark(rowOf('iksi.app/s7'));
+    expect(m.querySelector('svg.lucide-link')).toHaveAttribute('aria-hidden', 'true');
+    expect(m).toHaveTextContent(/^$/);
+  });
+
+  // Google answers an unknown site with a generic 16px globe (and a 404 the
+  // img cannot see): a placeholder, so it gets the link icon too.
+  it.each([
+    [16, 'svg.lucide-link'],
+    [64, 'img']
+  ])('treats a %ipx favicon as %s', async (width, shown) => {
+    renderPage([link(9, { originalURL: 'https://unknown-shop.example.ph/a' })]);
+    const m = mark(rowOf('iksi.app/s9'));
+    const img = m.querySelector('img');
+    Object.defineProperty(img, 'naturalWidth', { configurable: true, value: width });
+    await fireEvent.load(img);
+    await waitFor(() => expect(m.querySelector(shown)).not.toBeNull());
+    expect(m.querySelectorAll('img, svg')).toHaveLength(1);
+  });
+
+  it('falls back to the link icon when the favicon fails to load', async () => {
+    renderPage([link(8, { originalURL: 'https://broken.example.net/a' })]);
+    const m = mark(rowOf('iksi.app/s8'));
+    await fireEvent.error(m.querySelector('img'));
+    await waitFor(() => expect(m.querySelector('svg.lucide-link')).not.toBeNull());
+    expect(m.querySelector('img')).toBeNull();
+  });
+});

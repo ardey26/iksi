@@ -12,6 +12,7 @@ import Switch from './Switch.svelte';
 import Segmented from './Segmented.svelte';
 import ChipGroup from './ChipGroup.svelte';
 import Logo from './Logo.svelte';
+import MediaIcon from './MediaIcon.svelte';
 import Section from './Section.svelte';
 import RowHarness from './tests/RowHarness.svelte';
 import SheetHarness from './tests/SheetHarness.svelte';
@@ -306,6 +307,24 @@ describe('Logo', () => {
     const img = screen.getByAltText('Maya');
     expect(img).toHaveAttribute('width', w.replace('px', ''));
     expect(img).toHaveAttribute('height', h.replace('px', ''));
+  });
+});
+
+describe('MediaIcon', () => {
+  it('is a bare icon centred in the same box as a Logo, so text columns line up', () => {
+    const { container } = render(MediaIcon, { props: { name: 'flame', size: 32 } });
+    const box = container.querySelector('.media-icon');
+    expect(box.style.getPropertyValue('--size')).toBe('32px');
+    const svg = box.querySelector('svg.lucide-flame');
+    expect(svg).toHaveAttribute('width', '18');
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
+    expect(box).toHaveTextContent(/^$/);
+  });
+
+  it('is 40 by default and can carry an accessible name', () => {
+    render(MediaIcon, { props: { name: 'qr', label: 'Bank QR' } });
+    const img = screen.getByRole('img', { name: 'Bank QR' });
+    expect(img.closest('.media-icon').style.getPropertyValue('--size')).toBe('40px');
   });
 });
 

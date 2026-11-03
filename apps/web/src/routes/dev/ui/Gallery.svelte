@@ -10,7 +10,7 @@
     Input,
     List,
     Logo,
-    Monogram,
+    MediaIcon,
     PageHeader,
     Paper,
     Row,
@@ -99,7 +99,7 @@
   </PageHeader>
 
   <!-- Composed examples first: they are what the screens will look like. -->
-  <Section title="Example: dashboard payments" description="Section, Paper, List, Row, Logo, Monogram, IconButton, Button, Segmented.">
+  <Section title="Example: dashboard payments" description="Section, Paper, List, Row, Logo, MediaIcon, IconButton, Button, Segmented.">
     <Stack gap={24}>
       <Segmented
         size="sm"
@@ -321,7 +321,7 @@
     </Stack>
   </Section>
 
-  <Section title="Badge, Logo, Monogram">
+  <Section title="Badge, Logo, MediaIcon">
     <Stack gap={24}>
       <Specimen label="Badge">
         <Badge>Neutral</Badge>
@@ -331,15 +331,16 @@
         <Badge variant="error">Flagged</Badge>
         <Badge>1,284</Badge>
       </Specimen>
-      <Specimen label="Logo (no chip), wordmark (wide box) and Monogram, 40 and 32">
+      <Specimen label="Logo (no chip), wordmark (wide box) and MediaIcon (no logo: a bare icon, no tile), 40 and 32">
         <Logo src="/brands/gcash.svg" alt="GCash" />
         <Logo src="/brands/maya.svg" alt="Maya" wordmark />
         <Logo src="/brands/maribank.png" alt="MariBank" />
-        <Monogram name="BPI" />
-        <Monogram name="paypal" />
+        <MediaIcon name="qr" label="Bank QR" />
+        <MediaIcon name="wallet" label="Payment link" />
         <Logo src="/brands/gcash.svg" alt="GCash" size={32} />
         <Logo src="/brands/maya.svg" alt="Maya" size={32} wordmark />
-        <Monogram name="Union Bank" size={32} />
+        <MediaIcon name="link" label="Link" size={32} />
+        <MediaIcon name="flame" label="One-time link" size={32} />
       </Specimen>
     </Stack>
   </Section>
@@ -348,11 +349,11 @@
     <Paper padding="none">
       <List label="Top links">
         <Row interactive title="iksi.app/sale" subtitle="shop.mariasantos.ph">
-          <Monogram slot="leading" name="shop" />
+          <MediaIcon slot="leading" name="link" />
           <svelte:fragment slot="meta">12,480</svelte:fragment>
         </Row>
         <Row interactive subtitle="docs.google.com, expires Oct 15">
-          <Monogram slot="leading" name="docs" />
+          <MediaIcon slot="leading" name="link" />
           <span class="t-mono">iksi.app/q3</span>
           <svelte:fragment slot="meta">1,284</svelte:fragment>
           <svelte:fragment slot="actions">
@@ -360,7 +361,7 @@
           </svelte:fragment>
         </Row>
         <Row title="A very long title that has to truncate before it reaches the trailing meta and actions" subtitle="youtube.com/watch?v=dQw4w9WgXcQ&list=PL1234567890abcdef">
-          <Monogram slot="leading" name="YouTube" />
+          <MediaIcon slot="leading" name="link" />
           <svelte:fragment slot="meta">48</svelte:fragment>
           <svelte:fragment slot="actions">
             <IconButton icon="copy" label="Copy" />
@@ -368,7 +369,7 @@
           </svelte:fragment>
         </Row>
         <Row muted title="iksi.app/old" subtitle="Disabled 2 days ago">
-          <Monogram slot="leading" name="old" />
+          <MediaIcon slot="leading" name="link" />
           <svelte:fragment slot="meta">0</svelte:fragment>
         </Row>
       </List>
@@ -381,7 +382,7 @@
         <Row title={item.path} subtitle={item.host}>
           <svelte:fragment slot="leading">
             <DragHandle {handle} />
-            <Monogram name={item.host} />
+            <MediaIcon name="link" />
           </svelte:fragment>
           <svelte:fragment slot="meta">{item.clicks}</svelte:fragment>
         </Row>
@@ -405,9 +406,9 @@
       </Paper>
       <Paper padding="none">
         <List label="Loaded">
-          <Row title="iksi.app/sale" subtitle="shop.mariasantos.ph"><Monogram slot="leading" name="shop" /><svelte:fragment slot="meta">12,480</svelte:fragment></Row>
-          <Row title="iksi.app/q3" subtitle="docs.google.com"><Monogram slot="leading" name="docs" /><svelte:fragment slot="meta">1,284</svelte:fragment></Row>
-          <Row title="iksi.app/yt" subtitle="youtube.com/@mariasantos"><Monogram slot="leading" name="yt" /><svelte:fragment slot="meta">48</svelte:fragment></Row>
+          <Row title="iksi.app/sale" subtitle="shop.mariasantos.ph"><MediaIcon slot="leading" name="link" /><svelte:fragment slot="meta">12,480</svelte:fragment></Row>
+          <Row title="iksi.app/q3" subtitle="docs.google.com"><MediaIcon slot="leading" name="link" /><svelte:fragment slot="meta">1,284</svelte:fragment></Row>
+          <Row title="iksi.app/yt" subtitle="youtube.com/@mariasantos"><MediaIcon slot="leading" name="link" /><svelte:fragment slot="meta">48</svelte:fragment></Row>
         </List>
       </Paper>
     </div>

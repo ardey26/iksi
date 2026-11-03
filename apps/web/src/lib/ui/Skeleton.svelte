@@ -5,7 +5,7 @@
   export let width = '100%';
   /** CSS length; match the line-height of the text it stands in for. */
   export let height = '16px';
-  /** text | block | circle | square (logo, monogram) */
+  /** text | block | circle | square (logo, favicon) */
   export let shape = 'text';
 </script>
 

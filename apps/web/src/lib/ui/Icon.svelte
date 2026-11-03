@@ -9,10 +9,12 @@
   import CircleCheck from 'lucide-svelte/icons/circle-check';
   import Clock from 'lucide-svelte/icons/clock';
   import Copy from 'lucide-svelte/icons/copy';
+  import CircleUser from 'lucide-svelte/icons/circle-user';
   import Ellipsis from 'lucide-svelte/icons/ellipsis';
   import ExternalLink from 'lucide-svelte/icons/external-link';
   import Eye from 'lucide-svelte/icons/eye';
   import EyeOff from 'lucide-svelte/icons/eye-off';
+  import Flame from 'lucide-svelte/icons/flame';
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import Inbox from 'lucide-svelte/icons/inbox';
   import Info from 'lucide-svelte/icons/info';
@@ -43,6 +45,7 @@
     'external': ExternalLink,
     'eye': Eye,
     'eye-off': EyeOff,
+    'flame': Flame,
     'grip': GripVertical,
     'inbox': Inbox,
     'info': Info,
@@ -57,6 +60,7 @@
     'sun': Sun,
     'trash': Trash,
     'type': Type,
+    'user': CircleUser,
     'wallet': Wallet,
     'x': X
   };

@@ -15,7 +15,7 @@
     Input,
     List,
     Logo,
-    Monogram,
+    MediaIcon,
     PageHeader,
     Paper,
     Row,
@@ -91,12 +91,14 @@
   }
 
   // Favicon URLs are memoized per host (and the browser's HTTP cache dedupes
-  // requests for the same host). A host whose icon fails gets a monogram.
+  // requests for the same host). A host whose icon fails gets a bare link icon.
   const _faviconByHost = new Map<string, string | null>();
+  // Passed in from the markup, so the row re-renders when a host breaks (a
+  // variable read only inside a function is not tracked).
   let brokenHosts = new Set<string>();
-  function faviconOf(u: string): string | null {
+  function faviconOf(u: string, broken: Set<string>): string | null {
     const host = hostOf(u);
-    if (!host || !host.includes('.') || brokenHosts.has(host)) return null;
+    if (!host || !host.includes('.') || broken.has(host)) return null;
     const cached = _faviconByHost.get(host);
     if (cached !== undefined) return cached;
     const url = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
@@ -105,6 +107,12 @@
   }
   function onFaviconError(u: string) {
     brokenHosts = new Set([...brokenHosts, hostOf(u)]);
+  }
+  // Google answers a site it has no icon for with a generic 16px globe (on a
+  // 404 the img cannot see). That is a placeholder, not the site's icon.
+  function onFaviconLoad(u: string, e: Event) {
+    const img = e.target;
+    if (img instanceof HTMLImageElement && img.naturalWidth <= 16) onFaviconError(u);
   }
 
   async function copy(l: Link) {
@@ -412,13 +420,20 @@
 
 {#snippet leading(l: Link, handle: unknown)}
   {#if handle}<DragHandle {handle} />{/if}
-  <span class="mark" on:error|capture={() => onFaviconError(l.originalURL)}>
+  <span class="mark">
+    <!-- Decorative: the row's own text says what the link is. -->
     {#if l.oneTime}
-      <Monogram size={32} name={l.oneTime.kind === 'url' ? 'URL' : 'Text'} />
-    {:else if faviconOf(l.originalURL)}
-      <Logo size={32} inset={0.2} src={faviconOf(l.originalURL)} />
+      <MediaIcon size={32} name="flame" />
+    {:else if faviconOf(l.originalURL, brokenHosts)}
+      <Logo
+        size={32}
+        inset={0.2}
+        src={faviconOf(l.originalURL, brokenHosts)}
+        on:load={(e) => onFaviconLoad(l.originalURL, e)}
+        on:error={() => onFaviconError(l.originalURL)}
+      />
     {:else}
-      <Monogram size={32} name={hostOf(l.originalURL) || l.shortURL} />
+      <MediaIcon size={32} name="link" />
     {/if}
   </span>
 {/snippet}

@@ -10,7 +10,7 @@
   /** Dim the row while it is being removed or is unavailable. */
   export let muted = false;
   /**
-   * Fixed width of the `media` slot (logo, wordmark, monogram), left-aligned,
+   * Fixed width of the `media` slot (logo, wordmark, MediaIcon), left-aligned,
    * so the text column lines up across rows whose media differ in width:
    * 64 for 40px media (a wordmark's wide box), 48 for 32px.
    */

@@ -7,7 +7,7 @@
     IconButton,
     Input,
     List,
-    Monogram,
+    MediaIcon,
     Paper,
     Row,
     Segmented,
@@ -55,7 +55,7 @@
 <Paper padding="none">
   <List label="Links">
     <Row>
-      <Monogram slot="leading" name="shop" />
+      <MediaIcon slot="leading" name="link" />
       <span class="t-mono">iksi.app/sale</span>
       <svelte:fragment slot="subtitle">shop.mariasantos.ph</svelte:fragment>
       <svelte:fragment slot="meta">1,284</svelte:fragment>

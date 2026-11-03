@@ -40,7 +40,7 @@
   $: shown = picking ? methods.filter((m) => m.id === selected) : methods;
   $: cols = methods.length <= 3 ? methods.length : methods.length === 4 ? 2 : 3;
   $: current = shown[0];
-  // Links have no bank, so they always get a monogram of the service name.
+  // Links have no bank: they get their provider's logo, or a wallet icon.
   const institutionOf = (m: PublicPayMethod) => (m.kind === 'qr' ? m.institution : null);
 
   $: title = label === 'tip' ? `Send ${displayName} a tip` : `Pay ${displayName}`;

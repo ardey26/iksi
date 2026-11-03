@@ -145,14 +145,25 @@ describe('PayButton', () => {
     expect(who).toHaveTextContent('Shop');
   });
 
-  it('marks a QR from an unknown bank with a monogram of its label', async () => {
+  it('marks a QR from an unknown bank with a bare QR icon beside its label', async () => {
     render(PayButton, { props: props({ methods: [qr] }) });
     await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
     await screen.findByAltText('Payment QR for Juan Dela Cruz');
     const who = document.querySelector('.pay-who');
     expect(who.querySelector('img')).toBeNull();
-    expect(who.querySelector('.pay-monogram')).toHaveTextContent('B');
+    const mark = who.querySelector('.pay-mark');
+    expect(mark.querySelector('svg.lucide-qr-code')).toHaveAttribute('aria-hidden', 'true');
+    expect(mark).toHaveTextContent(/^$/);
     expect(who).toHaveTextContent('Bank QR');
+  });
+
+  it('marks a payment link whose provider has no logo with a bare wallet icon', async () => {
+    render(PayButton, { props: props({ methods: [{ id: 'l2', kind: 'link', provider: 'venmo', url: 'https://venmo.com/u/ana' }] }) });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    const mark = document.querySelector('.pay-who .pay-mark');
+    expect(mark.querySelector('img')).toBeNull();
+    expect(mark.querySelector('svg.lucide-wallet')).toHaveAttribute('aria-hidden', 'true');
+    expect(mark).toHaveTextContent(/^$/);
   });
 
   it('shows no picker with one method', async () => {
@@ -166,7 +177,7 @@ describe('PayButton', () => {
     const many = () => props({ methods: [gcash, qr, paypal] });
     beforeEach(() => fetchMock.mockResolvedValue(ok({ payloads: { q1: PAYLOAD, q2: 'GCASHPAYLOAD' } })));
 
-    it('offers a picker keyed by each method label, with its logo or monogram', async () => {
+    it('offers a picker keyed by each method label, with its logo or icon', async () => {
       render(PayButton, { props: many() });
       await fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
       const picker = screen.getByRole('radiogroup', { name: 'Payment method' });
@@ -177,7 +188,7 @@ describe('PayButton', () => {
         'src',
         '/brands/gcash.svg'
       );
-      expect(within(picker).getByRole('radio', { name: 'Bank QR' }).labels[0].querySelector('.pay-monogram')).toHaveTextContent('B');
+      expect(within(picker).getByRole('radio', { name: 'Bank QR' }).labels[0].querySelector('.pay-mark svg.lucide-qr-code')).not.toBeNull();
       expect(within(picker).getByRole('radio', { name: 'PayPal' })).toBeInTheDocument();
     });
 

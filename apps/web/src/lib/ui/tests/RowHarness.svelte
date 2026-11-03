@@ -1,7 +1,7 @@
 <script>
   import Row from '../Row.svelte';
   import Logo from '../Logo.svelte';
-  import Monogram from '../Monogram.svelte';
+  import MediaIcon from '../MediaIcon.svelte';
 
   export let mediaWidth = undefined;
   export let wrapSubtitle = false;
@@ -15,7 +15,7 @@
   <Row title="Maya" subtitle="Quezon City, Philippines" {mediaWidth} {wrapSubtitle}>
     <Logo slot="media" src="/brands/maya.svg" wordmark />
   </Row>
-  <Row title="PayPal" {mediaWidth}>
-    <Monogram slot="media" name="PayPal" />
+  <Row title="Venmo" {mediaWidth}>
+    <MediaIcon slot="media" name="wallet" />
   </Row>
 </ul>

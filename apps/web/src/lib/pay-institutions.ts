@@ -10,7 +10,7 @@ export interface Institution {
 	/** Stable id, saved with each method. Never change one once shipped. */
 	id: string;
 	name: string;
-	/** A trademark, shown only to say which app the QR is for. Banks without one get a monogram. */
+	/** A trademark, shown only to say which app the QR is for. Banks without one get a QR icon. */
 	logo?: string;
 	/** Natural aspect of the logo, as width / height. 1 when unset. */
 	aspect?: number;
@@ -56,7 +56,7 @@ const BIC_KEYED = new Set(Object.values(BY_BIC).map((i) => i.id).filter((id) => 
 /**
  * Logos for payment link providers (#lib/pay-methods PayProvider), kept apart
  * from the banks so a QR can never be saved as one. Providers without an entry
- * get a monogram. PayPal's is its official mark, from paypalobjects.com.
+ * get a wallet icon. PayPal's is its official mark, from paypalobjects.com.
  */
 const PROVIDER_BRANDS: Record<string, Institution> = {
 	paypal: { id: 'paypal', name: 'PayPal', logo: '/brands/paypal.svg', aspect: 1 }
@@ -126,10 +126,4 @@ export function logoSpellsName(id: unknown, label: string): boolean {
 
 export function defaultQrLabel(institution: Institution | null): string {
 	return institution?.name ?? FALLBACK_QR_LABEL;
-}
-
-/** The badge letter for a method without a logo: the label's first letter or digit. */
-export function monogramOf(label: string): string {
-	const ch = label.match(/[\p{L}\p{N}]/u)?.[0];
-	return ch ? ch.toLocaleUpperCase('en') : '?';
 }

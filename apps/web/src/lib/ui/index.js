@@ -11,7 +11,7 @@ export { default as IconButton } from './IconButton.svelte';
 export { default as Input } from './Input.svelte';
 export { default as List } from './List.svelte';
 export { default as Logo } from './Logo.svelte';
-export { default as Monogram } from './Monogram.svelte';
+export { default as MediaIcon } from './MediaIcon.svelte';
 export { default as PageHeader } from './PageHeader.svelte';
 export { default as Paper } from './Paper.svelte';
 export { default as Row } from './Row.svelte';

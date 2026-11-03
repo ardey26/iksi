@@ -43,15 +43,26 @@ describe('PaymentMethods', () => {
       expect(screen.getByText('paypal.me/ana')).toHaveAttribute('title', 'https://paypal.me/ana');
     });
 
-    it("marks a known bank's QR with its logo and an unknown bank's with a monogram", () => {
+    it("marks a known bank's QR with its logo and an unknown bank's with a bare QR icon", () => {
       const { container } = render(PaymentMethods, { props: { methods: [gcash, qr], label: 'pay' } });
       const [first, second] = container.querySelectorAll('li');
       expect(first.querySelector('img')).toHaveAttribute('src', '/brands/gcash.svg');
       expect(first).toHaveTextContent('Pays to Ana Reyes');
       expect(second.querySelector('img')).toBeNull();
-      // A monogram, not a logo: the label's first letter on its own tile.
-      expect(second.querySelector('[aria-hidden="true"]:not(svg)')).toHaveTextContent(/^B$/);
+      // No letter on a tile: an icon that says it is a QR, decorative beside the label.
+      const media = second.querySelector('.media');
+      expect(media.querySelector('svg.lucide-qr-code')).toHaveAttribute('aria-hidden', 'true');
+      expect(media).toHaveTextContent(/^$/);
       expect(screen.getByRole('button', { name: 'Remove GCash' })).toBeInTheDocument();
+    });
+
+    it('marks a payment link whose provider has no logo with a bare wallet icon', () => {
+      const wise = { id: 'l2', kind: 'link', provider: 'wise', url: 'https://wise.com/pay/me/ana' };
+      const { container } = render(PaymentMethods, { props: { methods: [wise], label: 'pay' } });
+      const media = container.querySelector('li .media');
+      expect(media.querySelector('img')).toBeNull();
+      expect(media.querySelector('svg.lucide-wallet')).toHaveAttribute('aria-hidden', 'true');
+      expect(media).toHaveTextContent(/^$/);
     });
 
     it("marks a payment link with its provider's logo", () => {

@@ -11,7 +11,7 @@
     IconButton,
     Input,
     Logo,
-    Monogram,
+    MediaIcon,
     Paper,
     Row,
     Section,
@@ -241,14 +241,15 @@
         {:else}
           <SortableList label="Payment methods" items={methods} name={methodTitle} disabled={busy || editing !== null} on:reorder={saveOrder} let:item={m} let:handle>
             {@const logo = logoOf(m)}
-            <!-- One media width for logos, wordmarks and monograms, so the text lines up. -->
+            <!-- One media width for logos, wordmarks and icons, so the text lines up. -->
             <Row muted={busy && confirming === m.id} mediaWidth={64} wrapSubtitle={m.kind === 'qr'}>
               <DragHandle slot="leading" {handle} />
               <svelte:fragment slot="media">
                 {#if logo}
                   <Logo src={logo.logo} wordmark={!!logo.wordmark} />
                 {:else}
-                  <Monogram name={methodTitle(m)} />
+                  <!-- No logo: what it is, a QR or a payment link; the label beside it names it. -->
+                  <MediaIcon name={m.kind === 'qr' ? 'qr' : 'wallet'} />
                 {/if}
               </svelte:fragment>
 

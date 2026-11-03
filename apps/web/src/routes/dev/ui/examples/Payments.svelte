@@ -8,7 +8,7 @@
     IconButton,
     List,
     Logo,
-    Monogram,
+    MediaIcon,
     Paper,
     Row,
     Section,
@@ -27,7 +27,7 @@
     { id: 'maya', name: 'Maya', detail: 'Pays to Maria Santos', logo: '/brands/maya.svg', wordmark: true },
     { id: 'maribank', name: 'MariBank', detail: 'Pays to Maria Santos', logo: '/brands/maribank.png' },
     { id: 'bpi', name: 'BPI', detail: 'Pays to Maria Santos, savings' },
-    { id: 'paypal', name: 'PayPal', detail: 'paypal.me/mariasantos' }
+    { id: 'paypal', name: 'PayPal', detail: 'paypal.me/mariasantos', logo: '/brands/paypal.svg' }
   ];
 
   let methods = START.slice();
@@ -116,7 +116,7 @@
               {#if m.logo}
                 <Logo src={m.logo} wordmark={m.wordmark} />
               {:else}
-                <Monogram name={m.name} />
+                <MediaIcon name="qr" />
               {/if}
             </svelte:fragment>
             <svelte:fragment slot="actions">

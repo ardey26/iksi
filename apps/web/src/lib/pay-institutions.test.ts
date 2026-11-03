@@ -5,7 +5,6 @@ import {
 	identifyInstitution,
 	institutionById,
 	logoSpellsName,
-	monogramOf,
 	normalizeBic,
 	storedInstitution
 } from './pay-institutions';
@@ -113,23 +112,6 @@ describe('storedInstitution', () => {
 	it('ignores what it does not know', () => {
 		expect(storedInstitution('bpi')).toBeNull();
 		expect(storedInstitution(null)).toBeNull();
-	});
-});
-
-describe('monogramOf', () => {
-	it('is the first letter of the label, in capitals', () => {
-		expect(monogramOf('Bank QR')).toBe('B');
-		expect(monogramOf('shop')).toBe('S');
-	});
-
-	it('skips leading marks and spaces', () => {
-		expect(monogramOf('  #1 tindahan')).toBe('1');
-		expect(monogramOf('"Ñora"')).toBe('Ñ');
-	});
-
-	it('is a neutral mark when the label has no letter', () => {
-		expect(monogramOf('')).toBe('?');
-		expect(monogramOf('---')).toBe('?');
 	});
 });
 

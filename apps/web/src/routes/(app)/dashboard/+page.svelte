@@ -6,7 +6,6 @@
     Icon,
     IconButton,
     List,
-    Monogram,
     PageHeader,
     Paper,
     Row,
@@ -22,6 +21,9 @@
   $: subdomains = !!data.subdomains;
   $: handle = data.user.handle as string | null;
   $: publicUrl = handle ? profileLabel(handle, subdomains) : null;
+  // The row leads with the owner's photo, or with nothing: never a stand-in.
+  let avatarBroken = false;
+  $: avatar = !avatarBroken ? ((data.user.avatarUrl as string | null | undefined) ?? null) : null;
 
   async function copyPublicUrl() {
     if (!handle) return;
@@ -47,6 +49,10 @@
 
 <svelte:head><title>Dashboard — iksi</title></svelte:head>
 
+{#snippet address(handle: string)}
+  <a class="address t-mono" href={profileHref(handle, subdomains)} target="_blank" rel="noopener">{publicUrl}</a>
+{/snippet}
+
 <Container width="wide">
   <PageHeader title="Dashboard" description="Your public page, your links and the keys that use them.">
     <svelte:fragment slot="actions">
@@ -58,14 +64,24 @@
     <Section title="Your page" description="Share it anywhere. Traffic counts every visit since you joined.">
       <Paper padding="none">
         <List label="Your page">
-          <Row>
-            <Monogram slot="leading" name={handle} />
-            <a class="address t-mono" href={profileHref(handle, subdomains)} target="_blank" rel="noopener">{publicUrl}</a>
-            <svelte:fragment slot="subtitle">Public page</svelte:fragment>
-            <svelte:fragment slot="actions">
-              <IconButton icon="copy" label="Copy link" on:click={copyPublicUrl} />
-            </svelte:fragment>
-          </Row>
+          {#if avatar}
+            <Row>
+              <img slot="leading" class="avatar" src={avatar} alt="" width="40" height="40" on:error={() => (avatarBroken = true)} />
+              {@render address(handle)}
+              <svelte:fragment slot="subtitle">Public page</svelte:fragment>
+              <svelte:fragment slot="actions">
+                <IconButton icon="copy" label="Copy link" on:click={copyPublicUrl} />
+              </svelte:fragment>
+            </Row>
+          {:else}
+            <Row>
+              {@render address(handle)}
+              <svelte:fragment slot="subtitle">Public page</svelte:fragment>
+              <svelte:fragment slot="actions">
+                <IconButton icon="copy" label="Copy link" on:click={copyPublicUrl} />
+              </svelte:fragment>
+            </Row>
+          {/if}
         </List>
 
         {#if data.streamed?.stats}
@@ -107,7 +123,7 @@
         <List>
           {#each MANAGE as item (item.href)}
             <Row interactive style="position: relative;">
-              <span slot="leading" class="tile"><Icon name={item.icon} /></span>
+              <span slot="leading" class="lead-icon"><Icon name={item.icon} size={20} /></span>
               <a class="stretch" href={item.href}>{item.title}</a>
               <svelte:fragment slot="subtitle">{item.desc}</svelte:fragment>
               <span slot="meta" class="chevron"><Icon name="chevron-right" /></span>
@@ -165,16 +181,19 @@
     padding: 0 16px;
   }
 
-  .tile {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  .avatar {
+    display: block;
+    flex: none;
     width: 40px;
     height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  /* A bare icon: no tile, fill or border. */
+  .lead-icon {
+    display: inline-flex;
     color: var(--text-muted);
-    background-color: var(--surface-2);
-    border-radius: var(--radius-control);
-    box-shadow: inset 0 0 0 1px var(--border);
   }
   .stretch {
     color: inherit;
