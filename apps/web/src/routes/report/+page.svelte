@@ -46,7 +46,7 @@
     <Button variant="secondary" size="lg" full href={home}>Go to iksi</Button>
   </Interstitial>
 {:else}
-  <Container width="narrow" class="report-page">
+  <Container width="form" class="report-page">
     <PageHeader
       title="Report a link"
       description="Tell us about a short link that leads to phishing, malware or other harm. No account needed."

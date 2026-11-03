@@ -47,7 +47,7 @@
 
 <svelte:head><title>Dashboard — iksi</title></svelte:head>
 
-<Container width="form">
+<Container width="wide">
   <PageHeader title="Dashboard" description="Your public page, your links and the keys that use them.">
     <svelte:fragment slot="actions">
       <Button variant="primary" icon="plus" href="/dashboard/links#new">New link</Button>

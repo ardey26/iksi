@@ -58,52 +58,57 @@
 
 <svelte:head><title>Claim your handle — iksi</title></svelte:head>
 
-<Container width="narrow" class="claim">
+<Container width="wide" class="claim">
   <PageHeader title="Claim your handle" description="It's the address of your public page." />
 
-  <Paper as="form" on:submit={(e) => { e.preventDefault(); submit(); }}>
-    <Stack gap={16}>
-      <Field
-        label="Handle"
-        error={shown}
-        hint="3 to 30 characters: lowercase letters, numbers and hyphens."
-        let:id
-        let:describedby
-        let:invalid
-      >
-        <div class="ui-box" data-invalid={invalid || undefined}>
-          <span class="ui-affix">iksi.app/@</span>
-          <input
-            data-ui
-            class="ui-native"
-            {id}
-            type="text"
-            value={handle}
-            on:input={onInput}
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            required
-            minlength="3"
-            maxlength="30"
-            placeholder="handle"
-            aria-describedby={describedby}
-            aria-invalid={invalid || undefined}
-          />
-        </div>
-      </Field>
+  <!-- The dashboard's wide column, so the header sits where it does on every
+       dashboard screen; the form itself stays narrow, on the left. -->
+  <div class="claim-form">
+    <Paper as="form" on:submit={(e) => { e.preventDefault(); submit(); }}>
+      <Stack gap={16}>
+        <Field
+          label="Handle"
+          error={shown}
+          hint="3 to 30 characters: lowercase letters, numbers and hyphens."
+          let:id
+          let:describedby
+          let:invalid
+        >
+          <div class="ui-box" data-invalid={invalid || undefined}>
+            <span class="ui-affix">iksi.app/@</span>
+            <input
+              data-ui
+              class="ui-native"
+              {id}
+              type="text"
+              value={handle}
+              on:input={onInput}
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              required
+              minlength="3"
+              maxlength="30"
+              placeholder="handle"
+              aria-describedby={describedby}
+              aria-invalid={invalid || undefined}
+            />
+          </div>
+        </Field>
 
-      <Button type="submit" variant="primary" size="lg" full {loading} disabled={!valid}>
-        Claim @{handle || 'handle'}
-      </Button>
-    </Stack>
-  </Paper>
+        <Button type="submit" variant="primary" size="lg" full {loading} disabled={!valid}>
+          Claim @{handle || 'handle'}
+        </Button>
+      </Stack>
+    </Paper>
+  </div>
 </Container>
 
 <style>
   /* Onboarding sits a little lower than app pages. */
   :global(.claim) { padding-top: 24px; }
+  .claim-form { max-width: var(--width-narrow); }
   /* The prefix reads as one address with the typed handle. */
   .ui-box > .ui-affix { color: var(--text-muted); margin-right: -8px; }
 </style>

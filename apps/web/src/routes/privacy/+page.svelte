@@ -31,7 +31,7 @@
   const title = (id) => SECTIONS.find((s) => s.id === id).title;
 </script>
 
-<Container class="policy">
+<Container width="form" class="policy">
   <PageHeader title="Privacy" description="Last updated {UPDATED}" />
 
   <p class="lead">
@@ -305,9 +305,8 @@
 </Container>
 
 <style>
-  /* A readable column: the form width, narrowed to about 680 for prose. */
+  /* The reading width, shared with /report. */
   :global(.page-column.form.policy) {
-    max-width: calc(680px + var(--gutter) * 2);
     padding-top: clamp(24px, 8vh, 80px);
     padding-bottom: 96px;
   }
