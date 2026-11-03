@@ -196,9 +196,13 @@ describe('manifest', () => {
   const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-  it('is version 1.1.0 in both files', () => {
-    expect(manifest.version).toBe('1.1.0');
-    expect(pkg.version).toBe('1.1.0');
+  it('is version 1.2.0 in both files', () => {
+    expect(manifest.version).toBe('1.2.0');
+    expect(pkg.version).toBe('1.2.0');
+  });
+
+  it('needs Chrome 119, for relative color syntax in profile palettes', () => {
+    expect(manifest.minimum_chrome_version).toBe('119');
   });
 
   it('asks for identity, and nothing beyond what the listing justifies', () => {
