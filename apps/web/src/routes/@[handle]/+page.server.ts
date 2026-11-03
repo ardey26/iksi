@@ -4,6 +4,7 @@ import { decodeURL } from '#lib/server/crypto.js';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 import { mediaUrl } from '#lib/server/media-url.js';
 import { tagProfile } from '#lib/server/profile-cache.js';
+import { PUBLIC_ROW_WHERE, publicRows } from '#lib/server/profile-rows.js';
 import { publicPayMethods, readPayMethods } from '#lib/server/pay-methods.js';
 import { payLabelOf } from '#lib/pay-methods.js';
 import { subdomainsEnabled } from '#lib/server/subdomains.js';
@@ -66,7 +67,7 @@ export const load: PageServerLoad = async ({ params, url, request, setHeaders })
       payMethods: true,
       payLabel: true,
       rows: {
-        where: { enabled: true, quarantined: false },
+        where: PUBLIC_ROW_WHERE,
         orderBy: { position: 'asc' },
         select: {
           id: true,
@@ -90,10 +91,7 @@ export const load: PageServerLoad = async ({ params, url, request, setHeaders })
 
   if (!p) error(404, 'not found');
 
-  // A one-time link opens once, so listing it publicly would let the first
-  // visitor burn it. The dashboard refuses to add one; this covers any row
-  // that points at one anyway.
-  const visible = p.rows.filter((r) => !r.link?.oneTime);
+  const visible = publicRows(p.rows);
 
   // Decode originalURL once per row so we can (a) compute the social sameAs
   // list for JSON-LD and (b) not send the encrypted ciphertext to the client.
