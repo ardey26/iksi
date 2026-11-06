@@ -118,3 +118,13 @@ describe('competitor sources', () => {
     }
   });
 });
+
+describe('TinyURL shortening', () => {
+  it('describes guest links from TinyURL own article, with no account cap', () => {
+    const cell = FEATURES.find((f) => f.id === 'shortening').competitors.tinyurl;
+    expect(cell.source).toBe('https://tinyurl.com/blog/i-created-tinyurl-link-without-account-how-edit-delete/');
+    expect(cell.value).toMatch(/without an account/);
+    expect(cell.value).not.toMatch(/\d+ links a month/);
+    expect(cell.gated).toBeUndefined();
+  });
+});

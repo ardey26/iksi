@@ -55,6 +55,7 @@ const BITLY_PRICING = 'https://bitly.com/pages/pricing/';
 // TinyURL builds its "Feature Breakdown" table in the browser from its own
 // /app/api/subscriptions data; the Free column was read from that data.
 const TINYURL_PRICING = 'https://tinyurl.com/app/pricing';
+const TINYURL_GUEST_LINKS = 'https://tinyurl.com/blog/i-created-tinyurl-link-without-account-how-edit-delete/';
 const DUB_PRICING = 'https://dub.co/pricing/links';
 const DUB_HELP = 'https://dub.co/help/article/';
 const DUB_RATE_LIMITS = 'https://dub.co/docs/api-reference/rate-limits';
@@ -82,7 +83,10 @@ export const FEATURES = [
         source: LINKTREE_PRICING
       },
       bitly: { value: '5 links a month, with ads', source: BITLY_PRICING },
-      tinyurl: { value: '30 links a month with a free account', source: TINYURL_PRICING },
+      tinyurl: {
+        value: 'Short links without an account, saved only in your browser until you claim them into an account',
+        source: TINYURL_GUEST_LINKS
+      },
       dub: { value: '25 new links a month', source: DUB_PRICING },
       'short-io': { value: "1,000 links over the account's lifetime", source: SHORTIO_PRICING }
     }
