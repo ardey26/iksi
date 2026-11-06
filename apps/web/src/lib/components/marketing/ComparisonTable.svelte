@@ -45,7 +45,7 @@
           <tr data-feature={f.id}>
             <th scope="row" class="feature t-body">{f.label}</th>
             {#each columns as id (id)}
-              <td data-product={id}>
+              <td data-product={id} data-label={PRODUCTS[id].name}>
                 {#if id === 'iksi'}
                   {@const badge = iksiBadge(f.iksi)}
                   {#if badge}
@@ -85,9 +85,6 @@
   }
   table {
     width: 100%;
-    /* The feature column plus room for each product, so six columns still read
-       as sentences. The box scrolls sideways when the page is narrower. */
-    min-width: max(640px, calc(160px + var(--columns) * 168px));
     border-collapse: separate;
     border-spacing: 0;
     font-size: 14px;
@@ -112,13 +109,6 @@
     white-space: nowrap;
   }
   th.feature {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    width: 160px;
-    min-width: 160px;
-    background-color: var(--surface);
-    border-right: 1px solid var(--border);
     font-weight: 500;
   }
   td :global(.badge) {
@@ -150,5 +140,78 @@
     color: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;
+  }
+
+  /* From 640px: a real table. The feature column plus room for each product,
+     so six columns still read as sentences; the box scrolls sideways only if
+     the page is narrower than that. */
+  @media (min-width: 640px) {
+    table {
+      min-width: calc(160px + var(--columns) * 168px);
+    }
+    th.feature {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      width: 160px;
+      min-width: 160px;
+      background-color: var(--surface);
+      border-right: 1px solid var(--border);
+    }
+  }
+
+  /* Phones: the same table, restacked. Each feature is a block, each product a
+     labelled full-width row. The header stays for screen readers. */
+  @media (max-width: 639px) {
+    .scroll {
+      overflow-x: visible;
+    }
+    table,
+    tbody,
+    tr,
+    th,
+    td,
+    caption {
+      display: block;
+    }
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    tbody tr {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:last-child {
+      border-bottom: 0;
+    }
+    th,
+    td {
+      border-bottom: 0;
+    }
+    tbody th.feature {
+      padding: 4px 16px;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    td {
+      padding: 8px 16px;
+    }
+    td::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    caption {
+      border-top: 1px solid var(--border);
+    }
   }
 </style>

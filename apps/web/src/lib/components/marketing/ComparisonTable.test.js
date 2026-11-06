@@ -88,4 +88,15 @@ describe('ComparisonTable', () => {
     expect(six.container.querySelector('table').getAttribute('style')).toContain('--columns: 6');
     expect(six.container.querySelectorAll('thead th[data-product]')).toHaveLength(6);
   });
+
+  it('labels every value cell with its product name, for the phone layout', () => {
+    const columns = ['iksi', 'linktree', 'bitly'];
+    const { container } = render(ComparisonTable, { props: { columns } });
+    expect(container.querySelectorAll('table')).toHaveLength(1);
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(FEATURES.length);
+    expect(container.querySelectorAll('thead th[data-product]')).toHaveLength(columns.length);
+    const cells = container.querySelectorAll('tbody td');
+    expect(cells).toHaveLength(FEATURES.length * columns.length);
+    for (const td of cells) expect(td.getAttribute('data-label')).toBe(PRODUCTS[td.getAttribute('data-product')].name);
+  });
 });
