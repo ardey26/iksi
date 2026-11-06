@@ -4,6 +4,8 @@
   import { Button } from '#lib/ui/index.js';
   import UserMenu from '#lib/components/UserMenu.svelte';
   import BrandMark from '#lib/components/BrandMark.svelte';
+  import SiteFooter from '#lib/components/SiteFooter.svelte';
+  import { marketingPage } from '#lib/marketing/pages.js';
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
   import { appHref, routedPathname } from '#lib/subdomains.js';
@@ -22,6 +24,8 @@
   const home = $derived(appHref('/', page.url.host, import.meta.env.DEV));
   const signIn = $derived(appHref('/login', page.url.host, import.meta.env.DEV));
   const isDashboard = $derived(isDashboardPath(page.url.pathname));
+  // Footer only on public marketing surfaces, never on short links or the app.
+  const showFooter = $derived(page.url.pathname === '/' || page.url.pathname === '/privacy' || !!marketingPage(page.url.pathname));
 
   // Theme is resolved by the inline script in app.html before first paint and
   // kept in sync by $lib/stores/theme.js. Nothing to do on mount.
@@ -78,6 +82,7 @@
       <main class="flex-1 flex flex-col pt-8 pb-24 px-4 dash-main">{@render children()}</main>
     {:else}
       <main class="site-main">{@render children()}</main>
+      {#if showFooter}<SiteFooter />{/if}
     {/if}
   </div>
 {/if}
