@@ -1,4 +1,6 @@
 import { prisma } from '#lib/prisma.js';
+import { MARKETING_PAGES } from '#lib/marketing/pages.js';
+import { newestVerified } from '#lib/marketing/facts.js';
 import { canonicalProfileUrl } from '#lib/subdomains.js';
 
 // Cache the sitemap in-memory for a bit so we're not hitting the DB on every crawl.
@@ -12,24 +14,28 @@ function xmlEscape(s) {
 	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+// Only profiles with something on them: a bio or at least one live link.
+// Empty profiles are thin content and render noindex (see @[handle]/+page.svelte).
+// Underscore name: SvelteKit rejects other exports from +server files.
+// scripts/seo-baseline.ts imports it to count exactly what the sitemap lists.
+export const _PROFILE_WITH_CONTENT = {
+	user: { handle: { isNot: null } },
+	OR: [
+		{ AND: [{ bio: { not: null } }, { NOT: { bio: '' } }] },
+		{ rows: { some: { enabled: true, quarantined: false, linkId: { not: null } } } }
+	]
+};
+
 const day = (d) => d.toISOString().split('T')[0];
 
 export async function GET() {
 	const now = Date.now();
 	if (cache && cacheExpires > now) return new Response(cache, { headers: HEADERS });
 
-	// Only profiles with something on them: a bio or at least one live link.
-	// Empty profiles are thin content and render noindex (see @[handle]/+page.svelte).
 	let profiles = [];
 	try {
 		profiles = await prisma.profile.findMany({
-			where: {
-				user: { handle: { isNot: null } },
-				OR: [
-					{ AND: [{ bio: { not: null } }, { NOT: { bio: '' } }] },
-					{ rows: { some: { enabled: true, quarantined: false, linkId: { not: null } } } }
-				]
-			},
+			where: _PROFILE_WITH_CONTENT,
 			select: {
 				updatedAt: true,
 				user: { select: { handle: { select: { handle: true } } } },
@@ -37,7 +43,7 @@ export async function GET() {
 				rows: { select: { createdAt: true }, orderBy: { createdAt: 'desc' }, take: 1 }
 			},
 			orderBy: { updatedAt: 'desc' },
-			take: 49999 // sitemap spec cap is 50k URLs per file, minus the homepage
+			take: 49999 - MARKETING_PAGES.length - 1 // 50k URLs per file, minus the homepage, privacy and registry pages
 		});
 	} catch (err) {
 		console.error('[sitemap] failed to load profiles', err);
@@ -56,6 +62,12 @@ export async function GET() {
 		})
 		.join('\n');
 
+	const pageUrls = MARKETING_PAGES.map((page) => {
+		const lastmod = page.kind === 'alternatives' ? newestVerified() : null;
+		const mod = lastmod ? `\n    <lastmod>${xmlEscape(lastmod)}</lastmod>` : '';
+		return `  <url>\n    <loc>https://www.iksi.app${xmlEscape(page.path)}</loc>${mod}\n  </url>`;
+	}).join('\n');
+
 	const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -64,7 +76,7 @@ export async function GET() {
   <url>
     <loc>https://www.iksi.app/privacy</loc>
   </url>
-${profileUrls}
+${pageUrls ? pageUrls + '\n' : ''}${profileUrls}
 </urlset>`;
 
 	cache = sitemap;
