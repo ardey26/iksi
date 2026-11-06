@@ -20,7 +20,10 @@ beforeAll(async () => {
     hits.push({ method: req.method!, path: req.url!, headers: req.headers });
     const url = new URL(req.url!, 'http://x');
     const [, kind, n] = url.pathname.split('/');
-    if (kind === 'loop') {
+    if (kind === 'slow') {
+      // Each hop answers just under the per-hop timeout, forever.
+      setTimeout(() => res.writeHead(302, { location: `/slow/${Number(n) + 1}` }).end(), 250);
+    } else if (kind === 'loop') {
       res.writeHead(302, { location: `/loop/${Number(n) + 1}` }).end();
     } else if (kind === 'metadata') {
       res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' }).end();
@@ -217,6 +220,17 @@ describe('expandURL against a live server', () => {
     const r = await expandURL(`${base()}/hang`, { ...local, timeoutMs: 300 });
     expect(Date.now() - t0).toBeLessThan(300 + 500);
     expect(r).toEqual({ hops: [], final: null, stopped: 'timeout' });
+  });
+
+  it('stops a chain of slow hops at the overall deadline', async () => {
+    const t0 = Date.now();
+    const r = await expandURL(`${base()}/slow/0`, { ...local, timeoutMs: 300, totalTimeoutMs: 700 });
+    expect(Date.now() - t0).toBeLessThan(700 + 500);
+    expect(r.stopped).toBe('timeout');
+    expect(r.final).toBeNull();
+    // The hops that did answer are kept.
+    expect(r.hops.length).toBeGreaterThanOrEqual(2);
+    expect(r.hops[0]).toEqual({ url: `${base()}/slow/0`, status: 302 });
   });
 
   it('times out a lookup that never answers', async () => {

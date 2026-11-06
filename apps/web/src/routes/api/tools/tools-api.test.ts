@@ -15,8 +15,8 @@ vi.mock('#lib/server/safe-browsing.js', () => ({ checkURL }));
 vi.mock('#lib/server/client.js', () => ({ clientIpHash }));
 vi.mock('#lib/server/expand.js', () => ({ expandURL }));
 
-import { POST as check } from './check/+server.js';
-import { POST as expand } from './expand/+server.js';
+import { POST as check, config as checkConfig } from './check/+server.js';
+import { POST as expand, config as expandConfig } from './expand/+server.js';
 
 let counts: Map<string, number>;
 const fakeLimiter = async (id: string, max: number) => {
@@ -56,9 +56,9 @@ beforeEach(() => {
 });
 
 describe.each([
-  ['check', check, 'check'],
-  ['expand', expand, 'expand']
-] as const)('POST /api/tools/%s', (_name, handler, tool) => {
+  ['check', check, 'check', checkConfig],
+  ['expand', expand, 'expand', expandConfig]
+] as const)('POST /api/tools/%s', (_name, handler, tool, config) => {
   it('is never cached', async () => {
     expect((await post(handler, { url: 'https://example.com' })).headers.get('cache-control')).toBe('no-store');
     expect((await post(handler, { url: 42 })).headers.get('cache-control')).toBe('no-store');
@@ -131,6 +131,24 @@ describe.each([
     expect(checkURL).not.toHaveBeenCalled();
   });
 
+  it('answers unavailable when Safe Browsing does not answer within 3 seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      checkURL.mockReturnValue(new Promise(() => {}));
+      const pending = post(handler, { url: 'https://example.com' });
+      await vi.advanceTimersByTimeAsync(3000);
+      const res = await pending;
+      expect(res.status).toBe(200);
+      expect((await res.json()).verdict).toBe('unavailable');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps the function at 20 seconds', () => {
+    expect(config).toEqual({ maxDuration: 20 });
+  });
+
   it('never touches the database directly', async () => {
     await post(handler, { url: 'https://example.com' });
     await post(handler, { url: 42 });
@@ -172,6 +190,15 @@ describe('POST /api/tools/expand', () => {
     expect(opts?.allowLoopbackForTest).toBeUndefined();
     expect(opts?.lookup).toBeUndefined();
   });
+
+  it.each(['javascript:alert(1)', 'ftp://example.com', '', '   ', 'https://', 'a'.repeat(2049)])(
+    'refuses unusable url #%# with 400 before spending the visitor limit',
+    async (url) => {
+      expect((await post(expand, { url })).status).toBe(400);
+      expect(rateLimit).not.toHaveBeenCalled();
+      expect(expandURL).not.toHaveBeenCalled();
+    }
+  );
 
   it('skips Safe Browsing when there is no final destination', async () => {
     expandURL.mockResolvedValue({ hops: [], final: null, stopped: 'blocked' });

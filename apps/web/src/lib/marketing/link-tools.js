@@ -54,7 +54,7 @@ export const URL_EXPANDER = {
     },
     {
       q: 'How many redirects does it follow?',
-      a: 'Up to 10 hops, counting the link you paste. Each hop has 5 seconds to answer. A longer chain stops with a note.'
+      a: 'Up to 10 hops, counting the link you paste. Each hop has 5 seconds to answer, and the whole chain 10 seconds. A longer or slower chain stops with a note.'
     },
     {
       q: 'Why was a hop blocked?',

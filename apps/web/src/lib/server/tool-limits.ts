@@ -46,6 +46,35 @@ export async function toolSafeBrowsing(url: string): Promise<ToolVerdict> {
   return verdict === 'pending' ? 'unavailable' : verdict;
 }
 
+export const SAFE_BROWSING_WAIT_MS = 3000;
+
+/**
+ * toolSafeBrowsing, but never waiting more than SAFE_BROWSING_WAIT_MS: a slow
+ * Google answer becomes 'unavailable' instead of holding the function.
+ * checkURL itself is left alone, since link creation shares it.
+ */
+export function toolSafeBrowsingWithin(url: string, ms = SAFE_BROWSING_WAIT_MS): Promise<ToolVerdict> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<ToolVerdict>((resolve) => {
+    timer = setTimeout(() => resolve('unavailable'), ms);
+  });
+  return Promise.race([toolSafeBrowsing(url), late]).finally(() => clearTimeout(timer));
+}
+
+/** An http(s) URL for a pasted link (a bare host gets https://), or null. */
+export function toolURL(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed || trimmed.length > TOOL_URL_LENGTH) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.hostname ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 const NO_STORE = { 'cache-control': 'no-store' };
 
 /** A JSON tool response; never cached. */

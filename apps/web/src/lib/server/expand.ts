@@ -30,7 +30,10 @@ export interface Expansion {
 }
 export interface ExpandOptions {
   maxHops?: number;
+  /** Per hop. */
   timeoutMs?: number;
+  /** For the whole chain; each hop gets the lesser of this and timeoutMs. */
+  totalTimeoutMs?: number;
   lookup?: LookupFn;
   /**
    * Tests only: lets 127.0.0.0/8 and ::1 through, and any port, so tests can
@@ -42,6 +45,7 @@ export interface ExpandOptions {
 
 export const MAX_HOPS = 10;
 export const HOP_TIMEOUT_MS = 5000;
+export const TOTAL_TIMEOUT_MS = 10_000;
 const MAX_URL_LENGTH = 2048;
 const USER_AGENT = 'iksi-url-expander';
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
@@ -227,6 +231,7 @@ const stopOf = (err: unknown): ExpandStop => (err instanceof HopError ? err.stop
 export async function expandURL(input: string, opts: ExpandOptions = {}): Promise<Expansion> {
   const maxHops = opts.maxHops ?? MAX_HOPS;
   const timeoutMs = opts.timeoutMs ?? HOP_TIMEOUT_MS;
+  const end = Date.now() + (opts.totalTimeoutMs ?? TOTAL_TIMEOUT_MS);
   const allowLoopback = opts.allowLoopbackForTest === true;
   const lookup = guardedLookup(opts.lookup ?? systemLookup, allowLoopback);
   const hops: ExpandHop[] = [];
@@ -240,10 +245,14 @@ export async function expandURL(input: string, opts: ExpandOptions = {}): Promis
     if (refused) return stop(refused);
     if (hops.length >= maxHops) return stop('too-many-hops');
 
+    // The chain as a whole is capped too, so slow hops cannot add up.
+    const remaining = end - Date.now();
+    if (remaining <= 0) return stop('timeout');
+
     let res: { status: number; location: string | undefined };
     try {
-      const deadline = Date.now() + timeoutMs;
-      res = await headersOf(current, 'HEAD', timeoutMs, lookup);
+      const deadline = Date.now() + Math.min(timeoutMs, remaining);
+      res = await headersOf(current, 'HEAD', deadline - Date.now(), lookup);
       if (res.status === 405 || res.status === 501) {
         res = await headersOf(current, 'GET', deadline - Date.now(), lookup);
       }

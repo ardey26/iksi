@@ -6,9 +6,9 @@
   const STOPS = {
     blocked: 'Stopped at an address on a private or local network. It was not followed.',
     'too-many-hops': 'Stopped after 10 hops. The link keeps redirecting.',
-    timeout: 'Stopped: a hop did not answer within 5 seconds.',
+    timeout: 'Stopped: a hop took over 5 seconds to answer, or the chain over 10 seconds.',
     error: 'Stopped: a hop could not be reached.',
-    'bad-url': 'Stopped: the next redirect is not an http or https link it can follow.'
+    'bad-url': 'Stopped: the next redirect is not a link it can safely follow.'
   };
   const REFUSED = 'Use an http or https link on a standard port, with no username or password.';
 

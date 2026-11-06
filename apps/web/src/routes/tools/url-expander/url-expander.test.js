@@ -54,9 +54,9 @@ describe('/tools/url-expander', () => {
   it.each([
     ['blocked', /private or local network/i],
     ['too-many-hops', /10 hops/i],
-    ['timeout', /5 seconds/i],
+    ['timeout', /5 seconds.*10 seconds/i],
     ['error', /could not be reached/i],
-    ['bad-url', /not an http or https link/i]
+    ['bad-url', /not a link it can safely follow/i]
   ])('explains a chain stopped by %s', async (stopped, text) => {
     reply({ hops: [{ url: 'https://bit.ly/abc', status: 302 }], final: null, stopped, verdict: null });
     const { container } = render(Page);
