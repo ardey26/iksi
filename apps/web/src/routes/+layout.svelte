@@ -7,77 +7,9 @@
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
   import { appHref, routedPathname } from '#lib/subdomains.js';
+  import { seoForRoute } from '#lib/seo/routes.js';
 
   let { data, children } = $props();
-
-  const HOMEPAGE_STRUCTURED_DATA = {
-    '@context': 'https://schema.org',
-    '@graph': [
-      {
-        '@type': 'WebSite',
-        '@id': 'https://www.iksi.app/#website',
-        url: 'https://www.iksi.app/',
-        name: 'iksi',
-        description: 'Free URL shortener. Transform long links into clean, shareable short URLs.',
-        inLanguage: 'en'
-      },
-      {
-        '@type': 'WebApplication',
-        '@id': 'https://www.iksi.app/#app',
-        name: 'iksi',
-        url: 'https://www.iksi.app/',
-        applicationCategory: 'UtilitiesApplication',
-        operatingSystem: 'Any',
-        browserRequirements: 'Requires JavaScript. Requires HTML5.',
-        description: 'A fast, free URL shortener with custom aliases and instant redirects. No registration required.',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        author: { '@type': 'Person', name: 'Andre de Jesus' }
-      }
-    ]
-  };
-
-  function seoForRoute(pathname, host) {
-    const isAdminHost = host === 'admin.iksi.app' || host === 'admin.localhost';
-    if (isAdminHost) {
-      return {
-        title: 'iksi admin',
-        description: 'iksi admin area.',
-        canonical: `https://admin.iksi.app${pathname}`,
-        ogImage: 'https://www.iksi.app/og-image.png',
-        structuredData: null,
-        noindex: true
-      };
-    }
-    if (pathname === '/') {
-      return {
-        title: 'iksi — free URL shortener. Make long links short.',
-        description: 'iksi turns long URLs into clean, shareable short links in seconds. Free, no signup, custom aliases, instant redirects.',
-        canonical: 'https://www.iksi.app/',
-        ogImage: 'https://www.iksi.app/og-image.png',
-        structuredData: HOMEPAGE_STRUCTURED_DATA,
-        noindex: false
-      };
-    }
-    if (pathname === '/privacy') {
-      return {
-        title: 'Privacy | iksi',
-        description: 'What iksi collects when you shorten links or build a profile, who handles it, how long it is kept, and how to get it deleted.',
-        canonical: 'https://www.iksi.app/privacy',
-        ogImage: 'https://www.iksi.app/og-image.png',
-        structuredData: null,
-        noindex: false
-      };
-    }
-    // Always www: andre.iksi.app/sale is a vanity alias of www/@andre/sale.
-    return {
-      title: 'iksi — free URL shortener',
-      description: 'iksi turns long URLs into clean, shareable short links in seconds.',
-      canonical: `https://www.iksi.app${pathname}`,
-      ogImage: 'https://www.iksi.app/og-image.png',
-      structuredData: null,
-      noindex: true
-    };
-  }
 
   // By route: on andre.iksi.app the path `/sale` is @andre/sale.
   const seo = $derived(seoForRoute(routedPathname(page.url, import.meta.env.DEV), page.url.host));
