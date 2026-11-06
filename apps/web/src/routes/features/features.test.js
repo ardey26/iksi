@@ -12,7 +12,7 @@ vi.hoisted(() => {
 import FeaturePage from './[feature]/+page.svelte';
 import { load, entries } from './[feature]/+page.js';
 import { FEATURE_PAGES, featureSlugs, planLabel } from '#lib/marketing/features.js';
-import { FEATURES } from '#lib/marketing/facts.js';
+import { FEATURES, PRODUCTS, formatDay } from '#lib/marketing/facts.js';
 import { marketingPage } from '#lib/marketing/pages.js';
 
 afterEach(cleanup);
@@ -86,6 +86,10 @@ describe('feature page', () => {
     const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
     expect(hrefs).toContain('/');
     expect(hrefs).toContain('/alternatives');
+  });
+  it.each(SLUGS)('dates the plan label from the facts on %s', (slug) => {
+    const { container } = render(FeaturePage, { props: { data: { slug } } });
+    expect(container.textContent).toContain(`checked ${formatDay(PRODUCTS.iksi.verified)}`);
   });
   it('renders the iksi fact values for each factId', () => {
     const { container } = render(FeaturePage, { props: { data: { slug: 'smart-routing' } } });

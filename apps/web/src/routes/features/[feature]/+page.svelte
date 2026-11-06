@@ -1,4 +1,5 @@
 <script>
+  import { PRODUCTS, formatDay } from '#lib/marketing/facts.js';
   import { FEATURE_PAGES, featureFacts, planLabel } from '#lib/marketing/features.js';
   import { Badge, Container, PageHeader, Paper, Section } from '#lib/ui/index.js';
 
@@ -16,7 +17,7 @@
     <Paper>
       <ul class="plain">
         {#if plan}
-          <li class="t-body">Plan: <span data-plan><Badge>{plan}</Badge></span></li>
+          <li class="t-body">Plan: <span data-plan><Badge>{plan}</Badge></span>, checked {formatDay(PRODUCTS.iksi.verified)}</li>
         {/if}
         {#each facts as fact (fact.label)}
           <li class="t-body">{fact.value}</li>

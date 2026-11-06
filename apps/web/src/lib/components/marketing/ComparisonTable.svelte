@@ -1,7 +1,7 @@
 <script>
   // One row per feature, one column per product. Values come from the facts
   // file only. Competitor cells link the vendor page the value was read from.
-  import { FEATURES, PRODUCTS } from '#lib/marketing/facts.js';
+  import { FEATURES, PRODUCTS, formatDay } from '#lib/marketing/facts.js';
   import { Badge, Paper } from '#lib/ui/index.js';
 
   /** @type {import('#lib/marketing/facts.js').ProductId[]} */
@@ -9,12 +9,7 @@
   /** Link each competitor header to its /alternatives page. */
   export let linkHeaders = false;
 
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  /** @param {string} iso YYYY-MM-DD */
-  function day(iso) {
-    const [y, m, d] = iso.split('-').map(Number);
-    return `${MONTHS[m - 1]} ${d}, ${y}`;
-  }
+  const day = formatDay;
 
   /** @param {import('#lib/marketing/facts.js').IksiFact} fact */
   function iksiBadge(fact) {

@@ -311,3 +311,11 @@ export function newestVerified() {
     .map((id) => /** @type {Product} */ (PRODUCTS[id]).verified)
     .reduce((a, b) => (b > a ? b : a), '');
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "Nov 6, 2026" from a YYYY-MM-DD `verified` date. @param {string} iso */
+export function formatDay(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
