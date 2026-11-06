@@ -99,4 +99,17 @@ describe('ComparisonTable', () => {
     expect(cells).toHaveLength(FEATURES.length * columns.length);
     for (const td of cells) expect(td.getAttribute('data-label')).toBe(PRODUCTS[td.getAttribute('data-product')].name);
   });
+
+  it('keeps table semantics with explicit roles, for the restacked phone layout', () => {
+    const { container } = render(ComparisonTable, { props: { columns: ['iksi', 'linktree'] } });
+    const q = (sel) => container.querySelectorAll(sel);
+    expect(q('table[role="table"]')).toHaveLength(1);
+    expect(q('thead[role="rowgroup"]')).toHaveLength(1);
+    expect(q('tbody[role="rowgroup"]')).toHaveLength(1);
+    expect(q('tr[role="row"]')).toHaveLength(FEATURES.length + 1);
+    expect(q('tr:not([role="row"])')).toHaveLength(0);
+    expect(q('thead th[role="columnheader"]')).toHaveLength(3);
+    expect(q('tbody th[role="rowheader"]')).toHaveLength(FEATURES.length);
+    expect(q('tbody td[role="cell"]')).toHaveLength(FEATURES.length * 2);
+  });
 });

@@ -22,15 +22,16 @@
 <Paper padding="none" class="table-paper">
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div class="scroll" tabindex="0" role="region" aria-label="Feature comparison">
-    <table style="--columns: {columns.length}">
+    <!-- svelte-ignore a11y_no_redundant_roles -->
+    <table role="table" style="--columns: {columns.length}">
       <caption class="t-caption">
         {columns.map((id) => `${PRODUCTS[id].name} checked ${day(PRODUCTS[id].verified)}`).join('. ')}.
       </caption>
-      <thead>
-        <tr>
-          <th scope="col" class="feature t-label">Feature</th>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th scope="col" role="columnheader" class="feature t-label">Feature</th>
           {#each columns as id (id)}
-            <th scope="col" data-product={id} class="t-label">
+            <th scope="col" role="columnheader" data-product={id} class="t-label">
               {#if linkHeaders && id !== 'iksi'}
                 <a href="/alternatives/{id}">{PRODUCTS[id].name}</a>
               {:else}
@@ -40,12 +41,12 @@
           {/each}
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {#each FEATURES as f (f.id)}
-          <tr data-feature={f.id}>
-            <th scope="row" class="feature t-body">{f.label}</th>
+          <tr role="row" data-feature={f.id}>
+            <th scope="row" role="rowheader" class="feature t-body">{f.label}</th>
             {#each columns as id (id)}
-              <td data-product={id} data-label={PRODUCTS[id].name}>
+              <td role="cell" data-product={id} data-label={PRODUCTS[id].name}>
                 {#if id === 'iksi'}
                   {@const badge = iksiBadge(f.iksi)}
                   {#if badge}
@@ -174,6 +175,9 @@
     caption {
       display: block;
     }
+    table {
+      position: relative;
+    }
     thead {
       position: absolute;
       width: 1px;
@@ -182,6 +186,25 @@
       overflow: hidden;
       clip-path: inset(50%);
       white-space: nowrap;
+    }
+    /* Hub header links stay focusable; reveal the header while one has focus,
+       over the table's top edge, so the ring is visible and nothing shifts. */
+    thead:focus-within {
+      top: 0;
+      left: 0;
+      right: 0;
+      width: auto;
+      height: auto;
+      margin: 0;
+      overflow: visible;
+      clip-path: none;
+      white-space: normal;
+      background-color: var(--surface);
+      border-bottom: 1px solid var(--border);
+      z-index: 2;
+    }
+    thead:focus-within th {
+      padding: 8px 16px;
     }
     tbody tr {
       padding: 12px 0;
@@ -210,8 +233,9 @@
       font-weight: 500;
       color: var(--text-muted);
     }
+    /* The caption is first in the DOM, so it sits above the rows on phones. */
     caption {
-      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
   }
 </style>
