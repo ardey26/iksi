@@ -14,10 +14,10 @@ vi.hoisted(() => {
 
 const registry = vi.hoisted(() => ({
   pages: [
-    { path: '/alternatives/bitly', title: 'Bitly alternative', description: 'd', kind: 'alternatives' },
-    { path: '/features/qr', title: 'QR codes', description: 'd', kind: 'feature' },
-    { path: '/tools/utm', title: 'UTM builder', description: 'd', kind: 'tool' },
-    { path: '/docs/api', title: 'API docs', description: 'd', kind: 'docs' }
+    { path: '/alternatives/bitly', title: 'Bitly alternative | iksi', label: 'Bitly alternative', description: 'd', kind: 'alternatives' },
+    { path: '/features/qr', title: 'QR codes | iksi', label: 'QR codes', description: 'd', kind: 'feature' },
+    { path: '/tools/utm', title: 'UTM builder | iksi', label: 'UTM builder', description: 'd', kind: 'tool' },
+    { path: '/docs/api', title: 'API docs | iksi', label: 'API docs', description: 'd', kind: 'docs' }
   ]
 }));
 vi.mock('#lib/marketing/pages.js', () => ({
@@ -34,10 +34,10 @@ import SiteFooter from './SiteFooter.svelte';
 import Layout from '../../routes/+layout.svelte';
 
 const all = [
-  { path: '/alternatives/bitly', title: 'Bitly alternative', description: 'd', kind: 'alternatives' },
-  { path: '/features/qr', title: 'QR codes', description: 'd', kind: 'feature' },
-  { path: '/tools/utm', title: 'UTM builder', description: 'd', kind: 'tool' },
-  { path: '/docs/api', title: 'API docs', description: 'd', kind: 'docs' }
+  { path: '/alternatives/bitly', title: 'Bitly alternative | iksi', label: 'Bitly alternative', description: 'd', kind: 'alternatives' },
+  { path: '/features/qr', title: 'QR codes | iksi', label: 'QR codes', description: 'd', kind: 'feature' },
+  { path: '/tools/utm', title: 'UTM builder | iksi', label: 'UTM builder', description: 'd', kind: 'tool' },
+  { path: '/docs/api', title: 'API docs | iksi', label: 'API docs', description: 'd', kind: 'docs' }
 ];
 
 afterEach(() => {
@@ -52,7 +52,12 @@ describe('SiteFooter', () => {
     for (const name of ['Compare', 'Features', 'Tools', 'Developers']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
     }
-    for (const p of all) expect(container.querySelector(`a[href="${p.path}"]`)).not.toBeNull();
+    for (const p of all) {
+      const a = container.querySelector(`a[href="${p.path}"]`);
+      expect(a).not.toBeNull();
+      expect(a.textContent).toBe(p.label);
+      expect(a.textContent).not.toContain('|');
+    }
     expect(container.querySelector('a[href="/privacy"]')).not.toBeNull();
   });
 

@@ -19,7 +19,7 @@
         <h2 class="t-label footer-heading" id="footer-{group.kind}">{group.heading}</h2>
         <ul class="footer-list">
           {#each group.pages as p (p.path)}
-            <li><a class="t-caption footer-link" href={p.path}>{p.title}</a></li>
+            <li><a class="t-caption footer-link" href={p.path}>{p.label}</a></li>
           {/each}
         </ul>
       </section>

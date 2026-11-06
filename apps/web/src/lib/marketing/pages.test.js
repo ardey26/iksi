@@ -21,6 +21,13 @@ describe('MARKETING_PAGES', () => {
       expect(p.description.toLowerCase(), p.path).toContain('iksi');
     }
   });
+  it('has a short label without a brand separator', () => {
+    for (const p of MARKETING_PAGES) {
+      expect(p.label.length, p.path).toBeGreaterThan(0);
+      expect(p.label.length, p.path).toBeLessThanOrEqual(30);
+      expect(p.label, p.path).not.toMatch(/[|\u00b7]/);
+    }
+  });
   it('looks pages up by path', () => {
     for (const p of MARKETING_PAGES) expect(marketingPage(p.path)).toBe(p);
     expect(marketingPage('/nope')).toBeUndefined();

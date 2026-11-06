@@ -1,12 +1,13 @@
 // Registry of indexable marketing pages. The footer, sitemap and SEO tags all
 // read it; later pages append their entry here.
-import { competitorIds } from './facts.js';
+import { PRODUCTS, competitorIds } from './facts.js';
 import { alternativeCopy, hubCopy } from './alternatives.js';
 import { faqPage, softwareApplication, withGraph } from '../seo/schema.js';
 
 /**
  * @typedef {{
  *   path: string,
+ *   label: string,
  *   title: string,
  *   description: string,
  *   kind: 'alternatives' | 'feature' | 'tool' | 'docs',
@@ -18,12 +19,14 @@ import { faqPage, softwareApplication, withGraph } from '../seo/schema.js';
 export const MARKETING_PAGES = [
   {
     path: '/alternatives',
+    label: 'Compare tools',
     ...pick(hubCopy()),
     kind: 'alternatives',
     structuredData: () => withGraph(softwareApplication())
   },
   ...competitorIds().map((id) => ({
     path: `/alternatives/${id}`,
+    label: `${PRODUCTS[id].name} alternative`,
     ...pick(alternativeCopy(id)),
     kind: /** @type {const} */ ('alternatives'),
     structuredData: () => withGraph(softwareApplication(), faqPage(alternativeCopy(id).faq))

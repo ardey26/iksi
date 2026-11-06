@@ -13,6 +13,28 @@ function iksiIsFree(id) {
   return Boolean(f && f.iksi.offered && f.iksi.plan === 'free');
 }
 
+/**
+ * Features that are free on iksi and need a paid plan on the competitor,
+ * judged by the first sentence of the competitor's own cell.
+ * @param {import('./facts.js').CompetitorId} id
+ */
+export function paidOnCompetitor(id) {
+  return FEATURES.filter((f) => {
+    const cell = f.competitors[id];
+    if (!cell || !f.iksi.offered || f.iksi.plan !== 'free') return false;
+    return /\bneeds?\b/.test(cell.value.split('. ')[0]);
+  }).map((f) => f.label);
+}
+
+/** @param {import('./facts.js').CompetitorId} id @param {string} name */
+function differenceAnswer(id, name) {
+  const labels = paidOnCompetitor(id);
+  if (labels.length === 0) {
+    return 'iksi puts a link-in-bio profile and the shortener in one tool. The table shows each feature side by side.';
+  }
+  return `These are free on iksi and need a paid plan on ${name}, going by its own pages: ${labels.join('; ')}.`;
+}
+
 /** @param {import('./facts.js').CompetitorId} id */
 export function alternativeCopy(id) {
   const name = PRODUCTS[id]?.name ?? id;
@@ -29,7 +51,7 @@ export function alternativeCopy(id) {
     ];
     return {
       title: `${freeWord}${name} alternative with smart links | iksi`,
-      description: `iksi is a link-in-bio where every row is a short link with routing, passwords and expiry. See how it compares with ${name}, row by row.`,
+      description: `iksi is a link-in-bio where every row is a short link that can route, lock or expire. See how it compares with ${name}, row by row.`,
       answer: `${POSITIONING} The table compares iksi with ${name} row by row, and each ${name} value links to the page it came from.`,
       switchSteps,
       faq: [
@@ -41,10 +63,10 @@ export function alternativeCopy(id) {
         },
         {
           q: `How is iksi different from ${name}?`,
-          a: `Every row on an iksi profile is a short link, so you can route it with rules, protect it or expire it. One tool covers the profile and the shortener.`
+          a: `Every row on an iksi profile is a short link. ${differenceAnswer(id, name)}`
         },
         {
-          q: `Where does iksi fall short of ${name}?`,
+          q: 'Where does iksi fall short?',
           a: GAPS.join(' ')
         },
         {
@@ -56,14 +78,14 @@ export function alternativeCopy(id) {
   }
 
   const switchSteps = [
-    'Shorten each destination URL on the iksi home page.',
+    'Create an iksi account so the links you shorten are yours and show click totals.',
+    'Shorten each destination URL.',
     'Set a custom alias on the links you want to keep readable.',
-    'Create an account to keep your links and see click totals.',
     `Replace your ${name} links wherever you control the text.`
   ];
   return {
     title: `${freeWord}${name} alternative for short links | iksi`,
-    description: `iksi shortens links and turns them into a link-in-bio page with smart routing. See how it compares with ${name}, row by row.`,
+    description: `iksi shortens links and turns them into a link-in-bio page. Links you own can route visitors with rules. See how it compares with ${name}, row by row.`,
     answer: `${POSITIONING} The table compares iksi with ${name} row by row, and each ${name} value links to the page it came from.`,
     switchSteps,
     faq: [
@@ -75,10 +97,10 @@ export function alternativeCopy(id) {
       },
       {
         q: `How is iksi different from ${name}?`,
-        a: `iksi puts a link-in-bio profile and the shortener in one tool, and every link can route visitors with rules.`
+        a: differenceAnswer(id, name)
       },
       {
-        q: `Where does iksi fall short of ${name}?`,
+        q: 'Where does iksi fall short?',
         a: GAPS.join(' ')
       },
       {
