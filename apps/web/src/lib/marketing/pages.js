@@ -5,7 +5,11 @@ import { alternativeCopy, hubCopy } from './alternatives.js';
 import { FEATURE_PAGES, featureSlugs } from './features.js';
 import { QR_TOOL } from './qr-tool.js';
 import { LINK_CHECKER, URL_EXPANDER } from './link-tools.js';
-import { faqPage, softwareApplication, withGraph } from '../seo/schema.js';
+import { faqPage, organization, softwareApplication, withGraph } from '../seo/schema.js';
+
+// WebApplication.author points at #org, so the Organization rides along in every graph.
+/** @param {...object} nodes */
+const graph = (...nodes) => withGraph(softwareApplication(), organization(), ...nodes);
 
 /**
  * @typedef {{
@@ -25,42 +29,42 @@ export const MARKETING_PAGES = [
     label: 'Compare tools',
     ...pick(hubCopy()),
     kind: 'alternatives',
-    structuredData: () => withGraph(softwareApplication())
+    structuredData: () => graph()
   },
   ...competitorIds().map((id) => ({
     path: `/alternatives/${id}`,
     label: `${PRODUCTS[id].name} alternative`,
     ...pick(alternativeCopy(id)),
     kind: /** @type {const} */ ('alternatives'),
-    structuredData: () => withGraph(softwareApplication(), faqPage(alternativeCopy(id).faq))
+    structuredData: () => graph(faqPage(alternativeCopy(id).faq))
   })),
   ...featureSlugs().map((slug) => ({
     path: `/features/${slug}`,
     label: FEATURE_PAGES[slug].label,
     ...pick(FEATURE_PAGES[slug]),
     kind: /** @type {const} */ ('feature'),
-    structuredData: () => withGraph(softwareApplication(), faqPage(FEATURE_PAGES[slug].faq))
+    structuredData: () => graph(faqPage(FEATURE_PAGES[slug].faq))
   })),
   {
     path: '/tools/qr-code',
     label: QR_TOOL.label,
     ...pick(QR_TOOL),
     kind: 'tool',
-    structuredData: () => withGraph(softwareApplication(), faqPage(QR_TOOL.faq))
+    structuredData: () => graph(faqPage(QR_TOOL.faq))
   },
   {
     path: '/tools/link-checker',
     label: LINK_CHECKER.label,
     ...pick(LINK_CHECKER),
     kind: 'tool',
-    structuredData: () => withGraph(softwareApplication(), faqPage(LINK_CHECKER.faq))
+    structuredData: () => graph(faqPage(LINK_CHECKER.faq))
   },
   {
     path: '/tools/url-expander',
     label: URL_EXPANDER.label,
     ...pick(URL_EXPANDER),
     kind: 'tool',
-    structuredData: () => withGraph(softwareApplication(), faqPage(URL_EXPANDER.faq))
+    structuredData: () => graph(faqPage(URL_EXPANDER.faq))
   }
 ];
 

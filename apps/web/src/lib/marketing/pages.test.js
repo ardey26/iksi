@@ -28,6 +28,15 @@ describe('MARKETING_PAGES', () => {
       expect(p.label, p.path).not.toMatch(/[|\u00b7]/);
     }
   });
+  it('puts the Organization that WebApplication.author points at in every graph', () => {
+    for (const p of MARKETING_PAGES) {
+      const graph = p.structuredData()['@graph'];
+      const ids = new Set(graph.map((n) => n['@id']).filter(Boolean));
+      expect(ids.has('https://www.iksi.app/#org'), p.path).toBe(true);
+      const app = graph.find((n) => n['@type'] === 'WebApplication');
+      expect(ids.has(app.author['@id']), p.path).toBe(true);
+    }
+  });
   it('looks pages up by path', () => {
     for (const p of MARKETING_PAGES) expect(marketingPage(p.path)).toBe(p);
     expect(marketingPage('/nope')).toBeUndefined();

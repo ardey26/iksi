@@ -78,6 +78,16 @@ describe('hub page', () => {
   });
 });
 
+describe('hub gaps', () => {
+  it('shows where iksi falls short, every gap verbatim, after the table', () => {
+    const { container } = render(Hub);
+    const html = container.innerHTML;
+    expect(html.indexOf('Where iksi falls short')).toBeGreaterThan(html.indexOf('<table'));
+    const items = [...container.querySelectorAll('section li')].map((li) => li.textContent);
+    for (const g of GAPS) expect(items).toContain(g);
+  });
+});
+
 describe('registry', () => {
   it.each(['/alternatives', ...IDS.map((id) => `/alternatives/${id}`)])('contains %s', (path) => {
     const p = marketingPage(path);
@@ -86,7 +96,7 @@ describe('registry', () => {
   it('emits FAQ structured data built from the page copy', () => {
     const data = marketingPage('/alternatives/linktree').structuredData();
     const types = data['@graph'].map((n) => n['@type']);
-    expect(types).toEqual(['WebApplication', 'FAQPage']);
-    expect(data['@graph'][1].mainEntity).toHaveLength(alternativeCopy('linktree').faq.length);
+    expect(types).toEqual(['WebApplication', 'Organization', 'FAQPage']);
+    expect(data['@graph'].find((n) => n['@type'] === 'FAQPage').mainEntity).toHaveLength(alternativeCopy('linktree').faq.length);
   });
 });
