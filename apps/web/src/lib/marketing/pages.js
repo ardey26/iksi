@@ -2,6 +2,7 @@
 // read it; later pages append their entry here.
 import { PRODUCTS, competitorIds } from './facts.js';
 import { alternativeCopy, hubCopy } from './alternatives.js';
+import { FEATURE_PAGES, featureSlugs } from './features.js';
 import { faqPage, softwareApplication, withGraph } from '../seo/schema.js';
 
 /**
@@ -30,6 +31,13 @@ export const MARKETING_PAGES = [
     ...pick(alternativeCopy(id)),
     kind: /** @type {const} */ ('alternatives'),
     structuredData: () => withGraph(softwareApplication(), faqPage(alternativeCopy(id).faq))
+  })),
+  ...featureSlugs().map((slug) => ({
+    path: `/features/${slug}`,
+    label: FEATURE_PAGES[slug].label,
+    ...pick(FEATURE_PAGES[slug]),
+    kind: /** @type {const} */ ('feature'),
+    structuredData: () => withGraph(softwareApplication(), faqPage(FEATURE_PAGES[slug].faq))
   }))
 ];
 
