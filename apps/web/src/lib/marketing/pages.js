@@ -4,6 +4,7 @@ import { PRODUCTS, competitorIds } from './facts.js';
 import { alternativeCopy, hubCopy } from './alternatives.js';
 import { FEATURE_PAGES, featureSlugs } from './features.js';
 import { QR_TOOL } from './qr-tool.js';
+import { LINK_CHECKER, URL_EXPANDER } from './link-tools.js';
 import { faqPage, softwareApplication, withGraph } from '../seo/schema.js';
 
 /**
@@ -46,6 +47,20 @@ export const MARKETING_PAGES = [
     ...pick(QR_TOOL),
     kind: 'tool',
     structuredData: () => withGraph(softwareApplication(), faqPage(QR_TOOL.faq))
+  },
+  {
+    path: '/tools/link-checker',
+    label: LINK_CHECKER.label,
+    ...pick(LINK_CHECKER),
+    kind: 'tool',
+    structuredData: () => withGraph(softwareApplication(), faqPage(LINK_CHECKER.faq))
+  },
+  {
+    path: '/tools/url-expander',
+    label: URL_EXPANDER.label,
+    ...pick(URL_EXPANDER),
+    kind: 'tool',
+    structuredData: () => withGraph(softwareApplication(), faqPage(URL_EXPANDER.faq))
   }
 ];
 
