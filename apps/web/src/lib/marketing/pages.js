@@ -3,6 +3,7 @@
 import { PRODUCTS, competitorIds } from './facts.js';
 import { alternativeCopy, hubCopy } from './alternatives.js';
 import { FEATURE_PAGES, featureSlugs } from './features.js';
+import { QR_TOOL } from './qr-tool.js';
 import { faqPage, softwareApplication, withGraph } from '../seo/schema.js';
 
 /**
@@ -38,7 +39,14 @@ export const MARKETING_PAGES = [
     ...pick(FEATURE_PAGES[slug]),
     kind: /** @type {const} */ ('feature'),
     structuredData: () => withGraph(softwareApplication(), faqPage(FEATURE_PAGES[slug].faq))
-  }))
+  })),
+  {
+    path: '/tools/qr-code',
+    label: QR_TOOL.label,
+    ...pick(QR_TOOL),
+    kind: 'tool',
+    structuredData: () => withGraph(softwareApplication(), faqPage(QR_TOOL.faq))
+  }
 ];
 
 /** @param {{ title: string, description: string }} c */
