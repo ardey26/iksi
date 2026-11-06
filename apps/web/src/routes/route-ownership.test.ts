@@ -46,6 +46,11 @@ describe('route ownership', () => {
 		expect(routesMatching('/connect')).toEqual(['/[slug]']);
 	});
 
+	it('gives /alternatives and each competitor to the alternatives pages over [slug]', () => {
+		expect(routesMatching('/alternatives')).toEqual(['/[slug]', '/alternatives']);
+		expect(routesMatching('/alternatives/linktree')).toEqual(['/alternatives/[competitor]']);
+	});
+
 	it('leaves a bare /media to the short-link route', () => {
 		expect(routesMatching('/media')).toEqual(['/[slug]']);
 		expect(routesMatching('/media/')).toEqual([]);
