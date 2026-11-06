@@ -20,7 +20,9 @@ vi.mock('./facts.js', async (orig) => {
 });
 
 import { alternativeCopy, gatedOnCompetitor } from './alternatives.js';
-import { GAPS, FEATURES } from './facts.js';
+import { GAPS, FEATURES, competitorIds } from './facts.js';
+
+const IDS = ['linktree', 'bitly', 'tinyurl', 'dub', 'short-io'];
 
 afterEach(() => {
   state.plan = 'free';
@@ -28,7 +30,7 @@ afterEach(() => {
 });
 
 describe('alternativeCopy', () => {
-  it.each(['linktree', 'bitly'])('fits search limits and names iksi for %s', (id) => {
+  it.each(IDS)('fits search limits and names iksi for %s', (id) => {
     const c = alternativeCopy(id);
     expect(c.title.length).toBeLessThanOrEqual(60);
     expect(c.description.length).toBeLessThanOrEqual(160);
@@ -39,41 +41,50 @@ describe('alternativeCopy', () => {
     expect(c.answer).toContain('One tool instead of Linktree plus Bitly.');
   });
 
+  it('covers every competitor in the facts file', () => {
+    expect(competitorIds()).toEqual(IDS);
+  });
+
   it('says Free in the title only while the facts say free', () => {
-    expect(alternativeCopy('linktree').title).toContain('Free');
-    expect(alternativeCopy('bitly').title).toContain('Free');
+    for (const id of IDS) expect(alternativeCopy(id).title, id).toContain('Free');
     state.plan = 'paid';
-    expect(alternativeCopy('linktree').title).not.toContain('Free');
-    expect(alternativeCopy('bitly').title).not.toContain('Free');
+    for (const id of IDS) expect(alternativeCopy(id).title, id).not.toContain('Free');
     expect(alternativeCopy('linktree').faq[0].a).not.toMatch(/\bfree\b/i);
   });
 
   it('keeps hype words and middle dots out of copy', () => {
-    for (const id of ['linktree', 'bitly']) {
+    for (const id of IDS) {
       const text = JSON.stringify(alternativeCopy(id));
       expect(text).not.toMatch(/best|ultimate|revolutionary|·/i);
     }
   });
 
-  it('puts every gap in the gaps FAQ answer verbatim', () => {
-    const answer = alternativeCopy('linktree').faq.find((f) => /fall short/i.test(f.q)).a;
+  it.each(IDS)('puts every gap in the gaps FAQ answer verbatim for %s', (id) => {
+    const answer = alternativeCopy(id).faq.find((f) => /fall short/i.test(f.q)).a;
     for (const g of GAPS) expect(answer).toContain(g);
+  });
+
+  it.each(['tinyurl', 'dub', 'short-io'])('names the competitor in the title and switch steps for %s', (id) => {
+    const c = alternativeCopy(id);
+    const name = { tinyurl: 'TinyURL', dub: 'Dub', 'short-io': 'Short.io' }[id];
+    expect(c.title).toContain(`${name} alternative`);
+    expect(c.switchSteps.join(' ')).toContain(`your ${name} links`);
   });
 });
 
 describe('claims follow the facts', () => {
-  it.each(['linktree', 'bitly'])('asks the gaps question without a competitor name for %s', (id) => {
+  it.each(IDS)('asks the gaps question without a competitor name for %s', (id) => {
     const q = alternativeCopy(id).faq.find((f) => /fall short/i.test(f.q)).q;
     expect(q).toBe('Where does iksi fall short?');
   });
 
   it('makes creating an account the first switch step for every competitor', () => {
-    for (const id of ['linktree', 'bitly']) {
+    for (const id of IDS) {
       expect(alternativeCopy(id).switchSteps[0]).toMatch(/Create an iksi account/);
     }
   });
 
-  it.each(['linktree', 'bitly'])('quotes every gated cell verbatim and no other cell for %s', (id) => {
+  it.each(IDS)('quotes every gated cell verbatim and no other cell for %s', (id) => {
     const a = alternativeCopy(id).faq.find((f) => /different/i.test(f.q)).a;
     const gated = gatedOnCompetitor(id);
     expect(gated.length).toBeGreaterThan(0);
@@ -94,7 +105,7 @@ describe('claims follow the facts', () => {
   });
 
   it('never claims every link can route', () => {
-    for (const id of ['linktree', 'bitly']) {
+    for (const id of IDS) {
       const c = alternativeCopy(id);
       expect(JSON.stringify(c)).not.toMatch(/every link can route|every row is a short link with/i);
     }

@@ -27,7 +27,7 @@
 <Paper padding="none" class="table-paper">
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div class="scroll" tabindex="0" role="region" aria-label="Feature comparison">
-    <table>
+    <table style="--columns: {columns.length}">
       <caption class="t-caption">
         {columns.map((id) => `${PRODUCTS[id].name} checked ${day(PRODUCTS[id].verified)}`).join('. ')}.
       </caption>
@@ -90,7 +90,9 @@
   }
   table {
     width: 100%;
-    min-width: 640px;
+    /* The feature column plus room for each product, so six columns still read
+       as sentences. The box scrolls sideways when the page is narrower. */
+    min-width: max(640px, calc(160px + var(--columns) * 168px));
     border-collapse: separate;
     border-spacing: 0;
     font-size: 14px;

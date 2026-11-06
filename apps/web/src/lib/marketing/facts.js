@@ -52,12 +52,22 @@
 const LINKTREE_PRICING = 'https://linktr.ee/s/pricing';
 const LINKTREE_SHORTENER = 'https://linktr.ee/features/link-shortener';
 const BITLY_PRICING = 'https://bitly.com/pages/pricing/';
+// TinyURL builds its "Feature Breakdown" table in the browser from its own
+// /app/api/subscriptions data; the Free column was read from that data.
+const TINYURL_PRICING = 'https://tinyurl.com/app/pricing';
+const DUB_PRICING = 'https://dub.co/pricing/links';
+const DUB_HELP = 'https://dub.co/help/article/';
+const DUB_RATE_LIMITS = 'https://dub.co/docs/api-reference/rate-limits';
+const SHORTIO_PRICING = 'https://short.io/pricing';
 
 /** @type {Readonly<Partial<Record<ProductId, Product>>>} */
 export const PRODUCTS = {
   iksi: { name: 'iksi', url: 'https://www.iksi.app', verified: '2026-11-06', pricingUrl: 'https://www.iksi.app/' },
   linktree: { name: 'Linktree', url: 'https://linktr.ee', verified: '2026-11-06', pricingUrl: LINKTREE_PRICING },
-  bitly: { name: 'Bitly', url: 'https://bitly.com', verified: '2026-11-06', pricingUrl: BITLY_PRICING }
+  bitly: { name: 'Bitly', url: 'https://bitly.com', verified: '2026-11-06', pricingUrl: BITLY_PRICING },
+  tinyurl: { name: 'TinyURL', url: 'https://tinyurl.com', verified: '2026-11-06', pricingUrl: TINYURL_PRICING },
+  dub: { name: 'Dub', url: 'https://dub.co', verified: '2026-11-06', pricingUrl: DUB_PRICING },
+  'short-io': { name: 'Short.io', url: 'https://short.io', verified: '2026-11-06', pricingUrl: SHORTIO_PRICING }
 };
 
 /** @type {ReadonlyArray<Feature>} */
@@ -71,7 +81,10 @@ export const FEATURES = [
         value: 'Basic tr.ee short links. Sending visitors straight to the destination needs Starter',
         source: LINKTREE_PRICING
       },
-      bitly: { value: '5 links a month, with ads', source: BITLY_PRICING }
+      bitly: { value: '5 links a month, with ads', source: BITLY_PRICING },
+      tinyurl: { value: '30 links a month with a free account', source: TINYURL_PRICING },
+      dub: { value: '25 new links a month', source: DUB_PRICING },
+      'short-io': { value: "1,000 links over the account's lifetime", source: SHORTIO_PRICING }
     }
   },
   {
@@ -80,7 +93,9 @@ export const FEATURES = [
     iksi: { value: 'Up to 50 characters, no account needed', offered: true, plan: 'free' },
     competitors: {
       linktree: { value: 'Custom back-halves need Starter', gated: true, source: LINKTREE_PRICING },
-      bitly: { value: '3 custom back-halves a month', source: BITLY_PRICING }
+      bitly: { value: '3 custom back-halves a month', source: BITLY_PRICING },
+      tinyurl: { value: 'Custom aliases, such as tinyurl.com/alias', source: TINYURL_PRICING },
+      'short-io': { value: 'Custom slugs on every plan', source: SHORTIO_PRICING }
     }
   },
   {
@@ -89,7 +104,12 @@ export const FEATURES = [
     iksi: { value: 'PNG QR code for each new short link', offered: true, plan: 'free' },
     competitors: {
       linktree: { value: 'QR code for your Linktree. Custom colors and logo need Starter', source: LINKTREE_PRICING },
-      bitly: { value: '2 QR codes a month', source: BITLY_PRICING }
+      bitly: { value: '2 QR codes a month', source: BITLY_PRICING },
+      dub: {
+        value: 'QR codes carry the Dub logo. Removing it or adding your own needs Pro',
+        source: `${DUB_HELP}custom-qr-codes`
+      },
+      'short-io': { value: 'QR codes with custom colors and logos', source: SHORTIO_PRICING }
     }
   },
   {
@@ -103,7 +123,11 @@ export const FEATURES = [
     },
     competitors: {
       linktree: { value: 'Unlimited basic links and 1 featured link', source: LINKTREE_PRICING },
-      bitly: { value: '2 pages, with Bitly branding', source: BITLY_PRICING }
+      bitly: { value: '2 pages, with Bitly branding', source: BITLY_PRICING },
+      'short-io': {
+        value: 'Link bundles: one short link that opens a branded page of your links',
+        source: SHORTIO_PRICING
+      }
     }
   },
   {
@@ -116,21 +140,28 @@ export const FEATURES = [
       feature: 'smart-routing'
     },
     competitors: {
-      linktree: { value: 'Rules by location or referrer need Premium', gated: true, source: LINKTREE_PRICING }
+      linktree: { value: 'Rules by location or referrer need Premium', gated: true, source: LINKTREE_PRICING },
+      dub: { value: 'Geo targeting needs Pro', gated: true, source: `${DUB_HELP}geo-targeting` },
+      'short-io': { value: 'Mobile OS targeting. Country targeting needs Hobby', source: SHORTIO_PRICING }
     }
   },
   {
     id: 'ab-split',
     label: 'A/B split',
     iksi: { value: '2 to 5 weighted destinations per rule', offered: true, plan: 'free' },
-    competitors: {}
+    competitors: {
+      dub: { value: 'A/B testing needs Business', gated: true, source: `${DUB_HELP}ab-testing` },
+      'short-io': { value: 'A/B testing on every plan', source: SHORTIO_PRICING }
+    }
   },
   {
     id: 'password',
     label: 'Password-protected links',
     iksi: { value: 'A password on any link you own', offered: true, plan: 'free', feature: 'password-protected-links' },
     competitors: {
-      linktree: { value: 'Password and code lock need Pro', gated: true, source: LINKTREE_PRICING }
+      linktree: { value: 'Password and code lock need Pro', gated: true, source: LINKTREE_PRICING },
+      dub: { value: 'Password protection needs Pro', gated: true, source: `${DUB_HELP}password-protected-links` },
+      'short-io': { value: 'Password protection needs Pro', gated: true, source: SHORTIO_PRICING }
     }
   },
   {
@@ -139,7 +170,10 @@ export const FEATURES = [
     iksi: { value: 'By date, by click limit, or both', offered: true, plan: 'free', feature: 'link-expiry' },
     competitors: {
       linktree: { value: 'Scheduling a link to go live and disappear needs Starter', gated: true, source: LINKTREE_PRICING },
-      bitly: { value: 'Link expiration needs Growth', gated: true, source: BITLY_PRICING }
+      bitly: { value: 'Link expiration needs Growth', gated: true, source: BITLY_PRICING },
+      tinyurl: { value: 'Setting expiration dates needs Pro', gated: true, source: TINYURL_PRICING },
+      dub: { value: 'Link expiration needs Pro', gated: true, source: `${DUB_HELP}link-expiration` },
+      'short-io': { value: 'Expiry by date or click limit needs Pro', gated: true, source: SHORTIO_PRICING }
     }
   },
   {
@@ -166,7 +200,16 @@ export const FEATURES = [
         value: 'Lifetime totals, with 28 days of history. Per-link, location, device and referrer data need a paid plan',
         source: LINKTREE_PRICING
       },
-      bitly: { value: 'No click history. Country, device and referrer data need a paid plan', source: BITLY_PRICING }
+      bitly: { value: 'No click history. Country, device and referrer data need a paid plan', source: BITLY_PRICING },
+      tinyurl: { value: 'Click analytics, including total clicks, need Pro', gated: true, source: TINYURL_PRICING },
+      dub: {
+        value: '1,000 tracked events a month, broken down by location, device and referrer',
+        source: `${DUB_HELP}dub-analytics-limits`
+      },
+      'short-io': {
+        value: 'Stats by country, device and language for 50,000 clicks a month',
+        source: SHORTIO_PRICING
+      }
     }
   },
   {
@@ -186,7 +229,12 @@ export const FEATURES = [
       plan: 'free'
     },
     competitors: {
-      bitly: { value: '1,000 requests a month', source: BITLY_PRICING }
+      bitly: { value: '1,000 requests a month', source: BITLY_PRICING },
+      dub: { value: '60 requests a minute per key', source: DUB_RATE_LIMITS },
+      'short-io': {
+        value: '50 requests a second. 1,000 links in total by API or bulk create',
+        source: SHORTIO_PRICING
+      }
     }
   },
   {
@@ -194,7 +242,8 @@ export const FEATURES = [
     label: 'Browser extension',
     iksi: { value: 'Chrome', offered: true, plan: 'free' },
     competitors: {
-      bitly: { value: 'Chrome, Edge and Firefox', source: BITLY_PRICING }
+      bitly: { value: 'Chrome, Edge and Firefox', source: BITLY_PRICING },
+      'short-io': { value: 'Browser extensions, plus mobile and desktop apps', source: SHORTIO_PRICING }
     }
   },
   {
@@ -218,7 +267,10 @@ export const FEATURES = [
     label: 'Custom domains',
     iksi: { value: 'Not offered', offered: false },
     competitors: {
-      bitly: { value: 'A custom domain needs Growth', gated: true, source: BITLY_PRICING }
+      bitly: { value: 'A custom domain needs Growth', gated: true, source: BITLY_PRICING },
+      tinyurl: { value: 'Connecting your own domain needs Pro', gated: true, source: TINYURL_PRICING },
+      dub: { value: '3 custom domains', source: DUB_PRICING },
+      'short-io': { value: '5 custom domains', source: SHORTIO_PRICING }
     }
   },
   {
@@ -227,7 +279,9 @@ export const FEATURES = [
     iksi: { value: 'Not offered', offered: false },
     competitors: {
       linktree: { value: 'Team seats on Agency or Enterprise plans', source: LINKTREE_PRICING },
-      bitly: { value: 'Multiple users on Enterprise only', source: BITLY_PRICING }
+      bitly: { value: 'Multiple users on Enterprise only', source: BITLY_PRICING },
+      dub: { value: '1 user. Inviting teammates needs Pro', gated: true, source: `${DUB_HELP}how-to-invite-teammates` },
+      'short-io': { value: '1 user. More users need Team', gated: true, source: SHORTIO_PRICING }
     }
   }
 ];

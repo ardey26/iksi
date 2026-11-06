@@ -18,6 +18,8 @@ import { alternativeCopy } from '#lib/marketing/alternatives.js';
 
 afterEach(cleanup);
 
+const IDS = ['linktree', 'bitly', 'tinyurl', 'dub', 'short-io'];
+
 describe('/alternatives/[competitor] load', () => {
   it('throws 404 for an unknown competitor', () => {
     expect(() => load({ params: { competitor: 'foo' } })).toThrow(expect.objectContaining({ status: 404 }));
@@ -27,14 +29,20 @@ describe('/alternatives/[competitor] load', () => {
     expect(() => load({ params: { competitor: 'iksi' } })).toThrow(expect.objectContaining({ status: 404 }));
   });
   it('lists every competitor in entries()', () => {
-    expect(entries()).toEqual(expect.arrayContaining([{ competitor: 'linktree' }, { competitor: 'bitly' }]));
+    expect(entries()).toEqual(IDS.map((competitor) => ({ competitor })));
+  });
+});
+
+describe('/alternatives/[competitor] load for each competitor', () => {
+  it.each(IDS)('returns the id for %s', (id) => {
+    expect(load({ params: { competitor: id } })).toEqual({ id });
   });
 });
 
 describe('competitor page', () => {
-  it('renders h1, answer, table, gaps, switch steps and FAQ in order', () => {
-    const { container } = render(CompetitorPage, { props: { data: { id: 'linktree' } } });
-    const copy = alternativeCopy('linktree');
+  it.each(IDS)('renders h1, answer, table, gaps, switch steps and FAQ in order for %s', (id) => {
+    const { container } = render(CompetitorPage, { props: { data: { id } } });
+    const copy = alternativeCopy(id);
     const html = container.innerHTML;
     const at = (needle) => {
       const i = html.indexOf(needle);
@@ -54,6 +62,7 @@ describe('competitor page', () => {
     for (const g of GAPS) expect(container.textContent).toContain(g);
     for (const s of copy.switchSteps) expect(container.textContent).toContain(s);
     expect(container.querySelectorAll('table')).toHaveLength(1);
+    expect(container.querySelector(`thead th[data-product="${id}"]`)?.textContent).toContain(PRODUCTS[id].name);
   });
 });
 
@@ -62,6 +71,7 @@ describe('hub page', () => {
     const { container } = render(Hub);
     expect(container.querySelectorAll('table')).toHaveLength(1);
     expect(container.querySelectorAll('thead th[data-product]')).toHaveLength(Object.keys(PRODUCTS).length);
+    expect(Object.keys(PRODUCTS)).toEqual(['iksi', ...IDS]);
     for (const id of Object.keys(PRODUCTS).filter((p) => p !== 'iksi')) {
       expect(container.querySelector(`thead a[href="/alternatives/${id}"]`), id).not.toBeNull();
     }
@@ -69,7 +79,7 @@ describe('hub page', () => {
 });
 
 describe('registry', () => {
-  it.each(['/alternatives', '/alternatives/linktree', '/alternatives/bitly'])('contains %s', (path) => {
+  it.each(['/alternatives', ...IDS.map((id) => `/alternatives/${id}`)])('contains %s', (path) => {
     const p = marketingPage(path);
     expect(p?.kind).toBe('alternatives');
   });

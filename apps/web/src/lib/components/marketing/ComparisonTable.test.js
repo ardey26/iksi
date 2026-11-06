@@ -79,4 +79,13 @@ describe('ComparisonTable', () => {
     expect(b.container.querySelector('thead a[href="/alternatives/linktree"]')).not.toBeNull();
     expect(b.container.querySelector('thead a[href="/alternatives/iksi"]')).toBeNull();
   });
+
+  it('widens the table with the number of columns so cells stay readable', () => {
+    const two = render(ComparisonTable, { props: { columns: ['iksi', 'linktree'] } });
+    expect(two.container.querySelector('table').getAttribute('style')).toContain('--columns: 2');
+    cleanup();
+    const six = render(ComparisonTable, { props: { columns: ['iksi', 'linktree', 'bitly', 'tinyurl', 'dub', 'short-io'] } });
+    expect(six.container.querySelector('table').getAttribute('style')).toContain('--columns: 6');
+    expect(six.container.querySelectorAll('thead th[data-product]')).toHaveLength(6);
+  });
 });

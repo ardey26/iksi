@@ -22,8 +22,7 @@ describe('PRODUCTS', () => {
 
   it('lists every product but iksi as a competitor', () => {
     expect(competitorIds()).toEqual(Object.keys(PRODUCTS).filter((id) => id !== 'iksi'));
-    expect(competitorIds()).toContain('linktree');
-    expect(competitorIds()).toContain('bitly');
+    expect(competitorIds()).toEqual(['linktree', 'bitly', 'tinyurl', 'dub', 'short-io']);
   });
 });
 
@@ -94,6 +93,28 @@ describe('gated cells', () => {
   it('only mark cells that name a plan', () => {
     const gated = FEATURES.flatMap((f) => Object.values(f.competitors).filter((c) => c.gated));
     expect(gated.length).toBeGreaterThan(0);
-    for (const c of gated) expect(c.value).toMatch(/\b(Starter|Pro|Premium|Growth|Core|paid|Enterprise)\b/);
+    for (const c of gated) expect(c.value).toMatch(/\b(Starter|Hobby|Pro|Premium|Growth|Core|Business|Team|paid|Enterprise)\b/);
+  });
+});
+
+describe('competitor sources', () => {
+  it('reads every cell from a page on the vendor own domain', () => {
+    const hosts = {
+      linktree: /^https:\/\/linktr\.ee\//,
+      bitly: /^https:\/\/bitly\.com\//,
+      tinyurl: /^https:\/\/tinyurl\.com\//,
+      dub: /^https:\/\/dub\.co\//,
+      'short-io': /^https:\/\/short\.io\//
+    };
+    for (const f of FEATURES) {
+      for (const [id, cell] of Object.entries(f.competitors)) expect(cell.source, `${f.id}.${id}`).toMatch(hosts[id]);
+    }
+    for (const id of competitorIds()) expect(PRODUCTS[id].pricingUrl, id).toMatch(hosts[id]);
+  });
+
+  it('never says a competitor lacks a feature as Not offered', () => {
+    for (const f of FEATURES) {
+      for (const [id, cell] of Object.entries(f.competitors)) expect(cell.value, `${f.id}.${id}`).not.toMatch(/not offered/i);
+    }
   });
 });
