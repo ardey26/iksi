@@ -89,3 +89,11 @@ describe('newestVerified', () => {
     expect(newestVerified()).toMatch(DATE_RE);
   });
 });
+
+describe('gated cells', () => {
+  it('only mark cells that name a plan', () => {
+    const gated = FEATURES.flatMap((f) => Object.values(f.competitors).filter((c) => c.gated));
+    expect(gated.length).toBeGreaterThan(0);
+    for (const c of gated) expect(c.value).toMatch(/\b(Starter|Pro|Premium|Growth|Core|paid|Enterprise)\b/);
+  });
+});

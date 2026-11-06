@@ -14,25 +14,25 @@ function iksiIsFree(id) {
 }
 
 /**
- * Features that are free on iksi and need a paid plan on the competitor,
- * judged by the first sentence of the competitor's own cell.
+ * Features that are free on iksi where the competitor's own cell is marked
+ * `gated`. Each entry carries the competitor's value verbatim.
  * @param {import('./facts.js').CompetitorId} id
  */
-export function paidOnCompetitor(id) {
-  return FEATURES.filter((f) => {
-    const cell = f.competitors[id];
-    if (!cell || !f.iksi.offered || f.iksi.plan !== 'free') return false;
-    return /\bneeds?\b/.test(cell.value.split('. ')[0]);
-  }).map((f) => f.label);
+export function gatedOnCompetitor(id) {
+  return FEATURES.filter((f) => f.competitors[id]?.gated && f.iksi.offered && f.iksi.plan === 'free').map((f) => ({
+    label: f.label,
+    value: /** @type {string} */ (f.competitors[id]?.value)
+  }));
 }
 
 /** @param {import('./facts.js').CompetitorId} id @param {string} name */
 function differenceAnswer(id, name) {
-  const labels = paidOnCompetitor(id);
-  if (labels.length === 0) {
+  const gated = gatedOnCompetitor(id);
+  if (gated.length === 0) {
     return 'iksi puts a link-in-bio profile and the shortener in one tool. The table shows each feature side by side.';
   }
-  return `These are free on iksi and need a paid plan on ${name}, going by its own pages: ${labels.join('; ')}.`;
+  const quoted = gated.map((g) => (/[.!?]$/.test(g.value) ? g.value : `${g.value}.`)).join(' ');
+  return `Free on iksi: ${gated.map((g) => g.label).join('; ')}. On ${name}: ${quoted}`;
 }
 
 /** @param {import('./facts.js').CompetitorId} id */

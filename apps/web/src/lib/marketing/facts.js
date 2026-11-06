@@ -34,8 +34,10 @@
  */
 
 /**
- * @typedef {{ value: string, source: string }} CompetitorFact
- * `source` is the vendor page the value was read from.
+ * @typedef {{ value: string, source: string, gated?: true }} CompetitorFact
+ * `source` is the vendor page the value was read from. `gated: true` is set
+ * only when the value itself says the feature, as the cell describes it,
+ * needs a paid plan. Pages quote gated values verbatim and never paraphrase.
  */
 
 /**
@@ -77,7 +79,7 @@ export const FEATURES = [
     label: 'Custom alias',
     iksi: { value: 'Up to 50 characters, no account needed', offered: true, plan: 'free' },
     competitors: {
-      linktree: { value: 'Custom back-halves need Starter', source: LINKTREE_PRICING },
+      linktree: { value: 'Custom back-halves need Starter', gated: true, source: LINKTREE_PRICING },
       bitly: { value: '3 custom back-halves a month', source: BITLY_PRICING }
     }
   },
@@ -114,7 +116,7 @@ export const FEATURES = [
       feature: 'smart-routing'
     },
     competitors: {
-      linktree: { value: 'Rules by location or referrer need Premium', source: LINKTREE_PRICING }
+      linktree: { value: 'Rules by location or referrer need Premium', gated: true, source: LINKTREE_PRICING }
     }
   },
   {
@@ -128,7 +130,7 @@ export const FEATURES = [
     label: 'Password-protected links',
     iksi: { value: 'A password on any link you own', offered: true, plan: 'free', feature: 'password-protected-links' },
     competitors: {
-      linktree: { value: 'Password and code lock need Pro', source: LINKTREE_PRICING }
+      linktree: { value: 'Password and code lock need Pro', gated: true, source: LINKTREE_PRICING }
     }
   },
   {
@@ -136,8 +138,8 @@ export const FEATURES = [
     label: 'Link expiry',
     iksi: { value: 'By date, by click limit, or both', offered: true, plan: 'free', feature: 'link-expiry' },
     competitors: {
-      linktree: { value: 'Scheduling a link to go live and disappear needs Starter', source: LINKTREE_PRICING },
-      bitly: { value: 'Link expiration needs Growth', source: BITLY_PRICING }
+      linktree: { value: 'Scheduling a link to go live and disappear needs Starter', gated: true, source: LINKTREE_PRICING },
+      bitly: { value: 'Link expiration needs Growth', gated: true, source: BITLY_PRICING }
     }
   },
   {
@@ -206,7 +208,7 @@ export const FEATURES = [
     },
     competitors: {
       linktree: {
-        value: 'Paid products and bookings need Pro. Inbox tips carry a 12% fee',
+        value: 'Paid products and bookings need Pro. Inbox tips carry a 12% fee', gated: true,
         source: LINKTREE_PRICING
       }
     }
@@ -216,7 +218,7 @@ export const FEATURES = [
     label: 'Custom domains',
     iksi: { value: 'Not offered', offered: false },
     competitors: {
-      bitly: { value: 'A custom domain needs Growth', source: BITLY_PRICING }
+      bitly: { value: 'A custom domain needs Growth', gated: true, source: BITLY_PRICING }
     }
   },
   {

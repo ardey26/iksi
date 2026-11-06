@@ -1,22 +1,31 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-const state = vi.hoisted(() => ({ plan: 'free' }));
+const state = vi.hoisted(() => ({ plan: 'free', ungate: '' }));
 vi.mock('./facts.js', async (orig) => {
   const real = await orig();
   return {
     ...real,
     get FEATURES() {
-      return real.FEATURES.map((f) =>
-        f.id === 'link-in-bio' || f.id === 'shortening' ? { ...f, iksi: { ...f.iksi, plan: state.plan } } : f
-      );
+      return real.FEATURES.map((f) => {
+        if (f.id === state.ungate) {
+          const competitors = Object.fromEntries(
+            Object.entries(f.competitors).map(([k, c]) => [k, { value: c.value, source: c.source }])
+          );
+          return { ...f, competitors };
+        }
+        return f.id === 'link-in-bio' || f.id === 'shortening' ? { ...f, iksi: { ...f.iksi, plan: state.plan } } : f;
+      });
     }
   };
 });
 
-import { alternativeCopy, paidOnCompetitor } from './alternatives.js';
+import { alternativeCopy, gatedOnCompetitor } from './alternatives.js';
 import { GAPS, FEATURES } from './facts.js';
 
-afterEach(() => (state.plan = 'free'));
+afterEach(() => {
+  state.plan = 'free';
+  state.ungate = '';
+});
 
 describe('alternativeCopy', () => {
   it.each(['linktree', 'bitly'])('fits search limits and names iksi for %s', (id) => {
@@ -64,18 +73,24 @@ describe('claims follow the facts', () => {
     }
   });
 
-  it.each(['linktree', 'bitly'])('names only facts-backed differences for %s', (id) => {
+  it.each(['linktree', 'bitly'])('quotes every gated cell verbatim and no other cell for %s', (id) => {
     const a = alternativeCopy(id).faq.find((f) => /different/i.test(f.q)).a;
-    const backed = paidOnCompetitor(id);
+    const gated = gatedOnCompetitor(id);
+    expect(gated.length).toBeGreaterThan(0);
     for (const f of FEATURES) {
-      if (!backed.includes(f.label)) expect(a, f.label).not.toContain(f.label);
+      const cell = f.competitors[id];
+      if (!cell) continue;
+      if (cell.gated && f.iksi.offered && f.iksi.plan === 'free') expect(a, f.id).toContain(cell.value);
+      else expect(a, f.id).not.toContain(cell.value);
     }
-    for (const label of backed) {
-      const f = FEATURES.find((x) => x.label === label);
-      expect(f.iksi.plan).toBe('free');
-      expect(f.competitors[id].value.split('. ')[0]).toMatch(/\bneeds?\b/);
-      expect(a).toContain(label);
-    }
+  });
+
+  it('leaves out a feature whose cell is not gated', () => {
+    state.ungate = 'password';
+    const a = alternativeCopy('linktree').faq.find((f) => /different/i.test(f.q)).a;
+    expect(a).not.toContain('Password and code lock need Pro');
+    expect(a).not.toContain('Password-protected links');
+    expect(a).toContain('Custom back-halves need Starter');
   });
 
   it('never claims every link can route', () => {
