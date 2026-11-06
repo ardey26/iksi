@@ -97,6 +97,12 @@ describe('feature page', () => {
     expect(hrefs).toContain('/');
     expect(hrefs).toContain('/alternatives');
   });
+  it.each(SLUGS)('styles every inline link as a text link on %s', (slug) => {
+    const { container } = render(FeaturePage, { props: { data: { slug } } });
+    const links = [...container.querySelectorAll('p a, li a')];
+    expect(links.length).toBeGreaterThan(0);
+    for (const a of links) expect(a.classList.contains('text-link'), a.textContent).toBe(true);
+  });
   it.each(SLUGS)('dates the plan label from the facts on %s', (slug) => {
     const { container } = render(FeaturePage, { props: { data: { slug } } });
     expect(container.textContent).toContain(`checked ${formatDay(PRODUCTS.iksi.verified)}`);
@@ -118,6 +124,7 @@ describe('feature page', () => {
       const { container } = render(FeaturePage, { props: { data: { slug: 'link-in-bio' } } });
       const a = container.querySelector('[data-example] a');
       expect(a.getAttribute('href')).toBe('https://www.iksi.app/abc123');
+      expect(a.classList.contains('text-link')).toBe(true);
       expect(container.querySelector('[data-example]').textContent).toContain('A live profile row.');
     } finally {
       FEATURE_PAGES['link-in-bio'].example = saved;

@@ -71,6 +71,13 @@ describe('/tools/qr-code', () => {
     expect(document.body.textContent).toMatch(/destination/i);
   });
 
+  it('styles every inline link as a text link', () => {
+    const { container } = render(QrPage);
+    const links = [...container.querySelectorAll('p a')];
+    expect(links.length).toBeGreaterThan(0);
+    for (const a of links) expect(a.classList.contains('text-link'), a.textContent).toBe(true);
+  });
+
   it('is registered with an FAQ', () => {
     const p = marketingPage('/tools/qr-code');
     expect(p.kind).toBe('tool');

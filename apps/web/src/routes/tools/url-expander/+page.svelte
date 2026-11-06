@@ -1,4 +1,6 @@
 <script>
+  import Faq from '#lib/components/marketing/Faq.svelte';
+  import TextLink from '#lib/components/marketing/TextLink.svelte';
   import { URL_EXPANDER, VERDICT_BADGES, linkHost } from '#lib/marketing/link-tools.js';
   import { Badge, Button, Container, Input, List, PageHeader, Paper, Row, Section, Skeleton } from '#lib/ui/index.js';
 
@@ -121,21 +123,12 @@
   <Section title="Check before you click" class="block">
     <Paper>
       <p class="t-body">
-        To check a link without following it, use the <a href="/tools/link-checker">link checker</a>. To make links of your own, <a href="/">shorten a link with iksi</a>; every new link is checked against Google Safe Browsing.
+        To check a link without following it, use the <TextLink href="/tools/link-checker">link checker</TextLink>. To make links of your own, <TextLink href="/">shorten a link with iksi</TextLink>; every new link is checked against Google Safe Browsing.
       </p>
     </Paper>
   </Section>
 
-  <Section title="Questions" class="block">
-    <Paper>
-      <dl class="faq">
-        {#each URL_EXPANDER.faq as item (item.q)}
-          <dt class="t-label">{item.q}</dt>
-          <dd class="t-body">{item.a}</dd>
-        {/each}
-      </dl>
-    </Paper>
-  </Section>
+  <Faq items={URL_EXPANDER.faq} />
 </Container>
 
 <style>
@@ -150,8 +143,4 @@
   .summary { margin: 8px 0 0; color: var(--text-muted); }
   .summary:first-child { margin-top: 0; }
   .note { margin: 0; color: var(--text-muted); }
-  .faq { margin: 0; display: grid; gap: 4px; }
-  .faq dt { margin-top: 16px; color: var(--text-primary); }
-  .faq dt:first-child { margin-top: 0; }
-  .faq dd { margin: 0; color: var(--text-muted); }
 </style>

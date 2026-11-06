@@ -97,6 +97,13 @@ describe('/tools/url-expander', () => {
     expect(screen.getByRole('link', { name: /link checker/i }).getAttribute('href')).toBe('/tools/link-checker');
   });
 
+  it('styles every inline link as a text link', () => {
+    const { container } = render(Page);
+    const links = [...container.querySelectorAll('p a')];
+    expect(links.length).toBeGreaterThan(0);
+    for (const a of links) expect(a.classList.contains('text-link'), a.textContent).toBe(true);
+  });
+
   it('is registered with an FAQ that says scripts are not followed', () => {
     const p = marketingPage('/tools/url-expander');
     expect(p.kind).toBe('tool');

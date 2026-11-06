@@ -72,6 +72,13 @@ describe('/tools/link-checker', () => {
     expect(screen.getByRole('link', { name: /url expander/i }).getAttribute('href')).toBe('/tools/url-expander');
   });
 
+  it('styles every inline link as a text link', () => {
+    const { container } = render(Page);
+    const links = [...container.querySelectorAll('p a')];
+    expect(links.length).toBeGreaterThan(0);
+    for (const a of links) expect(a.classList.contains('text-link'), a.textContent).toBe(true);
+  });
+
   it('is registered with an FAQ', () => {
     const p = marketingPage('/tools/link-checker');
     expect(p.kind).toBe('tool');

@@ -1,5 +1,7 @@
 <script>
   import ComparisonTable from '#lib/components/marketing/ComparisonTable.svelte';
+  import Faq from '#lib/components/marketing/Faq.svelte';
+  import PlainList from '#lib/components/marketing/PlainList.svelte';
   import { GAPS, PRODUCTS } from '#lib/marketing/facts.js';
   import { alternativeCopy } from '#lib/marketing/alternatives.js';
   import { Container, PageHeader, Paper, Section } from '#lib/ui/index.js';
@@ -20,57 +22,23 @@
 
   <Section title="Where iksi falls short" class="block">
     <Paper>
-      <ul class="plain">
+      <PlainList>
         {#each GAPS as gap (gap)}
           <li class="t-body">{gap}</li>
         {/each}
-      </ul>
+      </PlainList>
     </Paper>
   </Section>
 
   <Section title="How to switch" class="block">
     <Paper>
-      <ol class="plain">
+      <PlainList ordered>
         {#each copy.switchSteps as step (step)}
           <li class="t-body">{step}</li>
         {/each}
-      </ol>
+      </PlainList>
     </Paper>
   </Section>
 
-  <Section title="Questions" class="block">
-    <Paper>
-      <dl class="faq">
-        {#each copy.faq as item (item.q)}
-          <dt class="t-label">{item.q}</dt>
-          <dd class="t-body">{item.a}</dd>
-        {/each}
-      </dl>
-    </Paper>
-  </Section>
+  <Faq items={copy.faq} />
 </Container>
-
-<style>
-  .plain {
-    margin: 0;
-    padding-left: 20px;
-    display: grid;
-    gap: 12px;
-  }
-  .faq {
-    margin: 0;
-    display: grid;
-    gap: 4px;
-  }
-  .faq dt {
-    margin-top: 16px;
-    color: var(--text-primary);
-  }
-  .faq dt:first-child {
-    margin-top: 0;
-  }
-  .faq dd {
-    margin: 0;
-    color: var(--text-muted);
-  }
-</style>

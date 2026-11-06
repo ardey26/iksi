@@ -1,4 +1,6 @@
 <script>
+  import Faq from '#lib/components/marketing/Faq.svelte';
+  import TextLink from '#lib/components/marketing/TextLink.svelte';
   import { tick } from 'svelte';
   import QRCode from 'qrcode';
   import { addPrefix } from '#lib/utils/urlValidation.js';
@@ -79,21 +81,12 @@
   <Section title="Shorten it first" class="block">
     <Paper>
       <p class="t-body">
-        A long link makes a dense QR code that is harder to scan. <a href="/">Shorten the link with iksi</a> first and the code stays small and simple. A short link's destination can also be changed later, so a printed code keeps working.
+        A long link makes a dense QR code that is harder to scan. <TextLink href="/">Shorten the link with iksi</TextLink> first and the code stays small and simple. A short link's destination can also be changed later, so a printed code keeps working.
       </p>
     </Paper>
   </Section>
 
-  <Section title="Questions" class="block">
-    <Paper>
-      <dl class="faq">
-        {#each QR_TOOL.faq as item (item.q)}
-          <dt class="t-label">{item.q}</dt>
-          <dd class="t-body">{item.a}</dd>
-        {/each}
-      </dl>
-    </Paper>
-  </Section>
+  <Faq items={QR_TOOL.faq} />
 </Container>
 
 <style>
@@ -110,8 +103,4 @@
   canvas { display: block; }
   /* Holds the button's height whether or not it shows. */
   .actions { min-height: 44px; margin-top: 16px; display: grid; }
-  .faq { margin: 0; display: grid; gap: 4px; }
-  .faq dt { margin-top: 16px; color: var(--text-primary); }
-  .faq dt:first-child { margin-top: 0; }
-  .faq dd { margin: 0; color: var(--text-muted); }
 </style>

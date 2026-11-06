@@ -1,4 +1,6 @@
 <script>
+  import Faq from '#lib/components/marketing/Faq.svelte';
+  import TextLink from '#lib/components/marketing/TextLink.svelte';
   import { LINK_CHECKER, VERDICT_BADGES, linkHost } from '#lib/marketing/link-tools.js';
   import { Badge, Button, Container, Input, PageHeader, Paper, Section, Skeleton } from '#lib/ui/index.js';
 
@@ -66,21 +68,12 @@
   <Section title="Where does it lead?" class="block">
     <Paper>
       <p class="t-body">
-        A short link hides its destination. The <a href="/tools/url-expander">URL expander</a> follows it and checks where it ends up. To make links of your own, <a href="/">shorten a link with iksi</a>; every new link is checked against Google Safe Browsing.
+        A short link hides its destination. The <TextLink href="/tools/url-expander">URL expander</TextLink> follows it and checks where it ends up. To make links of your own, <TextLink href="/">shorten a link with iksi</TextLink>; every new link is checked against Google Safe Browsing.
       </p>
     </Paper>
   </Section>
 
-  <Section title="Questions" class="block">
-    <Paper>
-      <dl class="faq">
-        {#each LINK_CHECKER.faq as item (item.q)}
-          <dt class="t-label">{item.q}</dt>
-          <dd class="t-body">{item.a}</dd>
-        {/each}
-      </dl>
-    </Paper>
-  </Section>
+  <Faq items={LINK_CHECKER.faq} />
 </Container>
 
 <style>
@@ -107,8 +100,4 @@
     color: var(--text-muted);
   }
   .note { margin: 0; color: var(--text-muted); }
-  .faq { margin: 0; display: grid; gap: 4px; }
-  .faq dt { margin-top: 16px; color: var(--text-primary); }
-  .faq dt:first-child { margin-top: 0; }
-  .faq dd { margin: 0; color: var(--text-muted); }
 </style>
