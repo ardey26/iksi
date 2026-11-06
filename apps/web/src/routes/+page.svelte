@@ -1,5 +1,4 @@
 <script>
-  import { CHROME_EXTENSION_URL } from '#lib/extension-store.js';
   import { Input, ShortenedURL } from '#lib/components/index.js';
   import OneTimeForm from '#lib/components/OneTimeForm.svelte';
   import { Button, Container, Paper, Segmented } from '#lib/ui/index.js';
@@ -213,15 +212,6 @@
     </Container>
   </section>
 
-  <footer class="band site-foot">
-    <Container width="wide">
-      <div class="foot-inner">
-        <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">Chrome extension</a>
-        <a href="/report">Report a link</a>
-        <a href="/privacy">Privacy</a>
-      </div>
-    </Container>
-  </footer>
 </div>
 
 <style>
@@ -371,27 +361,6 @@
     gap: 16px;
     padding: 32px 0 48px;
   }
-  .foot-inner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-    padding: 8px 0 16px;
-    font-size: 13px;
-    line-height: 18px;
-    color: var(--text-faint);
-  }
-  .foot-inner a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    color: var(--text-muted);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 2px;
-    transition: color var(--duration-normal) var(--ease-out);
-  }
-  .foot-inner a:hover { color: var(--text-primary); }
   .cta-text {
     margin: 0;
     font-size: 15px;

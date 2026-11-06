@@ -1,5 +1,6 @@
 <script>
   import { MARKETING_PAGES } from '#lib/marketing/pages.js';
+  import { CHROME_EXTENSION_URL } from '#lib/extension-store.js';
 
   const GROUPS = [
     { kind: 'alternatives', heading: 'Compare' },
@@ -27,6 +28,10 @@
     <section class="footer-group" aria-label="Legal">
       <ul class="footer-list">
         <li><a class="t-caption footer-link" href="/privacy">Privacy</a></li>
+        <li><a class="t-caption footer-link" href="/report">Report a link</a></li>
+        <li>
+          <a class="t-caption footer-link" href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">Chrome extension</a>
+        </li>
       </ul>
     </section>
   </div>

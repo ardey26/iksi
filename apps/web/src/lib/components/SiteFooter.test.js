@@ -61,11 +61,24 @@ describe('SiteFooter', () => {
     expect(container.querySelector('a[href="/privacy"]')).not.toBeNull();
   });
 
-  it('renders only Privacy when the registry is empty', () => {
+  it('groups Privacy, Report a link and the Chrome extension, in that order', () => {
+    const legal = render(SiteFooter).container.querySelector('section[aria-label="Legal"]');
+    expect([...legal.querySelectorAll('a')].map((a) => [a.textContent.trim(), a.getAttribute('href')])).toEqual([
+      ['Privacy', '/privacy'],
+      ['Report a link', '/report'],
+      ['Chrome extension', 'https://chromewebstore.google.com/detail/iksi/fjlijiannnmnggbaknnkcloofcoeejnf']
+    ]);
+  });
+
+  it('renders only the legal links when the registry is empty', () => {
     registry.pages = [];
     const { container } = render(SiteFooter);
     expect(screen.queryAllByRole('heading')).toHaveLength(0);
-    expect([...container.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/privacy']);
+    expect([...container.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual([
+      '/privacy',
+      '/report',
+      'https://chromewebstore.google.com/detail/iksi/fjlijiannnmnggbaknnkcloofcoeejnf'
+    ]);
   });
 });
 

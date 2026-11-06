@@ -155,15 +155,8 @@ describe('home page layout', () => {
 });
 
 describe('home page footer', () => {
-  it('links the extension, the report form and the privacy policy, below the fold', () => {
+  it('leaves the footer to the layout, so the page has exactly one', () => {
     const { container } = render(Home);
-    const foot = container.querySelector('footer.site-foot');
-    expect([...foot.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Chrome extension', 'https://chromewebstore.google.com/detail/iksi/fjlijiannnmnggbaknnkcloofcoeejnf'],
-      ['Report a link', '/report'],
-      ['Privacy', '/privacy']
-    ]);
-    // The first screen stays the tool alone: the footer is outside the hero.
-    expect(container.querySelector('section.hero').contains(foot)).toBe(false);
+    expect(container.querySelector('footer')).toBeNull();
   });
 });
