@@ -204,14 +204,16 @@ export const FEATURES = [
         value: 'Lifetime totals, with 28 days of history. Per-link, location, device and referrer data need a paid plan',
         source: LINKTREE_PRICING
       },
-      bitly: { value: 'No click history. Country, device and referrer data need a paid plan', source: BITLY_PRICING },
+      bitly: { value: 'No data history. Country, device and referrer data need a paid plan', source: BITLY_PRICING },
       tinyurl: { value: 'Click analytics, including total clicks, need Pro', gated: true, source: TINYURL_PRICING },
       dub: {
         value: '1,000 tracked events a month, broken down by location, device and referrer',
         source: `${DUB_HELP}dub-analytics-limits`
       },
       'short-io': {
-        value: 'Stats by country, device and language for 50,000 clicks a month',
+        // The pricing table says 50,000/mo and its FAQ says the first 50,000 clicks;
+        // this wording holds under both.
+        value: 'Stats by country, device and language for up to 50,000 tracked clicks',
         source: SHORTIO_PRICING
       }
     }
@@ -261,7 +263,8 @@ export const FEATURES = [
     },
     competitors: {
       linktree: {
-        value: 'Paid products and bookings need Pro. Inbox tips carry a 12% fee', gated: true,
+        // Not gated: iksi sells no products or bookings, and the tip fee is not a plan.
+        value: 'Paid products and bookings need Pro. Inbox tips carry a 12% fee',
         source: LINKTREE_PRICING
       }
     }

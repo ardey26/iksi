@@ -128,3 +128,21 @@ describe('TinyURL shortening', () => {
     expect(cell.gated).toBeUndefined();
   });
 });
+
+describe('analytics cells', () => {
+  const cells = FEATURES.find((f) => f.id === 'analytics').competitors;
+  it('uses Bitly own row name, Data History', () => {
+    expect(cells.bitly.value).toMatch(/^No data history\./);
+  });
+  it('words the Short.io limit so it holds as a monthly cap and as a first-clicks cap', () => {
+    expect(cells['short-io'].value).toBe('Stats by country, device and language for up to 50,000 tracked clicks');
+  });
+});
+
+describe('Linktree payments', () => {
+  it('is not gated: iksi sells no products or bookings, and a fee is not a plan', () => {
+    const cell = FEATURES.find((f) => f.id === 'payments').competitors.linktree;
+    expect(cell.gated).toBeUndefined();
+    expect(cell.value).toBe('Paid products and bookings need Pro. Inbox tips carry a 12% fee');
+  });
+});

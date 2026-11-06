@@ -31,8 +31,9 @@ function differenceAnswer(id, name) {
   if (gated.length === 0) {
     return 'iksi puts a link-in-bio profile and the shortener in one tool. The table shows each feature side by side.';
   }
-  const quoted = gated.map((g) => (/[.!?]$/.test(g.value) ? g.value : `${g.value}.`)).join(' ');
-  return `Free on iksi: ${gated.map((g) => g.label).join('; ')}. On ${name}: ${quoted}`;
+  // One pair per feature, so each competitor cell sits beside the iksi feature it gates.
+  const quote = (/** @type {string} */ v) => (/[.!?]$/.test(v) ? v : `${v}.`);
+  return gated.map((g) => `Free on iksi: ${g.label}. On ${name}: ${quote(g.value)}`).join(' ');
 }
 
 /** @param {import('./facts.js').CompetitorId} id */

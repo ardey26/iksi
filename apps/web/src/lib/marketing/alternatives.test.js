@@ -96,6 +96,22 @@ describe('claims follow the facts', () => {
     }
   });
 
+  it.each(IDS)('pairs each free iksi feature with its quoted %s cell', (id) => {
+    const name = { linktree: 'Linktree', bitly: 'Bitly', tinyurl: 'TinyURL', dub: 'Dub', 'short-io': 'Short.io' }[id];
+    const a = alternativeCopy(id).faq.find((f) => /different/i.test(f.q)).a;
+    for (const g of gatedOnCompetitor(id)) {
+      const value = /[.!?]$/.test(g.value) ? g.value : `${g.value}.`;
+      expect(a).toContain(`Free on iksi: ${g.label}. On ${name}: ${value}`);
+    }
+    expect(a).not.toMatch(/Free on iksi: [^.]*;/);
+  });
+
+  it('does not compare iksi payments with Linktree products or bookings', () => {
+    const a = alternativeCopy('linktree').faq.find((f) => /different/i.test(f.q)).a;
+    expect(a).not.toContain('Paid products and bookings');
+    expect(a).not.toContain('Payments on your profile');
+  });
+
   it('leaves out a feature whose cell is not gated', () => {
     state.ungate = 'password';
     const a = alternativeCopy('linktree').faq.find((f) => /different/i.test(f.q)).a;
