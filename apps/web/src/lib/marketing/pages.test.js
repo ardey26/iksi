@@ -74,3 +74,29 @@ describe('marketing routes', () => {
     }
   });
 });
+
+// The root layout reads a page's SEO from page.data, which each section's
+// +layout.js fills from the registry, so the registry never loads on other pages.
+describe('marketing section layouts', () => {
+  const layouts = import.meta.glob('/src/routes/{alternatives,features,tools,docs}/+layout.js');
+
+  it('give every registered page its title, description and structured data', async () => {
+    for (const p of MARKETING_PAGES) {
+      const key = `/src/routes/${p.path.split('/')[1]}/+layout.js`;
+      expect(layouts[key], key).toBeDefined();
+      const { load } = await layouts[key]();
+      const data = load({ url: new URL(`https://www.iksi.app${p.path}`) });
+      expect(data.marketing, p.path).toEqual({
+        path: p.path,
+        title: p.title,
+        description: p.description,
+        structuredData: p.structuredData()
+      });
+    }
+  });
+
+  it('give an unregistered path nothing', async () => {
+    const { load } = await layouts['/src/routes/features/+layout.js']();
+    expect(load({ url: new URL('https://www.iksi.app/features/nope') }).marketing).toBeNull();
+  });
+});

@@ -1,5 +1,5 @@
 <script>
-  import { MARKETING_PAGES } from '#lib/marketing/pages.js';
+  import { MARKETING_NAV } from '#lib/marketing/nav.js';
   import { CHROME_EXTENSION_URL } from '#lib/extension-store.js';
 
   const GROUPS = [
@@ -10,7 +10,7 @@
   ];
 
   // Static data: server and client render the same markup, so no height change.
-  const groups = GROUPS.map((g) => ({ ...g, pages: MARKETING_PAGES.filter((p) => p.kind === g.kind) })).filter((g) => g.pages.length > 0);
+  const groups = GROUPS.map((g) => ({ ...g, pages: MARKETING_NAV.filter((p) => p.kind === g.kind) })).filter((g) => g.pages.length > 0);
 </script>
 
 <footer class="site-footer">

@@ -1,4 +1,3 @@
-import { marketingPage } from '../marketing/pages.js';
 import { organization, softwareApplication, website, withGraph } from './schema.js';
 
 const OG_IMAGE = 'https://www.iksi.app/og-image.png';
@@ -7,7 +6,13 @@ export function homepageStructuredData() {
   return withGraph(website(), softwareApplication(), organization());
 }
 
-export function seoForRoute(pathname, host) {
+/**
+ * @param {string} pathname The routed path.
+ * @param {string} host
+ * @param {{ path: string, title: string, description: string, structuredData: object | null } | null} [marketing]
+ *   A marketing page's SEO, from its section layout load (page.data.marketing).
+ */
+export function seoForRoute(pathname, host, marketing = null) {
   const isAdminHost = host === 'admin.iksi.app' || host === 'admin.localhost';
   if (isAdminHost) {
     return {
@@ -39,14 +44,13 @@ export function seoForRoute(pathname, host) {
       noindex: false
     };
   }
-  const page = marketingPage(pathname);
-  if (page) {
+  if (marketing && marketing.path === pathname) {
     return {
-      title: page.title,
-      description: page.description,
-      canonical: `https://www.iksi.app${page.path}`,
+      title: marketing.title,
+      description: marketing.description,
+      canonical: `https://www.iksi.app${marketing.path}`,
       ogImage: OG_IMAGE,
-      structuredData: page.structuredData ? page.structuredData() : null,
+      structuredData: marketing.structuredData,
       noindex: false
     };
   }

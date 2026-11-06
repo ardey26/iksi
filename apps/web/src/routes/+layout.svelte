@@ -5,7 +5,7 @@
   import UserMenu from '#lib/components/UserMenu.svelte';
   import BrandMark from '#lib/components/BrandMark.svelte';
   import SiteFooter from '#lib/components/SiteFooter.svelte';
-  import { marketingPage } from '#lib/marketing/pages.js';
+  import { isMarketingPath } from '#lib/marketing/nav.js';
   import { page, navigating } from '$app/state';
   import { isDashboardPath, isProfilePath } from '#lib/utils/route-kind.js';
   import { appHref, routedPathname } from '#lib/subdomains.js';
@@ -14,7 +14,10 @@
   let { data, children } = $props();
 
   // By route: on andre.iksi.app the path `/sale` is @andre/sale.
-  const seo = $derived(seoForRoute(routedPathname(page.url, import.meta.env.DEV), page.url.host));
+  const routed = $derived(routedPathname(page.url, import.meta.env.DEV));
+  // A marketing page's SEO comes from its section layout, so the registry and
+  // its facts load only there, not on every page.
+  const seo = $derived(seoForRoute(routed, page.url.host, page.data?.marketing));
   const isAdminSurface = $derived(page.url.host === 'admin.iksi.app' || page.url.host === 'admin.localhost' || page.url.host.startsWith('admin.localhost:') || page.url.pathname.startsWith('/admin'));
   const onLoginPage = $derived(page.url.pathname === '/login');
   // Only /@handle itself: /@handle/name is a short link and keeps the site chrome.
@@ -25,7 +28,7 @@
   const signIn = $derived(appHref('/login', page.url.host, import.meta.env.DEV));
   const isDashboard = $derived(isDashboardPath(page.url.pathname));
   // Footer only on public marketing surfaces, never on short links or the app.
-  const showFooter = $derived(page.url.pathname === '/' || page.url.pathname === '/privacy' || !!marketingPage(page.url.pathname));
+  const showFooter = $derived(routed === '/' || routed === '/privacy' || isMarketingPath(routed));
 
   // Theme is resolved by the inline script in app.html before first paint and
   // kept in sync by $lib/stores/theme.js. Nothing to do on mount.

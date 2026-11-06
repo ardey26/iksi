@@ -20,14 +20,14 @@ const registry = vi.hoisted(() => ({
     { path: '/docs/api', title: 'API docs | iksi', label: 'API docs', description: 'd', kind: 'docs' }
   ]
 }));
-vi.mock('#lib/marketing/pages.js', () => ({
-  get MARKETING_PAGES() {
+vi.mock('#lib/marketing/nav.js', () => ({
+  get MARKETING_NAV() {
     return registry.pages;
   },
-  marketingPage: (p) => registry.pages.find((x) => x.path === p)
+  isMarketingPath: (p) => registry.pages.some((x) => x.path === p)
 }));
 
-const page = vi.hoisted(() => ({ url: new URL('https://www.iksi.app/'), route: { id: '/' } }));
+const page = vi.hoisted(() => ({ url: new URL('https://www.iksi.app/'), route: { id: '/' }, data: {} }));
 vi.mock('$app/state', () => ({ page, navigating: { to: null } }));
 
 import SiteFooter from './SiteFooter.svelte';
@@ -83,9 +83,10 @@ describe('SiteFooter', () => {
 });
 
 describe('layout footer', () => {
-  function renderAt(url, route = { id: url }) {
+  function renderAt(url, route = { id: url }, data = {}) {
     page.url = new URL(url);
     page.route = route;
+    page.data = data;
     const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
     return render(Layout, { props: { data: { user: null }, children } });
   }
@@ -105,5 +106,41 @@ describe('layout footer', () => {
   ])('hides on %s', (url, route) => {
     const { container } = renderAt(url, route);
     expect(container.querySelector('footer')).toBeNull();
+  });
+
+  // By route, as the SEO tags are: on andre.iksi.app the path `/` is @andre.
+  it('hides on a profile subdomain root, which routes to the profile', () => {
+    const { container } = renderAt('https://andre.iksi.app/', { id: null });
+    expect(container.querySelector('footer')).toBeNull();
+  });
+});
+
+describe('layout SEO for marketing pages', () => {
+  const marketing = {
+    path: '/features/qr',
+    title: 'QR codes | iksi',
+    description: 'QR description',
+    structuredData: { '@context': 'https://schema.org', '@graph': [{ '@type': 'FAQPage' }] }
+  };
+  const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
+  const renderAt = (url, data) => {
+    page.url = new URL(url);
+    page.route = { id: new URL(url).pathname };
+    page.data = data;
+    return render(Layout, { props: { data: { user: null }, children } });
+  };
+
+  it('takes title, description, canonical and JSON-LD from the page load', () => {
+    renderAt('https://www.iksi.app/features/qr', { marketing });
+    expect(document.title).toBe('QR codes | iksi');
+    expect(document.head.querySelector('meta[name="description"]').getAttribute('content')).toBe('QR description');
+    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://www.iksi.app/features/qr');
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+    expect(document.head.querySelector('script[type="application/ld+json"]').textContent).toContain('FAQPage');
+  });
+
+  it('noindexes a marketing path whose load gave no SEO', () => {
+    renderAt('https://www.iksi.app/features/qr', {});
+    expect(document.head.querySelector('meta[name="robots"]').getAttribute('content')).toMatch(/noindex/);
   });
 });

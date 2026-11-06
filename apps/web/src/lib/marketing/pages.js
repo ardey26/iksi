@@ -1,5 +1,6 @@
-// Registry of indexable marketing pages. The footer, sitemap and SEO tags all
-// read it; later pages append their entry here.
+// Registry of indexable marketing pages. The sitemap and SEO tags read it;
+// later pages append their entry here and in nav.js, the copy-free list the
+// root layout and footer use (pages.test.js keeps the two in step).
 import { PRODUCTS, competitorIds } from './facts.js';
 import { alternativeCopy, hubCopy } from './alternatives.js';
 import { FEATURE_PAGES, featureSlugs } from './features.js';
@@ -76,4 +77,25 @@ function pick({ title, description }) {
 /** @param {string} path @returns {MarketingPage | undefined} */
 export function marketingPage(path) {
   return MARKETING_PAGES.find((p) => p.path === path);
+}
+
+/**
+ * The SEO a marketing page hands the root layout through page.data, or null.
+ * Structured data is built here, so the layout never imports the registry.
+ * @param {string} path
+ */
+export function marketingSeo(path) {
+  const p = marketingPage(path);
+  if (!p) return null;
+  return {
+    path: p.path,
+    title: p.title,
+    description: p.description,
+    structuredData: p.structuredData ? p.structuredData() : null
+  };
+}
+
+/** Load for each marketing section's +layout.js. @param {{ url: URL }} event */
+export function marketingLayoutLoad({ url }) {
+  return { marketing: marketingSeo(url.pathname) };
 }
