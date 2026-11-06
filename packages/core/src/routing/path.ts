@@ -17,7 +17,11 @@ const RESERVED_DIRECTORIES = [
 	'/internal',
 	'/_edge',
 	'/report',
-	'/privacy'
+	'/privacy',
+	'/alternatives',
+	'/features',
+	'/tools',
+	'/docs'
 ] as const;
 
 /**
