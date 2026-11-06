@@ -81,7 +81,7 @@
   <Section title="Shorten it first" class="block">
     <Paper>
       <p class="t-body">
-        A long link makes a dense QR code that is harder to scan. <TextLink href="/">Shorten the link with iksi</TextLink> first and the code stays small and simple. A short link's destination can also be changed later, so a printed code keeps working.
+        A long link makes a dense QR code that is harder to scan. <TextLink href="/">Shorten the link with iksi</TextLink> first and the code stays small and simple. Sign in before you shorten and you can change the destination later, so a printed code keeps working.
       </p>
     </Paper>
   </Section>

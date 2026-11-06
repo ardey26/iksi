@@ -71,6 +71,14 @@ describe('/tools/qr-code', () => {
     expect(document.body.textContent).toMatch(/destination/i);
   });
 
+  // Links shortened signed out have no owner, so nobody can change them.
+  it('says a destination can change only on a link shortened while signed in', () => {
+    render(QrPage);
+    const text = document.body.textContent;
+    expect(text).not.toMatch(/A short link's destination can also be changed later/);
+    expect(text).toContain('Sign in before you shorten and you can change the destination later');
+  });
+
   it('styles every inline link as a text link', () => {
     const { container } = render(QrPage);
     const links = [...container.querySelectorAll('p a')];
