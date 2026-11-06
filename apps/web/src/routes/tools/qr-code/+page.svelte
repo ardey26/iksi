@@ -1,6 +1,7 @@
 <script>
+  import { tick } from 'svelte';
   import QRCode from 'qrcode';
-  import { addPrefix, isValidURL } from '#lib/utils/urlValidation.js';
+  import { addPrefix } from '#lib/utils/urlValidation.js';
   import { QR_TOOL } from '#lib/marketing/qr-tool.js';
   import { Button, Container, Input, PageHeader, Paper, Section } from '#lib/ui/index.js';
 
@@ -14,21 +15,41 @@
   let canvas;
   let ready = false;
   let href = '';
+  let generated = '';
+
+  // Unlike the shortener, iksi links are fine here: people shorten first, then paste.
+  function parse(input) {
+    try {
+      const u = new URL(addPrefix(input));
+      const parts = u.hostname.split('.');
+      const ok = ['http:', 'https:'].includes(u.protocol) && parts.length >= 2 && parts.every((x) => x.length > 0);
+      return ok ? u.href && addPrefix(input) : '';
+    } catch {
+      return '';
+    }
+  }
 
   async function generate() {
-    if (!isValidURL(value)) {
+    href = '';
+    const url = parse(value);
+    if (!url) {
       error = 'Enter a valid link, like example.com.';
       ready = false;
-      href = '';
       return;
     }
     error = '';
-    const url = addPrefix(value);
     ready = true;
-    // The canvas mounts on the next tick; its box already holds the size.
-    await Promise.resolve();
-    await QRCode.toCanvas(canvas, url, { ...OPTIONS, width: BOX * 2 });
-    href = await QRCode.toDataURL(url, { ...OPTIONS, width: 1024 });
+    generated = url;
+    // The canvas mounts after the flush; its box already holds the size.
+    await tick();
+    try {
+      await QRCode.toCanvas(canvas, url, { ...OPTIONS, width: BOX * 2 });
+      href = await QRCode.toDataURL(url, { ...OPTIONS, width: 1024 });
+    } catch {
+      error = 'That link is too long for a QR code.';
+      ready = false;
+      href = '';
+    }
   }
 </script>
 
@@ -44,7 +65,7 @@
       <!-- Reserved at final size, so the page never shifts when the code appears. -->
       <div class="box" data-qr-box style="width: {BOX}px; height: {BOX}px;">
         {#if ready}
-          <canvas bind:this={canvas} style="width: 100%; height: 100%;" aria-label="QR code for {addPrefix(value)}"></canvas>
+          <canvas bind:this={canvas} style="width: 100%; height: 100%;" aria-label="QR code for {generated}"></canvas>
         {/if}
       </div>
       <div class="actions">

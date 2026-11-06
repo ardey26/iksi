@@ -78,4 +78,20 @@ describe('/tools/qr-code', () => {
     render(QrPage);
     expect(screen.getByText('Do QR codes expire?')).toBeTruthy();
   });
+
+  it.each(['iksi.app/abc', 'https://www.iksi.app/abc'])('accepts iksi link %s', async (v) => {
+    const { container } = render(QrPage);
+    await submit(v);
+    await waitFor(() => expect(container.querySelector('canvas')).not.toBeNull());
+    expect(qr.toCanvas.mock.calls[0][1]).toBe(v.startsWith('http') ? v : 'https://' + v);
+  });
+
+  it('shows an error and resets when generation throws', async () => {
+    qr.toCanvas.mockRejectedValue(new Error('data too big'));
+    const { container } = render(QrPage);
+    await submit('example.com');
+    await waitFor(() => expect(container.querySelector('[id$="-error"]').textContent).toMatch(/too long/i));
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
+  });
 });
