@@ -50,7 +50,6 @@
 const LINKTREE_PRICING = 'https://linktr.ee/s/pricing';
 const LINKTREE_SHORTENER = 'https://linktr.ee/features/link-shortener';
 const BITLY_PRICING = 'https://bitly.com/pages/pricing/';
-const BITLY_ROUTING = 'https://bitly.com/pages/features/dynamic-routing/';
 
 /** @type {Readonly<Partial<Record<ProductId, Product>>>} */
 export const PRODUCTS = {
@@ -115,8 +114,7 @@ export const FEATURES = [
       feature: 'smart-routing'
     },
     competitors: {
-      linktree: { value: 'Rules by location or referrer need Premium', source: LINKTREE_PRICING },
-      bitly: { value: 'Routing by location and device needs Growth', source: BITLY_ROUTING }
+      linktree: { value: 'Rules by location or referrer need Premium', source: LINKTREE_PRICING }
     }
   },
   {
