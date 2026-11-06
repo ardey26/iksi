@@ -42,7 +42,7 @@
       <Paper>
         <div data-example>
           <p class="t-body">{copy.example.note}</p>
-          <a class="t-mono" href="https://iksi.app/{copy.example.shortURL}">iksi.app/{copy.example.shortURL}</a>
+          <a class="t-mono" href="https://www.iksi.app/{copy.example.shortURL}">iksi.app/{copy.example.shortURL}</a>
         </div>
       </Paper>
     </Section>

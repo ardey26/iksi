@@ -50,6 +50,16 @@ describe('feature copy', () => {
     for (const id of c.factIds) expect(FEATURES.some((f) => f.id === id), id).toBe(true);
     expect(c.example).toBeUndefined();
   });
+  it('tells link-in-bio users to select Add link', () => {
+    expect(FEATURE_PAGES['link-in-bio'].steps.join(' ')).toMatch(/select Add link/);
+  });
+  it('names the icon-only settings gear by what it looks like', () => {
+    for (const slug of ['smart-routing', 'password-protected-links', 'link-expiry']) {
+      const steps = FEATURE_PAGES[slug].steps.join(' ');
+      expect(steps, slug).not.toMatch(/Select Settings/);
+      expect(steps, slug).toMatch(/Select the gear \(Settings\) next to the link/);
+    }
+  });
   it('contains no middle dots or emojis', () => {
     for (const c of Object.values(FEATURE_PAGES)) {
       const all = JSON.stringify(c);
@@ -107,7 +117,7 @@ describe('feature page', () => {
     try {
       const { container } = render(FeaturePage, { props: { data: { slug: 'link-in-bio' } } });
       const a = container.querySelector('[data-example] a');
-      expect(a.getAttribute('href')).toBe('https://iksi.app/abc123');
+      expect(a.getAttribute('href')).toBe('https://www.iksi.app/abc123');
       expect(container.querySelector('[data-example]').textContent).toContain('A live profile row.');
     } finally {
       FEATURE_PAGES['link-in-bio'].example = saved;

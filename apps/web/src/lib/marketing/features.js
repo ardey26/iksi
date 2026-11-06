@@ -30,7 +30,7 @@ export const FEATURE_PAGES = {
       'A link-in-bio page on iksi lives at iksi.app/@yourhandle. Every row is an iksi short link, so each row can also route visitors by country or device, ask for a password, or expire.',
     steps: [
       'Sign in with X or Google, then claim your handle.',
-      'Open Links, paste a Long URL under New link, add a Title and switch on Show on your page.',
+      'Open Links, paste a Long URL under New link, add a Title, switch on Show on your page and select Add link.',
       'Open Profile to set your display name, bio, accent and background, then select Save changes.',
       'Select View page to check it, then share iksi.app/@yourhandle.'
     ],
@@ -60,7 +60,7 @@ export const FEATURE_PAGES = {
       'Smart routing sends visitors of one short link to different destinations. A rule matches on country, continent, device, operating system, referrer or time of day. The first rule that matches wins, and everyone else goes to the link destination.',
     steps: [
       'Sign in and open Links.',
-      'Select Settings for the link you want to route.',
+      'Select the gear (Settings) next to the link you want to route.',
       'Under Routing rules, select Add rule, then Add condition and pick a type such as Country or Device.',
       'Under Go to, choose One URL or A/B split and enter the destination.',
       'Select Save.'
@@ -91,7 +91,7 @@ export const FEATURE_PAGES = {
       'A password-protected link shows a password page before it redirects. Visitors enter the password to continue, and iksi stores it hashed, not as plain text.',
     steps: [
       'Sign in and open Links.',
-      'Select Settings for the link you want to protect.',
+      'Select the gear (Settings) next to the link you want to protect.',
       'Enter a Password. It needs at least 4 characters.',
       'Select Save.'
     ],
@@ -121,7 +121,7 @@ export const FEATURE_PAGES = {
       'An expiring link stops working on a date you pick, after a number of clicks, or both. Once either limit is reached, visitors see a page that says the link has expired.',
     steps: [
       'Sign in and open Links.',
-      'Select Settings for the link.',
+      'Select the gear (Settings) next to the link.',
       'Set an Expiry date and time, a Click limit, or both. The date uses your time zone.',
       'Select Save.'
     ],
