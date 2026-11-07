@@ -69,6 +69,16 @@ describe('GAPS', () => {
   it('admits no custom domains', () => {
     expect(has(/custom domain/i)).toBe(true);
   });
+  it('names the free profile subdomain beside the custom domain gap', () => {
+    expect(GAPS.some((g) => /custom domain/i.test(g) && /\.iksi\.app subdomain/i.test(g))).toBe(true);
+  });
+  it('lists the subdomain on the link-in-bio row and custom domains as not offered', () => {
+    const bio = FEATURES.find((f) => f.id === 'link-in-bio').iksi;
+    const domains = FEATURES.find((f) => f.id === 'custom-domains').iksi;
+    expect(bio.value).toMatch(/\.iksi\.app subdomain/);
+    expect(domains.offered).toBe(false);
+    expect(domains.value).toMatch(/\.iksi\.app subdomain/);
+  });
   it('admits no teams', () => {
     expect(has(/team/i)).toBe(true);
   });

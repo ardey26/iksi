@@ -120,7 +120,7 @@ export const FEATURES = [
     id: 'link-in-bio',
     label: 'Link-in-bio page',
     iksi: {
-      value: 'Profile at iksi.app/@handle where every row is an iksi short link',
+      value: 'Profile at iksi.app/@handle and a free handle.iksi.app subdomain, where every row is an iksi short link',
       offered: true,
       plan: 'free',
       feature: 'link-in-bio'
@@ -272,7 +272,7 @@ export const FEATURES = [
   {
     id: 'custom-domains',
     label: 'Custom domains',
-    iksi: { value: 'Not offered', offered: false },
+    iksi: { value: 'Not offered. Profiles get a free handle.iksi.app subdomain', offered: false },
     competitors: {
       bitly: { value: 'A custom domain needs Growth', gated: true, source: BITLY_PRICING },
       tinyurl: { value: 'Connecting your own domain needs Pro', gated: true, source: TINYURL_PRICING },
@@ -295,7 +295,7 @@ export const FEATURES = [
 
 /** Where iksi falls short. Every alternatives page shows these. */
 export const GAPS = [
-  'No custom domains. Every short link and profile lives on iksi.app.',
+  'No custom domains of your own. Profiles get a free handle.iksi.app subdomain, and short links live on iksi.app.',
   'No teams. Each account belongs to one person, with no shared workspace or roles.',
   'Click analytics show totals only: clicks per link, plus profile visits, clicks and clickthrough rate. iksi records country, device, browser and referrer host for each click, but the dashboard does not break clicks down by them.',
   'The API creates short links and one-time links and reads your profile. It cannot set routing rules, expiry or a password on a regular link, or read click stats.',
