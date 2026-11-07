@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { checkedCaption, formatDay } from '#lib/marketing/facts.js';
 import { render, cleanup } from '@testing-library/svelte';
 
 const state = vi.hoisted(() => ({ linkInBioPlan: 'free' }));
@@ -48,12 +49,23 @@ describe('ComparisonTable', () => {
     expect(cell(container, 'teams', 'iksi').textContent).not.toContain('Free');
   });
 
+  it('says the shared date once when every product was checked the same day', () => {
+    expect(checkedCaption(['iksi', 'linktree'], {
+      iksi: { name: 'iksi', verified: '2026-11-06' },
+      linktree: { name: 'Linktree', verified: '2026-11-06' }
+    })).toBe('Checked Nov 6, 2026.');
+  });
+  it('names each product when the checked dates differ', () => {
+    expect(checkedCaption(['iksi', 'linktree'], {
+      iksi: { name: 'iksi', verified: '2026-11-06' },
+      linktree: { name: 'Linktree', verified: '2026-10-01' }
+    })).toBe('iksi checked Nov 6, 2026. Linktree checked Oct 1, 2026.');
+  });
   it('shows the verified date for each product in the caption', () => {
     const { container } = render(ComparisonTable, { props: { columns: ['iksi', 'linktree', 'bitly'] } });
     const caption = container.querySelector('caption').textContent;
-    expect(PRODUCTS.linktree.verified).toBe('2026-11-06');
-    expect(caption).toContain('Linktree checked Nov 6, 2026');
-    expect(caption).toContain('Bitly checked Nov 6, 2026');
+    expect(caption.trim()).toBe(checkedCaption(['iksi', 'linktree', 'bitly']));
+    expect(caption).toContain(formatDay(PRODUCTS.linktree.verified));
   });
 
   it('renders Not listed with no link for a missing competitor value', () => {

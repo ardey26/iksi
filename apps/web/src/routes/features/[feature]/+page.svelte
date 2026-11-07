@@ -13,7 +13,7 @@
   $: facts = featureFacts(data.slug);
 </script>
 
-<Container width="wide">
+<Container width="wide" class="marketing">
   <PageHeader title={copy.label} description={copy.answer} />
 
   <Section title="What iksi offers" class="block">

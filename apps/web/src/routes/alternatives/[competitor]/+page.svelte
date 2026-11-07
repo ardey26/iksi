@@ -13,7 +13,7 @@
   $: copy = alternativeCopy(id);
 </script>
 
-<Container width="wide">
+<Container width="wide" class="marketing">
   <PageHeader title="iksi as a {name} alternative" description={copy.answer} />
 
   <Section title="How iksi compares with {name}" description="Each {name} value is for its free plan." class="block">

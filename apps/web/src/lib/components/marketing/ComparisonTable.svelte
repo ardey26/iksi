@@ -1,7 +1,7 @@
 <script>
   // One row per feature, one column per product. Values come from the facts
   // file only. Competitor cells link the vendor page the value was read from.
-  import { FEATURES, PRODUCTS, formatDay } from '#lib/marketing/facts.js';
+  import { FEATURES, PRODUCTS, checkedCaption } from '#lib/marketing/facts.js';
   import { Badge, Paper } from '#lib/ui/index.js';
 
   /** @type {import('#lib/marketing/facts.js').ProductId[]} */
@@ -9,7 +9,6 @@
   /** Link each competitor header to its /alternatives page. */
   export let linkHeaders = false;
 
-  const day = formatDay;
 
   /** @param {import('#lib/marketing/facts.js').IksiFact} fact */
   function iksiBadge(fact) {
@@ -25,7 +24,7 @@
     <!-- svelte-ignore a11y_no_redundant_roles -->
     <table role="table" style="--columns: {columns.length}">
       <caption class="t-caption">
-        {columns.map((id) => `${PRODUCTS[id].name} checked ${day(PRODUCTS[id].verified)}`).join('. ')}.
+        {checkedCaption(columns)}
       </caption>
       <thead role="rowgroup">
         <tr role="row">

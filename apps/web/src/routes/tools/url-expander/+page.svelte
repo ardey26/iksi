@@ -64,7 +64,7 @@
   $: summary = !result ? '' : result.stopped ? STOPS[result.stopped] ?? STOPS.error : `${hops.length} ${hops.length === 1 ? 'hop' : 'hops'}`;
 </script>
 
-<Container width="form">
+<Container width="form" class="marketing">
   <PageHeader title="URL expander" description={URL_EXPANDER.answer} />
 
   <Section class="block">

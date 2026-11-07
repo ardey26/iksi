@@ -444,3 +444,10 @@ textarea.ui-native {
 /* An icon button inside a field (show password, clear) sits flush with the
    box's right padding. */
 .ui-box > button[data-ui] { margin-right: -8px; }
+
+/* Marketing pages (/alternatives, /features, /tools): the same room under the
+   site header and above the footer as the privacy page. */
+.page-column.marketing {
+  padding-top: clamp(24px, 8vh, 80px);
+  padding-bottom: 96px;
+}

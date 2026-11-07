@@ -9,9 +9,11 @@
   const columns = ['iksi', ...competitorIds()];
 </script>
 
-<Container width="wide">
+<Container width="wide" class="marketing">
   <PageHeader title="Compare iksi with other link tools" description={copy.answer} />
-  <ComparisonTable {columns} linkHeaders />
+  <Section title="How iksi compares" description="Each value is for that tool's free plan." class="block">
+    <ComparisonTable {columns} linkHeaders />
+  </Section>
 
   <Section title="Where iksi falls short" class="block">
     <Paper>

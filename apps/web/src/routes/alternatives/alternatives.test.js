@@ -78,6 +78,16 @@ describe('hub page', () => {
   });
 });
 
+describe('hub layout', () => {
+  it('puts the table in its own section, so the gaps section gets section spacing', () => {
+    const { container } = render(Hub);
+    const sections = [...container.querySelectorAll('.page-column > section.ui-section')];
+    expect(sections.length).toBeGreaterThanOrEqual(2);
+    expect(sections[0].querySelector('table')).not.toBeNull();
+    expect(sections[1].textContent).toContain('Where iksi falls short');
+  });
+});
+
 describe('hub gaps', () => {
   it('shows where iksi falls short, every gap verbatim, after the table', () => {
     const { container } = render(Hub);

@@ -55,7 +55,7 @@
   }
 </script>
 
-<Container width="form">
+<Container width="form" class="marketing">
   <PageHeader title="QR code generator" description={QR_TOOL.answer} />
 
   <Section class="block">

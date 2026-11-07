@@ -322,3 +322,14 @@ export function formatDay(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
+
+/**
+ * The table's "checked" line. One shared date reads once ("Checked Nov 6,
+ * 2026."); differing dates name each product, so a long list never runs off
+ * the table's visible edge when they agree.
+ */
+export function checkedCaption(ids, products = PRODUCTS) {
+  const days = ids.map((id) => products[id].verified);
+  if (days.every((d) => d === days[0])) return `Checked ${formatDay(days[0])}.`;
+  return ids.map((id) => `${products[id].name} checked ${formatDay(products[id].verified)}.`).join(' ');
+}

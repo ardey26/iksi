@@ -40,7 +40,7 @@
   }
 </script>
 
-<Container width="form">
+<Container width="form" class="marketing">
   <PageHeader title="Link checker" description={LINK_CHECKER.answer} />
 
   <Section class="block">
