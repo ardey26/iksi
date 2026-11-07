@@ -27,33 +27,45 @@ const submit = async (value) => {
 };
 
 describe('/tools/qr-code', () => {
-  it('renders a canvas and a Download PNG button for a valid link', async () => {
+  it('shows nothing below the button until a code exists', () => {
     const { container } = render(QrPage);
-    expect(container.querySelector('canvas')).toBeNull();
-    await submit('example.com');
-    await waitFor(() => expect(container.querySelector('canvas')).not.toBeNull());
-    expect(qr.toCanvas.mock.calls[0][1]).toBe('https://example.com');
-    expect(screen.getByRole('link', { name: 'Download PNG' })).toBeTruthy();
-  });
-
-  it('shows an error and no canvas for an invalid link', async () => {
-    const { container } = render(QrPage);
-    await submit('not a url');
-    expect(container.querySelector('canvas')).toBeNull();
-    expect(qr.toCanvas).not.toHaveBeenCalled();
-    expect(container.querySelector('[id$="-error"]').textContent).toMatch(/valid link/i);
+    // No empty placeholder box either: the old reserved white square.
+    expect(container.querySelector('[data-qr-frame], [data-qr-box]')).toBeNull();
+    expect(container.querySelector('img')).toBeNull();
     expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
   });
 
-  it('keeps the canvas box the same size before and after generation', async () => {
+  it('shows the code as an image in a white frame, with Download PNG, for a valid link', async () => {
     const { container } = render(QrPage);
-    const box = container.querySelector('[data-qr-box]');
-    const before = box.getAttribute('style');
-    expect(before).toMatch(/width/);
     await submit('example.com');
-    await waitFor(() => expect(container.querySelector('canvas')).not.toBeNull());
-    expect(box.getAttribute('style')).toBe(before);
-    expect(container.querySelector('canvas').getAttribute('style')).toMatch(/width:\s*100%/);
+    const img = await waitFor(() => {
+      const el = container.querySelector('[data-qr-frame] img');
+      expect(el).not.toBeNull();
+      return el;
+    });
+    expect(qr.toDataURL.mock.calls[0][0]).toBe('https://example.com');
+    expect(img.getAttribute('src')).toBe('data:image/png;base64,AAAA');
+    expect(img.getAttribute('alt')).toBe('QR code for https://example.com');
+    expect(screen.getByRole('link', { name: 'Download PNG' })).toBeTruthy();
+  });
+
+  // A canvas sized by the library overflowed its box and cropped the code.
+  it('renders one image, never a canvas the library can resize', async () => {
+    const { container } = render(QrPage);
+    await submit('example.com');
+    await waitFor(() => expect(container.querySelector('[data-qr-frame] img')).not.toBeNull());
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(qr.toCanvas).not.toHaveBeenCalled();
+    expect(qr.toDataURL).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error and no code for an invalid link', async () => {
+    const { container } = render(QrPage);
+    await submit('not a url');
+    expect(container.querySelector('[data-qr-frame]')).toBeNull();
+    expect(qr.toDataURL).not.toHaveBeenCalled();
+    expect(container.querySelector('[id$="-error"]').textContent).toMatch(/valid link/i);
+    expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
   });
 
   it('downloads iksi-qr.png from toDataURL', async () => {
@@ -97,16 +109,16 @@ describe('/tools/qr-code', () => {
   it.each(['iksi.app/abc', 'https://www.iksi.app/abc'])('accepts iksi link %s', async (v) => {
     const { container } = render(QrPage);
     await submit(v);
-    await waitFor(() => expect(container.querySelector('canvas')).not.toBeNull());
-    expect(qr.toCanvas.mock.calls[0][1]).toBe(v.startsWith('http') ? v : 'https://' + v);
+    await waitFor(() => expect(container.querySelector('[data-qr-frame] img')).not.toBeNull());
+    expect(qr.toDataURL.mock.calls[0][0]).toBe(v.startsWith('http') ? v : 'https://' + v);
   });
 
   it('shows an error and resets when generation throws', async () => {
-    qr.toCanvas.mockRejectedValue(new Error('data too big'));
+    qr.toDataURL.mockRejectedValue(new Error('data too big'));
     const { container } = render(QrPage);
     await submit('example.com');
     await waitFor(() => expect(container.querySelector('[id$="-error"]').textContent).toMatch(/too long/i));
-    expect(container.querySelector('canvas')).toBeNull();
+    expect(container.querySelector('[data-qr-frame]')).toBeNull();
     expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
   });
 });

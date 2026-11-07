@@ -75,8 +75,8 @@
       </form>
     </Paper>
 
-    <!-- Reserves room for a typical chain, so a result fills space instead of pushing the page. -->
-    <div class="result" data-result aria-live="polite">
+    <!-- Empty until there is something to show; a result appears below the form, so nothing above moves. -->
+    <div class="result" class:filled={loading || result} data-result aria-live="polite">
       {#if loading}
         <Skeleton width="96px" height="18px" />
         <Paper padding="none">
@@ -134,12 +134,11 @@
 <style>
   form { display: grid; gap: 4px; }
   .result {
-    min-height: 240px;
-    margin-top: 16px;
     display: grid;
     align-content: start;
     gap: 8px;
   }
+  .result.filled { margin-top: 16px; }
   .summary { margin: 8px 0 0; color: var(--text-muted); }
   .summary:first-child { margin-top: 0; }
   .note { margin: 0; color: var(--text-muted); }

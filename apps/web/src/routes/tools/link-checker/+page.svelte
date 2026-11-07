@@ -49,8 +49,8 @@
         <Input label="Link" bind:value {error} placeholder="example.com" />
         <Button type="submit" variant="primary" full {loading}>Check link</Button>
       </form>
-      <!-- Holds its height before, during and after a check, so nothing below jumps. -->
-      <div class="result" data-result aria-live="polite">
+      <!-- Empty until there is something to show; a result appears below the form, so nothing above moves. -->
+      <div class="result" class:filled={loading || result} data-result aria-live="polite">
         {#if loading}
           <div class="line"><Skeleton width="72px" height="20px" /></div>
           <Skeleton width="100%" height="22px" />
@@ -79,12 +79,11 @@
 <style>
   form { display: grid; gap: 4px; }
   .result {
-    min-height: 80px;
-    margin-top: 16px;
     display: grid;
     align-content: start;
     gap: 8px;
   }
+  .result.filled { margin-top: 16px; }
   .line {
     display: flex;
     align-items: center;

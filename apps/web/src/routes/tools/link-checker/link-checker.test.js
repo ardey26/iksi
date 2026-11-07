@@ -29,6 +29,7 @@ describe('/tools/link-checker', () => {
     expect(JSON.parse(init.body)).toEqual({ url: 'example.com/login' });
     expect(container.querySelector('[data-result]').textContent).toMatch(/not a guarantee/i);
     expect(container.querySelector('[data-result]').textContent).toContain('example.com');
+    expect(container.querySelector('[data-result]').classList.contains('filled')).toBe(true);
   });
 
   it.each([
@@ -59,11 +60,14 @@ describe('/tools/link-checker', () => {
     expect(container.querySelector('[id$="-error"]').textContent).toMatch(/valid link/i);
   });
 
-  it('reserves the result area before there is a result', () => {
+  // No empty gap under the form: the live region is there for screen
+  // readers, but takes no room until it has something to say.
+  it('keeps an empty, unspaced live region before there is a result', () => {
     const { container } = render(Page);
     const area = container.querySelector('[data-result]');
-    expect(area).not.toBeNull();
     expect(area.getAttribute('aria-live')).toBe('polite');
+    expect(area.children).toHaveLength(0);
+    expect(area.classList.contains('filled')).toBe(false);
   });
 
   it('links to the shortener and the expander', () => {

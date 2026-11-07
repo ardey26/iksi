@@ -62,6 +62,7 @@ describe('/tools/url-expander', () => {
     const { container } = render(Page);
     await submit('bit.ly/abc');
     await waitFor(() => expect(container.querySelector('[data-result]').textContent).toMatch(text));
+    expect(container.querySelector('[data-result]').classList.contains('filled')).toBe(true);
     expect(screen.queryByRole('list', { name: 'Final destination' })).toBeNull();
   });
 
@@ -86,9 +87,14 @@ describe('/tools/url-expander', () => {
     expect(container.querySelector('[id$="-error"]').textContent).toMatch(/valid link/i);
   });
 
-  it('reserves the result area before there is a result', () => {
+  // No empty gap under the form: the live region is there for screen
+  // readers, but takes no room until it has something to say.
+  it('keeps an empty, unspaced live region before there is a result', () => {
     const { container } = render(Page);
-    expect(container.querySelector('[data-result]')).not.toBeNull();
+    const area = container.querySelector('[data-result]');
+    expect(area.getAttribute('aria-live')).toBe('polite');
+    expect(area.children).toHaveLength(0);
+    expect(area.classList.contains('filled')).toBe(false);
   });
 
   it('links to the shortener and the link checker', () => {
