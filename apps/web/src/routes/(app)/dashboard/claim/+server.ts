@@ -4,11 +4,13 @@ import { validateHandle } from '#lib/server/handles.js';
 import { verifyUserSession } from '#lib/server/user-auth.js';
 import { invalidateUserCache } from '#lib/server/user-cache.js';
 import { clientIpHash } from '#lib/server/client.js';
+import { rateLimitsOff } from '#lib/rateLimit.js';
 
 const CLAIM_LIMIT_PER_HOUR_IP = 3;
 const CLAIM_LIMIT_PER_HOUR_USER = 1;
 
 async function checkAndBump(key: string, max: number): Promise<boolean> {
+  if (rateLimitsOff()) return true;
   const { prisma } = await import('#lib/prisma.js');
   const now = new Date();
   const existing = await prisma.handleClaimRateLimit.findUnique({ where: { id: key } });

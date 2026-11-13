@@ -1,7 +1,17 @@
 // Database-backed rate limiter for horizontal scaling
 import { prisma } from '#lib/prisma.js';
 
+/**
+ * Rate limits are off under `vite dev`, so local work never trips them (or
+ * needs a database for them). On everywhere else: a production build has
+ * DEV false, and tests run in MODE 'test' so the limits stay under test.
+ */
+export function rateLimitsOff(env = import.meta.env) {
+	return env.DEV === true && env.MODE !== 'test';
+}
+
 export async function rateLimit(identifier, maxRequests = 10, windowMs = 60000) {
+	if (rateLimitsOff()) return { allowed: true, remaining: maxRequests };
 	const now = new Date();
 	const resetAt = new Date(now.getTime() + windowMs);
 

@@ -3,10 +3,12 @@ import type { RequestHandler } from './$types';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
 import { mediaUrl } from '#lib/server/media-url.js';
 import { clientIpHash } from '#lib/server/client.js';
+import { rateLimitsOff } from '#lib/rateLimit.js';
 
 const PUBLIC_LIMIT_PER_HOUR = 100;
 
 async function checkAndBump(key: string, max: number): Promise<boolean> {
+  if (rateLimitsOff()) return true;
   const { prisma } = await import('#lib/prisma.js');
   const now = new Date();
   const existing = await prisma.rateLimit.findUnique({ where: { id: key } });
