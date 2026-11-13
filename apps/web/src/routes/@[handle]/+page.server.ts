@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { waitUntil } from '@vercel/functions';
 import type { PageServerLoad } from './$types';
 import { decodeURL } from '#lib/server/crypto.js';
 import { normalizeAvatarUrl } from '#lib/server/avatar-url.js';
@@ -123,12 +124,10 @@ export const load: PageServerLoad = async ({ params, url, request, setHeaders })
   const payMethods = readPayMethods(p.payMethods);
   const pay = payMethods.length ? { label: payLabelOf(p.payLabel), methods: publicPayMethods(payMethods) } : null;
 
-  // Record the view before responding. Vercel's Node runtime freezes the
-  // function once the response is sent, so a fire-and-forget write here was
-  // silently dropped. With the function co-located with the DB this is one
-  // short round trip, and with edge caching it only runs on cache misses.
+  // Recorded past the response. A bare fire-and-forget was dropped when Vercel
+  // froze the function; waitUntil keeps it alive until the write lands.
   const { recordProfileView } = await import('#lib/server/tracking.js');
-  await recordProfileView(p.id, { request } as any);
+  waitUntil(recordProfileView(p.id, { request } as any));
 
   setHeaders({ 'cache-control': CACHE_CONTROL });
   await tagProfile(p.userId);
