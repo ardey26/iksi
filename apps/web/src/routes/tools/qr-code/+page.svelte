@@ -3,13 +3,10 @@
   import TextLink from '#lib/components/marketing/TextLink.svelte';
   import { addPrefix } from '#lib/utils/urlValidation.js';
   import { copyToClipboard } from '#lib/utils/clipboard.js';
+  import { dataUrlToBlob, iksiQR } from '#lib/qr.js';
   import { QR_TOOL } from '#lib/marketing/qr-tool.js';
   import { Button, Container, Input, PageHeader, Paper, Section, Sheet } from '#lib/ui/index.js';
 
-  // Same colors and margin as the QR in the app; plain codes need less
-  // error correction than the logo version, so M keeps them simpler to scan.
-  // One 1024px PNG is both what shows and what downloads, like the homepage QR.
-  const OPTIONS = { margin: 2, errorCorrectionLevel: 'M', width: 1024, color: { dark: '#0A0A0B', light: '#FFFFFF' } };
 
   let value = '';
   let error = '';
@@ -23,8 +20,7 @@
   // link otherwise, so the button always does something useful.
   async function copy() {
     try {
-      const blob = await (await fetch(src)).blob();
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': dataUrlToBlob(src) })]);
     } catch {
       if (!(await copyToClipboard(generated))) return;
     }
@@ -54,9 +50,9 @@
     }
     error = '';
     try {
-      // Loaded on first use, so the page itself ships without it.
-      const { default: QRCode } = await import('qrcode');
-      src = await QRCode.toDataURL(url, OPTIONS);
+      // The same code as the homepage, iksi mark in the middle. One 1024px
+      // PNG is both what shows and what downloads.
+      src = await iksiQR(url, 1024);
       generated = url;
       open = true;
     } catch {

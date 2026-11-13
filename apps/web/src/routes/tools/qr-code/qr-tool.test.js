@@ -50,7 +50,7 @@ describe('/tools/qr-code', () => {
   });
 
   // A canvas sized by the library overflowed its box and cropped the code.
-  it('renders one image, never a canvas the library can resize', async () => {
+  it('renders one image with the iksi mark, never a canvas the library can resize', async () => {
     render(QrPage);
     await submit('example.com');
     await waitFor(() => expect(document.querySelector('[data-qr-frame] img')).not.toBeNull());
@@ -141,7 +141,6 @@ describe('/tools/qr-code copy', () => {
     const write = vi.fn(async () => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write, writeText: vi.fn(async () => {}) } });
     vi.stubGlobal('ClipboardItem', class { constructor(items) { this.items = items; } });
-    vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => new Blob(['png'], { type: 'image/png' }) })));
     render(QrPage);
     await submit('example.com');
     await fireEvent.click(await screen.findByRole('button', { name: 'Copy image' }));
@@ -155,7 +154,6 @@ describe('/tools/qr-code copy', () => {
     vi.stubGlobal('isSecureContext', true);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write: vi.fn(async () => { throw new Error('no images'); }), writeText } });
     vi.stubGlobal('ClipboardItem', class {});
-    vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => new Blob(['png']) })));
     render(QrPage);
     await submit('example.com');
     await fireEvent.click(await screen.findByRole('button', { name: 'Copy image' }));
