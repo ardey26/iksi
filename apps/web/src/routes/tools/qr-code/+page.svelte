@@ -2,6 +2,7 @@
   import Faq from '#lib/components/marketing/Faq.svelte';
   import TextLink from '#lib/components/marketing/TextLink.svelte';
   import { addPrefix } from '#lib/utils/urlValidation.js';
+  import { copyToClipboard } from '#lib/utils/clipboard.js';
   import { QR_TOOL } from '#lib/marketing/qr-tool.js';
   import { Button, Container, Input, PageHeader, Paper, Section, Sheet } from '#lib/ui/index.js';
 
@@ -15,6 +16,22 @@
   let src = '';
   let generated = '';
   let open = false;
+  let copied = false;
+  let copiedTimer;
+
+  // The image itself where the browser can put one on the clipboard; the
+  // link otherwise, so the button always does something useful.
+  async function copy() {
+    try {
+      const blob = await (await fetch(src)).blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    } catch {
+      if (!(await copyToClipboard(generated))) return;
+    }
+    copied = true;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copied = false), 1500);
+  }
 
   // Unlike the shortener, iksi links are fine here: people shorten first, then paste.
   function parse(input) {
@@ -70,8 +87,16 @@
       </div>
     {/if}
     <svelte:fragment slot="footer">
+      <!-- Both labels hold the width, so Copied never resizes the button. -->
+      <Button icon={copied ? 'check' : 'copy'} on:click={copy}>
+        <span class="swap">
+          <span class:off={copied}>Copy image</span>
+          <span class:off={!copied} aria-hidden="true">Copied</span>
+        </span>
+      </Button>
       <Button variant="primary" href={src} download="iksi-qr.png">Download PNG</Button>
     </svelte:fragment>
+    <span class="sr-only" aria-live="polite">{copied ? 'QR code copied' : ''}</span>
   </Sheet>
 
   <Section title="Shorten it first" class="block">
@@ -91,6 +116,10 @@
     display: flex;
     justify-content: center;
   }
+  /* Two labels in one cell: the wider one sets the width. */
+  .swap { display: inline-grid; }
+  .swap > span { grid-area: 1 / 1; text-align: center; }
+  .swap > .off { visibility: hidden; }
   /* Same frame as the homepage QR: white in both themes, what cameras read best. */
   .qr-frame {
     display: flex;

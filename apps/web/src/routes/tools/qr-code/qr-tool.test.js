@@ -133,3 +133,32 @@ describe('/tools/qr-code result', () => {
     expect(container.querySelector('[data-qr-frame]')).toBeNull();
   });
 });
+
+describe('/tools/qr-code copy', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('copies the code as a PNG image and says so in place', async () => {
+    const write = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write, writeText: vi.fn(async () => {}) } });
+    vi.stubGlobal('ClipboardItem', class { constructor(items) { this.items = items; } });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => new Blob(['png'], { type: 'image/png' }) })));
+    render(QrPage);
+    await submit('example.com');
+    await fireEvent.click(await screen.findByRole('button', { name: 'Copy image' }));
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    expect(Object.keys(write.mock.calls[0][0][0].items)).toEqual(['image/png']);
+    expect(await screen.findByText('QR code copied')).toBeInTheDocument();
+  });
+
+  it('copies the link when the browser cannot copy images', async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal('isSecureContext', true);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write: vi.fn(async () => { throw new Error('no images'); }), writeText } });
+    vi.stubGlobal('ClipboardItem', class {});
+    vi.stubGlobal('fetch', vi.fn(async () => ({ blob: async () => new Blob(['png']) })));
+    render(QrPage);
+    await submit('example.com');
+    await fireEvent.click(await screen.findByRole('button', { name: 'Copy image' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://example.com'));
+  });
+});
