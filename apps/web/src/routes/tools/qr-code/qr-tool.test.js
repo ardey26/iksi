@@ -28,18 +28,18 @@ const submit = async (value) => {
 
 describe('/tools/qr-code', () => {
   it('shows nothing below the button until a code exists', () => {
-    const { container } = render(QrPage);
+    render(QrPage);
     // No empty placeholder box either: the old reserved white square.
-    expect(container.querySelector('[data-qr-frame], [data-qr-box]')).toBeNull();
-    expect(container.querySelector('img')).toBeNull();
+    expect(document.querySelector('[data-qr-frame], [data-qr-box]')).toBeNull();
+    expect(document.querySelector('img')).toBeNull();
     expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
   });
 
   it('shows the code as an image in a white frame, with Download PNG, for a valid link', async () => {
-    const { container } = render(QrPage);
+    render(QrPage);
     await submit('example.com');
     const img = await waitFor(() => {
-      const el = container.querySelector('[data-qr-frame] img');
+      const el = document.querySelector('[data-qr-frame] img');
       expect(el).not.toBeNull();
       return el;
     });
@@ -51,20 +51,20 @@ describe('/tools/qr-code', () => {
 
   // A canvas sized by the library overflowed its box and cropped the code.
   it('renders one image, never a canvas the library can resize', async () => {
-    const { container } = render(QrPage);
+    render(QrPage);
     await submit('example.com');
-    await waitFor(() => expect(container.querySelector('[data-qr-frame] img')).not.toBeNull());
-    expect(container.querySelector('canvas')).toBeNull();
+    await waitFor(() => expect(document.querySelector('[data-qr-frame] img')).not.toBeNull());
+    expect(document.querySelector('canvas')).toBeNull();
     expect(qr.toCanvas).not.toHaveBeenCalled();
     expect(qr.toDataURL).toHaveBeenCalledTimes(1);
   });
 
   it('shows an error and no code for an invalid link', async () => {
-    const { container } = render(QrPage);
+    render(QrPage);
     await submit('not a url');
-    expect(container.querySelector('[data-qr-frame]')).toBeNull();
+    expect(document.querySelector('[data-qr-frame]')).toBeNull();
     expect(qr.toDataURL).not.toHaveBeenCalled();
-    expect(container.querySelector('[id$="-error"]').textContent).toMatch(/valid link/i);
+    expect(document.querySelector('[id$="-error"]').textContent).toMatch(/valid link/i);
     expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
   });
 
@@ -107,18 +107,29 @@ describe('/tools/qr-code', () => {
   });
 
   it.each(['iksi.app/abc', 'https://www.iksi.app/abc'])('accepts iksi link %s', async (v) => {
-    const { container } = render(QrPage);
+    render(QrPage);
     await submit(v);
-    await waitFor(() => expect(container.querySelector('[data-qr-frame] img')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-qr-frame] img')).not.toBeNull());
     expect(qr.toDataURL.mock.calls[0][0]).toBe(v.startsWith('http') ? v : 'https://' + v);
   });
 
   it('shows an error and resets when generation throws', async () => {
     qr.toDataURL.mockRejectedValue(new Error('data too big'));
+    render(QrPage);
+    await submit('example.com');
+    await waitFor(() => expect(document.querySelector('[id$="-error"]').textContent).toMatch(/too long/i));
+    expect(document.querySelector('[data-qr-frame]')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
+  });
+});
+
+describe('/tools/qr-code result', () => {
+  it('opens the code in a sheet over the page, not below the form', async () => {
     const { container } = render(QrPage);
     await submit('example.com');
-    await waitFor(() => expect(container.querySelector('[id$="-error"]').textContent).toMatch(/too long/i));
+    const dialog = await screen.findByRole('dialog', { name: 'QR code' });
+    expect(dialog.querySelector('[data-qr-frame] img')).not.toBeNull();
+    // The page under the sheet holds no code: it never grows.
     expect(container.querySelector('[data-qr-frame]')).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Download PNG' })).toBeNull();
   });
 });
