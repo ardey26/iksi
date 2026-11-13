@@ -15,6 +15,8 @@
   /** Equal-width segments that fill the container. */
   export let full = false;
   export let disabled = false;
+  /** track: pill track (default) | tabs: plain labels, a 2px underline marks the active one */
+  export let variant = 'track';
 
   const dispatch = createEventDispatcher();
   let buttons = [];
@@ -81,6 +83,7 @@
 
 <div
   class="seg {size}"
+  class:tabs={variant === 'tabs'}
   class:full
   class:measured
   class:ready
@@ -187,6 +190,37 @@
   .opt:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  /* Tabs: no track, the labels sit on the canvas and the thumb is a 2px
+     underline that slides between them. */
+  .tabs {
+    --pad: 0px;
+    gap: 20px;
+    background-color: transparent;
+    border-radius: 0;
+  }
+  .tabs .opt {
+    padding: 0;
+    font-size: 15px;
+    line-height: 22px;
+    border-radius: 0;
+  }
+  .tabs .thumb {
+    top: auto;
+    bottom: 0;
+    height: 2px;
+    border-radius: 1px;
+    background-color: var(--text-primary);
+    box-shadow: none;
+  }
+  .tabs:not(.measured) .opt[aria-checked='true'] {
+    background-color: transparent;
+    box-shadow: inset 0 -2px 0 var(--text-primary);
+  }
+  .tabs .opt:focus-visible {
+    outline-offset: 2px;
+    border-radius: 4px;
   }
   /* Phones: every option is a 44px target. The default track grows by its
      padding so each option is drawn 44px tall; the small one keeps its drawn

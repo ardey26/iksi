@@ -64,10 +64,13 @@
   <div class="site">
     <!-- In the page flow, so nothing scrolls under it at any width. -->
     <header class="site-header">
-      <a href={home} class="brand" data-ui aria-label="iksi home">
-        <BrandMark size={20} />
-        <span class="brand-name">iksi</span>
-      </a>
+      <!-- On the home page the wordmark is the brand, so the header's would say it twice. -->
+      {#if routed !== '/'}
+        <a href={home} class="brand" data-ui aria-label="iksi home">
+          <BrandMark size={20} />
+          <span class="brand-name">iksi</span>
+        </a>
+      {/if}
 
       <div class="controls">
         <ThemeToggle />
@@ -134,6 +137,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Stays right when the header has no brand (the home page). */
+    margin-left: auto;
   }
   /* Phones: 44px targets need their 6px of air on either side. */
   @media (max-width: 639px) {

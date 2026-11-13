@@ -22,10 +22,10 @@ describe('ShortenedURL', () => {
       const { container } = render(ShortenedURL, { props: { shortURL: 'AbC' } });
       const swap = container.querySelector('.actions .swap');
       const [idle, done] = swap.children;
-      expect(idle).toHaveTextContent('Copy link');
+      expect(idle).toHaveTextContent(/^Copy$/);
       expect(done).toHaveTextContent('Copied');
       expect(done).toHaveClass('off');
-      await fireEvent.click(screen.getByRole('button', { name: /Copy link/ }));
+      await fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
       await waitFor(() => expect(idle).toHaveClass('off'));
       // Same nodes, both still laid out; only which one is visible changed.
       expect(swap.children).toHaveLength(2);

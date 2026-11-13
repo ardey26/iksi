@@ -1,6 +1,5 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import QRCode from 'qrcode';
   import { Button, IconButton, Sheet } from '#lib/ui/index.js';
   import { copyToClipboard } from '../utils/clipboard.js';
 
@@ -23,9 +22,8 @@
     ? `${location.protocol}//${location.host}/${shortURL}`
     : shortURL;
 
-  $: displayURL = typeof window !== 'undefined'
-    ? `${location.hostname.replace('www.', '')}/${shortURL}`
-    : shortURL;
+  const displayHost = typeof window !== 'undefined' ? location.hostname.replace('www.', '') : 'iksi.app';
+  $: displayURL = `${displayHost}/${shortURL}`;
 
   const copy = async () => {
     const success = await copyToClipboard(fullURL);
@@ -43,6 +41,8 @@
   });
 
   const renderQRCanvas = async (size) => {
+    // Loaded on first use: most visitors never open the QR, so the home page doesn't ship it.
+    const { default: QRCode } = await import('qrcode');
     const canvas = document.createElement('canvas');
     await QRCode.toCanvas(canvas, fullURL, {
       width: size,
@@ -122,33 +122,32 @@
   };
 </script>
 
-<!-- Row for row, the same heights as the form it replaces (mode row, field,
-     message line, buttons), so the swap moves nothing: Copy link lands where
+<!-- Row for row, the same heights as the form it replaces (mode row, bar,
+     toggle row, message line), so the swap moves nothing: Copy lands where
      Shorten was and Shorten another where Custom name was. -->
 <div class="result">
-  <div class="head">
-    <p class="t-label t-muted">Your short link</p>
-    <!-- Reserved line: the note never moves what is under it. -->
-    <p class="note t-caption">{note}</p>
-  </div>
+  <p class="head">Your short link</p>
 
-  <div class="url-row">
-    <a class="url t-mono" href={fullURL} target="_blank" rel="noopener" title={fullURL}>{displayURL}</a>
+  <div class="pill-bar actions">
+    <a class="url t-mono" href={fullURL} target="_blank" rel="noopener" title={fullURL}
+      ><span class="host">{displayHost}/</span>{shortURL}</a
+    >
     <IconButton icon="qr" label="Show QR code" aria-haspopup="dialog" on:click={openQR} />
-  </div>
-
-  <div class="line" aria-hidden="true"></div>
-
-  <div class="actions">
-    <Button variant="ghost" size="sm" class="flush" on:click={reset}>Shorten another</Button>
     <!-- Both labels hold the width, so Copied never resizes the button. -->
-    <Button variant="primary" icon={copied ? 'check' : 'copy'} on:click={copy}>
+    <Button variant="primary" size="lg" on:click={copy}>
       <span class="swap">
-        <span class:off={copied}>Copy link</span>
+        <span class:off={copied}>Copy</span>
         <span class:off={!copied} aria-hidden="true">Copied</span>
       </span>
     </Button>
   </div>
+
+  <div class="pill-toggle">
+    <Button variant="ghost" size="sm" on:click={reset}>Shorten another</Button>
+  </div>
+
+  <!-- The one line at the end, e.g. that a one-time link opens once. -->
+  <p class="note pill-status">{note}</p>
   <span class="sr-only" aria-live="polite">{copied ? 'Link copied' : ''}</span>
 </div>
 
@@ -173,69 +172,47 @@
 </Sheet>
 
 <style>
-  /* Mirrors the home form: 32px mode row and 16px under it, a field, a 20px
-     message line, the buttons. */
+  /* Mirrors the home form: the 32px mode row and 16px under it, the bar,
+     the toggle row, the message line. */
   .result {
     display: flex;
     flex-direction: column;
-    gap: 12px;
   }
   .head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     height: var(--control-sm);
-    margin-bottom: 4px;
-  }
-  .head p { margin: 0; }
-  .line {
-    height: 20px;
-    margin: -4px 0;
+    margin: 0 0 16px;
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
   }
   .note {
-    min-width: 0;
     overflow: hidden;
     color: var(--text-muted);
-    text-align: right;
     white-space: nowrap;
     text-overflow: ellipsis;
-  }
-  .url-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: var(--control);
-    padding: 0 3px 0 12px;
-    background-color: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-control);
   }
   .url {
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    font-size: 18px;
-    line-height: 26px;
+    font-size: 17px;
+    line-height: 24px;
     font-weight: 500;
-    color: var(--accent);
+    color: var(--text-primary);
     white-space: nowrap;
     text-overflow: ellipsis;
     text-decoration: none;
   }
+  .host { color: var(--text-faint); }
   .url:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
   .url:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
-  .actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .actions :global(.flush) { margin-left: -10px; }
   /* Two labels in one cell: the wider one sets the width. */
   .swap { display: inline-grid; }
   .swap > span { grid-area: 1 / 1; text-align: center; }

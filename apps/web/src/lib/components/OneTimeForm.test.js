@@ -69,11 +69,11 @@ describe('OneTimeForm', () => {
     const password = screen.getByLabelText('Password');
     const url = screen.getByLabelText('URL to share once');
     const create = screen.getByRole('button', { name: 'Create one-time link' });
-    // Field, then the toggle, then the password: what opens comes after
-    // everything the user was looking at, so none of it moves.
-    expect(url.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The bar (field and Create), then the toggle, then the password: what
+    // opens comes after everything the user was looking at, so none of it moves.
+    expect(url.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(create.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(toggle.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(password.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector('.note').compareDocumentPosition(password) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 

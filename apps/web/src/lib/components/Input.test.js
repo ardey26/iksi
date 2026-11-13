@@ -15,7 +15,7 @@ describe('Input Component', () => {
   it('should render main input with placeholder', () => {
     render(Input, { props: defaultProps });
 
-    expect(screen.getByPlaceholderText('Paste a link')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Paste a long link')).toBeInTheDocument();
   });
 
   it('should show submit button when valid URL is provided', () => {
@@ -37,7 +37,7 @@ describe('Input Component', () => {
 
     // Alias input is only rendered when toggle is open
     expect(screen.queryByPlaceholderText('your-name')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Custom name' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Want a custom one?' })).toBeInTheDocument();
   });
 
   it('should show loading spinner during submission', () => {
@@ -60,7 +60,7 @@ describe('Input Component', () => {
     const props = { ...defaultProps, showCustomAlias: true };
     render(Input, { props });
 
-    const urlInput = screen.getByPlaceholderText('Paste a link');
+    const urlInput = screen.getByPlaceholderText('Paste a long link');
     const aliasInput = screen.getByPlaceholderText('your-name');
 
     expect(urlInput).toHaveAttribute('type', 'text');
@@ -102,26 +102,26 @@ describe('Input Component', () => {
 
   it('opens the custom name under the button row and keeps the toggle in place', async () => {
     const { container } = render(Input, { props: defaultProps });
-    const toggle = screen.getByRole('button', { name: 'Custom name' });
+    const toggle = screen.getByRole('button', { name: 'Want a custom one?' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await fireEvent.click(toggle);
-    expect(screen.getByRole('button', { name: 'Custom name' })).toBe(toggle);
+    expect(screen.getByRole('button', { name: 'Want a custom one?' })).toBe(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const url = screen.getByLabelText('URL to shorten');
     const alias = screen.getByPlaceholderText('your-name');
     const status = container.querySelector('#shorten-status');
-    // URL field, message line, toggle, then the name: everything above the
-    // name stays where it was.
-    expect(url.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(status.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The bar (field and Shorten), the toggle, the name, then the message
+    // line: everything above the name stays where it was.
+    const shorten = screen.getByLabelText('Shorten link');
+    expect(url.compareDocumentPosition(shorten) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(shorten.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(toggle.compareDocumentPosition(alias) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Tab reaches the name before Shorten.
-    expect(alias.compareDocumentPosition(screen.getByLabelText('Shorten link')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(alias.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('closes the custom name from the same toggle and drops the name', async () => {
     render(Input, { props: { ...defaultProps, showCustomAlias: true, customURL: 'sale' } });
-    const toggle = screen.getByRole('button', { name: 'Custom name' });
+    const toggle = screen.getByRole('button', { name: 'Want a custom one?' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');

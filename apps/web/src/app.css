@@ -451,3 +451,88 @@ textarea.ui-native {
   padding-top: clamp(24px, 8vh, 80px);
   padding-bottom: 96px;
 }
+
+/* Home hero pill bar (DESIGN.md › Home hero): the tool's one field, with its
+   primary action inside the same pill. A sub bar (custom name, password)
+   opens under it at a smaller height. Shared by the home forms and the
+   result that replaces them, so every state is drawn from the same parts. */
+.pill-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+  padding: 0 8px 0 24px;
+  background-color: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+.pill-bar:focus-within { border-color: var(--border-focus); }
+.pill-bar[data-invalid] { border-color: var(--error); }
+.pill-bar.sub {
+  height: 56px;
+  padding: 0 24px;
+}
+/* Text content: a rounded box, the count and the action on its last row. */
+.pill-bar.box {
+  flex-direction: column;
+  align-items: stretch;
+  height: auto;
+  padding: 18px 8px 8px 24px;
+  border-radius: 28px;
+}
+.pill-native {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 17px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 0;
+  outline: none;
+  caret-color: var(--accent);
+}
+.pill-native:focus { outline: none; box-shadow: none; }
+.pill-native::placeholder { color: var(--text-faint); opacity: 1; }
+.pill-bar.sub .pill-native { font-size: 16px; }
+textarea.pill-native {
+  display: block;
+  height: 96px;
+  padding-right: 16px;
+  line-height: 24px;
+  resize: none;
+}
+/* Under the bar: one 44px row for its toggle (Custom name, Add a password,
+   Shorten another). The ghost button's text lines up with the field's. */
+.pill-toggle {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding-left: 12px;
+}
+.pill-toggle .disclose .ui-icon { transition: transform var(--duration-normal) var(--ease-out); }
+.pill-toggle .disclose[aria-expanded='true'] .ui-icon { transform: rotate(45deg); }
+/* The one message line at the end, in line with the field's text. */
+.pill-status {
+  min-height: 20px;
+  margin: 0;
+  padding: 0 24px;
+  font-size: 13px;
+  line-height: 20px;
+}
+@media (max-width: 639px) {
+  .pill-bar { padding-left: 20px; }
+  .pill-bar.sub { padding: 0 20px; }
+  .pill-bar.box { padding-left: 20px; }
+  .pill-status { padding: 0 20px; }
+  .pill-toggle { padding-left: 8px; }
+  .pill-native { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pill-bar,
+  .pill-toggle .disclose .ui-icon { transition: none; }
+}

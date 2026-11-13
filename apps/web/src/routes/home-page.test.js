@@ -44,7 +44,7 @@ describe('home page scoped suggestion', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(Home);
     await fireEvent.input(screen.getByLabelText('URL to shorten'), { target: { value: 'example.com/sale' } });
-    await fireEvent.click(screen.getByRole('button', { name: 'Custom name' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Want a custom one?' }));
     await fireEvent.input(screen.getByLabelText('Custom name'), { target: { value: 'sale' } });
     await fireEvent.click(screen.getByLabelText('Shorten link'));
   }
@@ -117,19 +117,22 @@ describe('home page without layout shift', () => {
     expect(container.querySelector('.tool')).toBe(tool);
     expect(tool.querySelectorAll('form')).toHaveLength(1);
     expect(screen.getByLabelText('URL to shorten')).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'Custom name' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Want a custom one?' })).toHaveAttribute('aria-expanded', 'false');
   });
 });
 
 describe('home page layout', () => {
-  // The first screen is only the tool; the SEO copy and the one H1 sit
-  // below the fold, visible (never visually hidden).
-  it('has only the tool in the hero', () => {
+  // The first screen is only the tool and the wordmark; the SEO copy and the
+  // one H1 sit below the fold, visible (never visually hidden).
+  it('has only the tool and the wordmark in the hero', () => {
     const { container } = render(Home);
     const hero = container.querySelector('section.hero');
     expect(hero).toHaveAccessibleName('Shorten a link');
     expect(hero.querySelector('h1, h2, p.lede')).toBeNull();
-    expect(hero.querySelectorAll('.paper')).toHaveLength(1);
+    // A poster, not a card: the tool sits on the canvas.
+    expect(hero.querySelector('.paper')).toBeNull();
+    expect(hero.querySelectorAll('.tool')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'iksi home' })).toHaveAttribute('href', '/');
     expect(hero.querySelector('[role="radiogroup"][aria-label="Link type"]')).not.toBeNull();
     expect(hero.querySelector('input')).not.toBeNull();
     expect(screen.queryByText('Make long links short.')).toBeNull();
@@ -142,6 +145,34 @@ describe('home page layout', () => {
     expect(h1s[0]).toHaveTextContent('A free URL shortener that stays out of the way');
     expect(h1s[0].closest('section')).toBe(container.querySelector('section.hero').nextElementSibling);
     expect(h1s[0].closest('.sr-only, .visually-hidden')).toBeNull();
+  });
+
+  it('joins the links of the wordmark once a link is made', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ shortURL: 'AbCdEf' }))));
+    const { container } = render(Home);
+    const mark = container.querySelector('.wordmark');
+    expect(mark).not.toHaveClass('joined');
+    await fireEvent.input(screen.getByLabelText('URL to shorten'), { target: { value: 'example.com/a' } });
+    await fireEvent.click(screen.getByLabelText('Shorten link'));
+    await screen.findByText(/AbCdEf/);
+    expect(mark).toHaveClass('joined');
+    await fireEvent.click(screen.getByRole('button', { name: 'Shorten another' }));
+    expect(mark).not.toHaveClass('joined');
+  });
+
+  it('shows the wait on the wordmark and the button until the link is made', async () => {
+    let answer;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => (answer = resolve))));
+    const { container } = render(Home);
+    const mark = container.querySelector('.wordmark');
+    await fireEvent.input(screen.getByLabelText('URL to shorten'), { target: { value: 'example.com/a' } });
+    await fireEvent.click(screen.getByLabelText('Shorten link'));
+    expect(mark).toHaveClass('loading');
+    expect(screen.getByLabelText('Shorten link')).toHaveAttribute('aria-busy', 'true');
+    answer(new Response(JSON.stringify({ shortURL: 'AbCdEf' })));
+    await screen.findByText(/AbCdEf/);
+    expect(mark).not.toHaveClass('loading');
+    expect(mark).toHaveClass('joined');
   });
 
   it('keeps the result inside the hero', async () => {

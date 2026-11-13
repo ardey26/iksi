@@ -1,7 +1,8 @@
 <script>
   import { Input, ShortenedURL } from '#lib/components/index.js';
   import OneTimeForm from '#lib/components/OneTimeForm.svelte';
-  import { Button, Container, Paper, Segmented } from '#lib/ui/index.js';
+  import Wordmark from '#lib/components/Wordmark.svelte';
+  import { Button, Container, Segmented } from '#lib/ui/index.js';
   import { motion } from '#lib/ui/motion.js';
   import { onMount, tick } from 'svelte';
   import { fade } from 'svelte/transition';
@@ -33,6 +34,7 @@
   let kind = 'url';
   let oneTimeRef;
   let createdOneTime = false;
+  let oneTimeLoading = false;
 
   const focusLater = async (get) => {
     await tick();
@@ -140,41 +142,43 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <div class="home">
-  <!-- The first screen is the tool and nothing else. The words are below the fold. -->
+  <!-- The first screen is the tool and the wordmark, nothing else. The words
+       are below the fold. See DESIGN.md › Home hero. -->
   <section class="hero" aria-label="Shorten a link">
-    <Container width="form" class="hero-inner">
-      <Paper class="tool">
-        {#if shortURL}
-          <div in:fade={swapIn()}>
-            <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
-          </div>
-        {:else}
-          <div in:fade={swapIn()}>
-            <div class="mode">
-              <Segmented size="sm" label="Link type" bind:value={mode} options={MODES} on:change={switchMode} />
-              {#if mode === 'oneTime'}
-                <Segmented size="sm" label="Content" bind:value={kind} options={KINDS} />
-              {/if}
-            </div>
+    <div class="tool">
+      {#if shortURL}
+        <div in:fade={swapIn()}>
+          <ShortenedURL {shortURL} note={createdOneTime ? 'One-time link. It opens once.' : ''} on:reset={reset} />
+        </div>
+      {:else}
+        <div in:fade={swapIn()}>
+          <div class="mode">
+            <Segmented size="sm" variant="tabs" label="Link type" bind:value={mode} options={MODES} on:change={switchMode} />
             {#if mode === 'oneTime'}
-              <OneTimeForm bind:inputRef={oneTimeRef} {kind} on:created={oneTimeCreated} />
-            {:else}
-              <Input
-                bind:longURL
-                bind:customURL
-                bind:showCustomAlias
-                bind:inputRef
-                {isLoading}
-                {error}
-                {handleSubmit}
-                {suggestion}
-                onSuggestion={() => handleSubmit(suggestion)}
-              />
+              <Segmented size="sm" label="Content" bind:value={kind} options={KINDS} />
             {/if}
           </div>
-        {/if}
-      </Paper>
-    </Container>
+          {#if mode === 'oneTime'}
+            <OneTimeForm bind:inputRef={oneTimeRef} bind:isLoading={oneTimeLoading} {kind} on:created={oneTimeCreated} />
+          {:else}
+            <Input
+              bind:longURL
+              bind:customURL
+              bind:showCustomAlias
+              bind:inputRef
+              {isLoading}
+              {error}
+              {handleSubmit}
+              {suggestion}
+              onSuggestion={() => handleSubmit(suggestion)}
+            />
+          {/if}
+        </div>
+      {/if}
+    </div>
+    <div class="wordmark-row">
+      <Wordmark joined={!!shortURL} loading={isLoading || oneTimeLoading} />
+    </div>
   </section>
 
   <!-- For people who scroll and for search engines. Hairline grid, after Composer. -->
@@ -183,8 +187,8 @@
       <div class="about">
         <h1 id="about-heading" class="about-title">A free URL shortener that stays out of the way</h1>
         <p class="about-body">
-          Paste a long link, get a short one, no signup needed. No interstitial ads on your links, and
-          redirects served from the edge. <em>Iksi</em> is Tagalog for "short".
+          Paste a long link, get a short one, no signup needed. No interstitial ads on your links.
+          <em>Iksi</em> is Tagalog for "short".
         </p>
       </div>
     </Container>
@@ -221,38 +225,45 @@
     flex: 1;
   }
 
-  /* Exactly the first screen under the site header, so the next band's
+  /* At least the first screen under the site header, so the next band's
      hairline sits at the fold. svh: the screen with the browser bars shown.
-     The tool's top edge is pinned, never centered by flex: centering would
-     move everything each time the card grows (custom name, one-time,
-     messages). The offset is worked out once, in CSS, from the card's
-     resting height, so on first paint it sits where centering put it, and
-     every change after that grows downward. */
+     A poster: the tool at the top (top right on wide screens), the wordmark
+     standing on the fold, cropped by it. Both are in the flow, so they never
+     overlap: when the tool grows (custom name, text, password) on a short
+     screen, the hero grows and the wordmark moves down, below the change.
+     The tool's top edge is fixed, so every change grows downward. */
   .hero {
-    /* The resting card: mode row 32 + 16, field, 12 + 20 + 12 message line,
-       buttons (84 + 2 controls), plus padding and border: 214 at every width
-       (phones trade 4px of padding for 44px controls). Only the first-paint
-       position depends on it; if it drifts, nothing moves, it is just a few
-       px off center. */
-    --tool-rest: 214px;
-    --hero-pad: 24px;
-    --hero-pad-end: calc(24px + var(--site-header) / 2);
-    display: flex;
-    align-items: flex-start;
+    --wordmark-size: 40vw;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
     min-height: calc(100vh - var(--site-header));
     min-height: calc(100svh - var(--site-header));
-    padding-bottom: var(--hero-pad-end);
-    padding-top: max(var(--hero-pad), calc(var(--hero-pad) + (100vh - var(--site-header) - var(--hero-pad) - var(--hero-pad-end) - var(--tool-rest)) / 2));
-    padding-top: max(var(--hero-pad), calc(var(--hero-pad) + (100svh - var(--site-header) - var(--hero-pad) - var(--hero-pad-end) - var(--tool-rest)) / 2));
+    padding: 16px var(--gutter) 0;
+    overflow: hidden;
   }
-  :global(.hero-inner) {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  :global(.tool) {
+  .tool {
     width: 100%;
     max-width: 560px;
+  }
+  .wordmark-row {
+    display: flex;
+    align-items: flex-end;
+    padding-top: 32px;
+  }
+  /* Wide: the tool in a right column, the wordmark filling the left one.
+     Its size is the smallest of 40vw, what the left column holds (the word
+     is 1.55em wide) and 60svh, so it never runs under the tool. */
+  @media (min-width: 1024px) {
+    .hero {
+      --wordmark-size: min(40vw, calc((100vw - 2 * var(--gutter) - 560px - 48px) / 1.55), 60svh);
+      grid-template-columns: minmax(0, 1fr) 560px;
+      grid-template-rows: minmax(0, 1fr);
+      column-gap: 48px;
+      padding-top: 72px;
+    }
+    .tool { grid-column: 2; grid-row: 1; align-self: start; }
+    .wordmark-row { grid-column: 1; grid-row: 1; padding-top: 0; }
   }
   /* Mode switch left; in one-time mode, URL or Text on the right of the same
      row. Too narrow for both, the labels truncate rather than wrap, so the

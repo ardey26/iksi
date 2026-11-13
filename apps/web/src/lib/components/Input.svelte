@@ -1,10 +1,10 @@
 <script>
   // The home shortener form: paste a link, optionally pick a name, shorten.
-  // Nothing above a change moves: the custom name opens below the button row,
-  // the button that opens it stays where it is, and messages use one
-  // reserved line. See DESIGN.md (No layout shifts).
+  // Nothing above a change moves: the custom name opens below its toggle,
+  // the toggle stays where it is, and messages use the one line at the end.
+  // See DESIGN.md (Home hero, No layout shifts).
   import { slide } from 'svelte/transition';
-  import { Button, IconButton, Input as Field } from '#lib/ui/index.js';
+  import { Button, IconButton } from '#lib/ui/index.js';
   import { DISCLOSE_MS, easeOut, motion } from '#lib/ui/motion.js';
   import { isValidURL, isValidAlias } from '../utils/urlValidation.js';
 
@@ -71,34 +71,78 @@
   };
 </script>
 
+<!-- The bar holds the field and Shorten. Under it, the toggle row stays put
+     and the custom name opens below it; the one message line comes last. -->
 <form class="shorten" on:submit|preventDefault={submit} novalidate>
-  <div class:shake={shakeInput} class:invalid={urlInvalid}>
-    <Field
+  <div class="pill-bar" class:shake={shakeInput} data-invalid={urlInvalid || undefined}>
+    <label class="sr-only" for="url">URL to shorten</label>
+    <input
       bind:value={longURL}
-      bind:element={inputRef}
+      bind:this={inputRef}
+      data-ui
+      class="pill-native"
+      type="text"
       id="url"
       name="url"
-      label="URL to shorten"
-      hideLabel
-      reserve={false}
-      icon="link"
-      placeholder="Paste a link"
+      placeholder="Paste a long link"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
       aria-invalid={urlInvalid || undefined}
       aria-describedby="shorten-status"
-    >
-      <svelte:fragment slot="end">
-        {#if longURL && !isLoading}
-          <IconButton icon="x" label="Clear input" on:click={clearInput} />
-        {/if}
-      </svelte:fragment>
-    </Field>
+    />
+    {#if longURL && !isLoading}
+      <IconButton icon="x" label="Clear input" on:click={clearInput} />
+    {/if}
+    <Button type="submit" variant="primary" size="lg" disabled={!longURL} loading={isLoading} aria-label="Shorten link">
+      Shorten
+    </Button>
   </div>
 
-  <!-- One reserved line for every message, so nothing below it moves. -->
-  <div class="status" id="shorten-status" aria-live="polite">
+  <div class="pill-toggle">
+    <Button
+      variant="ghost"
+      size="sm"
+      icon="plus"
+      class="disclose"
+      aria-expanded={showCustomAlias}
+      aria-controls="alias-panel"
+      on:click={toggleAlias}
+    >
+      Want a custom one?
+    </Button>
+  </div>
+  <div id="alias-panel">
+    {#if showCustomAlias}
+      <!-- A fixed prefix, so the name reads as the final URL. -->
+      <div class="alias" class:shake={shakeAlias} transition:slide={motion({ duration: DISCLOSE_MS, easing: easeOut })}>
+        <label class="sr-only" for="alias">Custom name</label>
+        <div class="pill-bar sub" data-invalid={aliasInvalid || undefined}>
+          <span class="prefix t-mono" aria-hidden="true">iksi.app/</span>
+          <input
+            bind:value={customURL}
+            bind:this={aliasRef}
+            data-ui
+            class="pill-native t-mono"
+            type="text"
+            id="alias"
+            name="alias"
+            placeholder="your-name"
+            maxlength="50"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            aria-invalid={aliasInvalid || undefined}
+            aria-describedby="shorten-status"
+          />
+        </div>
+      </div>
+    {/if}
+  </div>
+
+  <!-- One line for every message, after everything it could describe. -->
+  <div class="pill-status" id="shorten-status" aria-live="polite">
     {#if suggestion && onSuggestion}
       <!-- The lead gives way first, so the offer is always whole on one line. -->
       <p class="error offer">
@@ -114,79 +158,25 @@
       <p class="error">Use letters, numbers, _ or - in the name</p>
     {/if}
   </div>
-
-  <!-- The toggle stays put and the name opens under this row. DOM order is
-       toggle, name, submit, so Tab reaches the name before Shorten. -->
-  <div class="actions">
-    <Button
-      variant="ghost"
-      size="sm"
-      icon="plus"
-      class="flush disclose"
-      aria-expanded={showCustomAlias}
-      aria-controls="alias-panel"
-      on:click={toggleAlias}
-    >
-      Custom name
-    </Button>
-    <div class="panel" id="alias-panel">
-      {#if showCustomAlias}
-        <!-- Kit field box with a fixed prefix, so the name reads as the final URL. -->
-        <div class="alias" class:shake={shakeAlias} transition:slide={motion({ duration: DISCLOSE_MS, easing: easeOut })}>
-          <label class="sr-only" for="alias">Custom name</label>
-          <div class="ui-box" data-invalid={aliasInvalid || undefined}>
-            <span class="ui-affix t-mono prefix" aria-hidden="true">iksi.app/</span>
-            <input
-              bind:value={customURL}
-              bind:this={aliasRef}
-              data-ui
-              class="ui-native"
-              type="text"
-              id="alias"
-              name="alias"
-              placeholder="your-name"
-              maxlength="50"
-              autocomplete="off"
-              autocapitalize="off"
-              autocorrect="off"
-              spellcheck="false"
-              aria-invalid={aliasInvalid || undefined}
-              aria-describedby="shorten-status"
-            />
-          </div>
-        </div>
-      {/if}
-    </div>
-    <div class="submit">
-      <Button type="submit" variant="primary" disabled={!longURL} loading={isLoading} aria-label="Shorten link">
-        Shorten
-      </Button>
-    </div>
-  </div>
 </form>
 
 <style>
   .shorten {
     display: flex;
     flex-direction: column;
-    gap: 12px;
   }
-  .invalid :global(.ui-box) { border-color: var(--error); }
-  .invalid :global(.ui-box:focus-within) { box-shadow: 0 0 0 1px var(--error); }
   .prefix {
-    margin-right: -8px;
-    font-size: 14px;
+    flex: none;
+    font-size: 16px;
+    color: var(--text-faint);
   }
-  /* Exactly one line, whatever it says, so the buttons never move. */
-  .status {
-    height: 20px;
-    margin: -4px 0 -4px;
-  }
+  /* The gap lives inside the sliding element, so it opens with it. */
+  .alias { padding-bottom: 12px; }
+  /* The name reads as the end of the URL: mono like its prefix. */
+  .alias .pill-native { font-family: var(--font-mono); }
   .error {
     margin: 0;
     overflow: hidden;
-    font-size: 13px;
-    line-height: 20px;
     color: var(--error);
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -217,29 +207,5 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 2px;
-  }
-  /* Row one: toggle left, submit right. Row two: the custom name, which
-     slides open downward, so nothing in row one moves. */
-  .actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'toggle submit'
-      'panel panel';
-    align-items: center;
-    column-gap: 12px;
-  }
-  .actions > :global(.disclose) { grid-area: toggle; justify-self: start; }
-  .submit { grid-area: submit; }
-  .panel { grid-area: panel; }
-  /* The gap lives inside the sliding element, so it opens with it. */
-  .alias { padding-top: 12px; }
-  /* A ghost button's text lines up with the field edge above it. */
-  .actions :global(.flush) { margin-left: -10px; }
-  /* Open, the plus turns into a close mark. */
-  .actions :global(.disclose .ui-icon) { transition: transform var(--duration-normal) var(--ease-out); }
-  .actions :global(.disclose[aria-expanded='true'] .ui-icon) { transform: rotate(45deg); }
-  @media (prefers-reduced-motion: reduce) {
-    .actions :global(.disclose .ui-icon) { transition: none; }
   }
 </style>
