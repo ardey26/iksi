@@ -129,6 +129,8 @@ describe('/tools/qr-code result', () => {
     await submit('example.com');
     const dialog = await screen.findByRole('dialog', { name: 'QR code' });
     expect(dialog.querySelector('[data-qr-frame] img')).not.toBeNull();
+    // A dialog in the middle, as tall as the code: not a full-height side sheet.
+    expect(dialog).toHaveClass('center');
     // The page under the sheet holds no code: it never grows.
     expect(container.querySelector('[data-qr-frame]')).toBeNull();
   });

@@ -37,8 +37,14 @@
   export let title;
   /** One line under the title. */
   export let description = '';
-  /** Side-sheet width from 768px. */
+  /** Side-sheet width from 768px; the dialog's width when centered. */
   export let width = 440;
+  /**
+   * 'side': bottom sheet on phones, side sheet from 768px (full height).
+   * 'center': a dialog in the middle at every width, only as tall as its
+   * content. For small, fixed content such as a QR code.
+   */
+  export let placement = 'side';
   /** Selector inside the sheet to focus on open. Default: the sheet itself. */
   export let initialFocus = undefined;
   export let id = uid('sheet');
@@ -100,6 +106,14 @@
 
   function slide(node, { out = false } = {}) {
     if (reducedMotion()) return { duration: 0 };
+    if (placement === 'center') {
+      // Fades and settles from 98% in place; it keeps its centring translate.
+      return {
+        duration: out ? 150 : 200,
+        easing: cubicOut,
+        css: (t) => `opacity: ${t}; transform: translate(-50%, -50%) scale(${0.98 + 0.02 * t});`
+      };
+    }
     const side = window.matchMedia('(min-width: 768px)').matches;
     return {
       duration: out ? 180 : 220,
@@ -126,6 +140,7 @@
     <div
       bind:this={panel}
       class="panel"
+      class:center={placement === 'center'}
       style="--sheet-width: {width}px;"
       role="dialog"
       aria-modal="true"
@@ -245,5 +260,23 @@
       min-width: 0;
     }
     .panel .foot > :global(:not([data-ui])) { flex: 0 1 auto; }
+  }
+
+  /* Centered: a dialog at every width, as tall as its content. Two classes,
+     so these win over the side sheet's rules at every breakpoint. */
+  .panel.center {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    width: min(var(--sheet-width), calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sheet);
+    transform: translate(-50%, -50%);
+  }
+  .panel.center .foot {
+    padding-bottom: 16px;
+    border-radius: 0 0 var(--radius-sheet) var(--radius-sheet);
   }
 </style>

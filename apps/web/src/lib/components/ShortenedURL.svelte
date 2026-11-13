@@ -1,8 +1,8 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { Button, IconButton, Sheet } from '#lib/ui/index.js';
+  import { Button, IconButton } from '#lib/ui/index.js';
+  import QRDialog from './QRDialog.svelte';
   import { copyToClipboard } from '../utils/clipboard.js';
-  import { dataUrlToBlob, iksiQR } from '#lib/qr.js';
 
   export let shortURL;
   /** Shown in the reserved line above the result, e.g. for a one-time link. */
@@ -11,10 +11,9 @@
   const dispatch = createEventDispatcher();
 
   let copied = false;
+  // The QR library loads only when this opens (inside QRDialog): most
+  // visitors never open the QR, so the home page doesn't ship it.
   let showQR = false;
-  let qrLoading = false;
-  let qrCopied = false;
-  let qrDataUrl = '';
 
   $: fullURL = typeof window !== 'undefined'
     ? `${location.protocol}//${location.host}/${shortURL}`
@@ -29,51 +28,6 @@
       copied = true;
       setTimeout(() => { copied = false; }, 1500);
     }
-  };
-
-  // The QR library loads on first use (inside iksiQR): most visitors never
-  // open the QR, so the home page doesn't ship it.
-  const openQR = async () => {
-    showQR = true;
-    if (qrDataUrl) return;
-    qrLoading = true;
-    try {
-      qrDataUrl = await iksiQR(fullURL, 560);
-    } finally {
-      qrLoading = false;
-    }
-  };
-
-  const closeQR = () => {
-    showQR = false;
-    qrCopied = false;
-  };
-
-  const qrPngBlob = async () => dataUrlToBlob(await iksiQR(fullURL, 1024));
-
-  const copyQR = async () => {
-    try {
-      const blob = await qrPngBlob();
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      qrCopied = true;
-      setTimeout(() => { qrCopied = false; }, 1500);
-    } catch {
-      await copyToClipboard(fullURL);
-      qrCopied = true;
-      setTimeout(() => { qrCopied = false; }, 1500);
-    }
-  };
-
-  const downloadQR = async () => {
-    const blob = await qrPngBlob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `iksi-${shortURL}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const reset = () => {
@@ -91,7 +45,7 @@
     <a class="url t-mono" href={fullURL} target="_blank" rel="noopener" title={fullURL}
       ><span class="host">{displayHost}/</span>{shortURL}</a
     >
-    <IconButton icon="qr" label="Show QR code" aria-haspopup="dialog" on:click={openQR} />
+    <IconButton icon="qr" label="Show QR code" aria-haspopup="dialog" on:click={() => (showQR = true)} />
     <!-- Both labels hold the width, so Copied never resizes the button. -->
     <Button variant="primary" size="lg" on:click={copy}>
       <span class="swap">
@@ -110,25 +64,7 @@
   <span class="sr-only" aria-live="polite">{copied ? 'Link copied' : ''}</span>
 </div>
 
-<Sheet bind:open={showQR} title="QR code" description={displayURL} width={400} on:close={closeQR}>
-  <div class="qr">
-    <div class="qr-frame">
-      <!-- Reserved at full size; the image renders in a few milliseconds. -->
-      {#if !qrLoading && qrDataUrl}
-        <img src={qrDataUrl} alt="QR code for {displayURL}" width="280" height="280" />
-      {/if}
-    </div>
-  </div>
-  <svelte:fragment slot="footer">
-    <Button icon={qrCopied ? 'check' : 'copy'} disabled={!qrDataUrl} on:click={copyQR}>
-      <span class="swap">
-        <span class:off={qrCopied}>Copy image</span>
-        <span class:off={!qrCopied} aria-hidden="true">Copied</span>
-      </span>
-    </Button>
-    <Button variant="primary" disabled={!qrDataUrl} on:click={downloadQR}>Download PNG</Button>
-  </svelte:fragment>
-</Sheet>
+<QRDialog bind:open={showQR} url={fullURL} description={displayURL} filename="iksi-{shortURL}.png" />
 
 <style>
   /* Mirrors the home form: the 32px mode row and 16px under it, the bar,
@@ -177,27 +113,4 @@
   .swap > span { grid-area: 1 / 1; text-align: center; }
   .swap > .off { visibility: hidden; }
 
-  .qr {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-  }
-  /* White in both themes: what cameras read most reliably. */
-  .qr-frame {
-    display: flex;
-    width: 100%;
-    max-width: 296px;
-    aspect-ratio: 1;
-    padding: 8px;
-    background-color: #FFFFFF;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-paper);
-  }
-  .qr-frame img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
-  }
 </style>
