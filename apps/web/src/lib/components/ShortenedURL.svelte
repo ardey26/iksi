@@ -2,15 +2,13 @@
   import { createEventDispatcher } from 'svelte';
   import { Button, IconButton, Sheet } from '#lib/ui/index.js';
   import { copyToClipboard } from '../utils/clipboard.js';
+  import { dataUrlToBlob, iksiQR } from '#lib/qr.js';
 
   export let shortURL;
   /** Shown in the reserved line above the result, e.g. for a one-time link. */
   export let note = '';
 
   const dispatch = createEventDispatcher();
-
-  // iksi brand mark — black disc, white chain links. Used as the center logo on the QR.
-  const IKSI_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#0A0A0B"/><g transform="rotate(-45 12 12)" stroke="#FFFFFF" stroke-width="1.6" fill="none" stroke-linecap="round"><rect x="4" y="10" width="7" height="4" rx="2"/><rect x="13" y="10" width="7" height="4" rx="2"/></g></svg>`;
 
   let copied = false;
   let showQR = false;
@@ -33,50 +31,14 @@
     }
   };
 
-  const loadLogo = () => new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = `data:image/svg+xml;base64,${btoa(IKSI_LOGO_SVG)}`;
-  });
-
-  const renderQRCanvas = async (size) => {
-    // Loaded on first use: most visitors never open the QR, so the home page doesn't ship it.
-    const { default: QRCode } = await import('qrcode');
-    const canvas = document.createElement('canvas');
-    await QRCode.toCanvas(canvas, fullURL, {
-      width: size,
-      margin: 2,
-      errorCorrectionLevel: 'H',
-      color: { dark: '#0A0A0B', light: '#FFFFFF' }
-    });
-    const ctx = canvas.getContext('2d');
-    const logo = await loadLogo();
-    const logoSize = Math.round(canvas.width * 0.22);
-    const halo = Math.max(6, Math.round(canvas.width * 0.015));
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const x = cx - logoSize / 2;
-    const y = cy - logoSize / 2;
-    // Clear the modules behind the logo as a circle so it sits on a clean halo
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(cx, cy, logoSize / 2 + halo, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.drawImage(logo, x, y, logoSize, logoSize);
-    return canvas;
-  };
-
-  const canvasToBlob = (canvas) =>
-    new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
-
+  // The QR library loads on first use (inside iksiQR): most visitors never
+  // open the QR, so the home page doesn't ship it.
   const openQR = async () => {
     showQR = true;
     if (qrDataUrl) return;
     qrLoading = true;
     try {
-      const canvas = await renderQRCanvas(560);
-      qrDataUrl = canvas.toDataURL('image/png');
+      qrDataUrl = await iksiQR(fullURL, 560);
     } finally {
       qrLoading = false;
     }
@@ -87,10 +49,7 @@
     qrCopied = false;
   };
 
-  const qrPngBlob = async () => {
-    const canvas = await renderQRCanvas(1024);
-    return await canvasToBlob(canvas);
-  };
+  const qrPngBlob = async () => dataUrlToBlob(await iksiQR(fullURL, 1024));
 
   const copyQR = async () => {
     try {
@@ -98,7 +57,7 @@
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       qrCopied = true;
       setTimeout(() => { qrCopied = false; }, 1500);
-    } catch (err) {
+    } catch {
       await copyToClipboard(fullURL);
       qrCopied = true;
       setTimeout(() => { qrCopied = false; }, 1500);
